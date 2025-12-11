@@ -1,0 +1,31 @@
+# Environment variables
+.env*
+*.env
+
+# Virtual environments
+env/
+venv/
+.venv/
+
+# Certificates
+.pem*
+*.pem
+.crt*
+*.crt
+
+# Python
+__pycache__/
+*.py[cod]
+*.sqlite3
+
+# Django stuff
+staticfiles/
+media/
+
+# IDE / Editor files
+.idea/
+.vscode/
+*.log
+
+# Other
+.tar

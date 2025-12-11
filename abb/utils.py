@@ -1,0 +1,228 @@
+import uuid
+import re
+from django.conf import settings
+from django.utils import timezone
+from django.db.models import Q
+from django.db.models.query import QuerySet
+
+import logging
+logger = logging.getLogger(__name__)
+
+translation_manager = settings.TRANSLATION_MANAGER
+
+
+def hex_uuid():
+    """ Docstring """
+    return uuid.uuid4().hex
+
+
+def get_default_notification_status_3():
+    return [False, False, False]
+
+
+def get_user_company(user):
+    try:
+        user_company = user.company_set.all().first()
+        return user_company
+
+    except Exception as e:
+        logger.error(f'EU759 get_user_company. Error: {e}')
+        return None
+
+
+def get_company_manager(company):
+    manager = None
+    level_group_name = 'level_manager'
+
+    try:
+        company_users = company.user.all()
+        for user in company_users:
+            if user.groups.filter(name__exact=level_group_name).exists():
+                manager = user
+
+        return manager
+    except Exception as e:
+        logger.error(f'EU683 get_company_manager. Error: {e}')
+        pass
+
+    return manager
+
+
+def get_company_users(user):
+    try:
+        user_company = get_user_company(user)
+
+        if user_company is not None:
+            com_users = user_company.user.all()
+            return com_users
+        else:
+            return []
+    except Exception as e:
+        logger.error(f'EU571 get_company_users. Error: {e}')
+        return []
+
+
+def get_company_current_membership(user_or_company_instance=None):
+    """
+    Returns a tuple: (company_current_active_subscription, current_subscription_plan_str)
+    Example:
+        company_current_active_subscription, current_subscription_plan_str = get_company_current_membership(request.user)
+    """
+    today_date = timezone.now().date()
+
+    current_subscription_plan_str = 'basic'
+    company_current_active_subscription = None
+    user_company = None
+
+    if user_or_company_instance is not None:
+        # print('U544',)
+
+        try:
+            if (hasattr(user_or_company_instance, 'first_name') and not user_or_company_instance.is_anonymous) \
+                    or hasattr(user_or_company_instance, 'logo'):
+                # print('U550',)
+
+                if hasattr(user_or_company_instance, 'logo'):
+                    user_company = user_or_company_instance
+                else:
+                    user_company = get_user_company(user_or_company_instance)
+
+                # print('U552', user_company)
+
+                if user_company is not None:
+                    user_company_subsriptions = user_company.company_subscriptions.all()
+
+                    # print('UT554',)
+
+                    company_current_active_subscription = user_company_subsriptions.select_related('plan').filter(
+                        Q(active=True) & Q(date_start__date__lte=today_date) & Q(date_exp__date__gte=today_date)).first()
+
+                    if company_current_active_subscription:
+                        current_subscription_plan_str = company_current_active_subscription.plan.membership_type
+
+                        # print('UT558', current_subscription_plan_str)
+
+        except Exception as e:
+            logger.error(
+                f'EU483 get_company_current_membership, error: {e}')
+            pass
+
+    return company_current_active_subscription, current_subscription_plan_str
+
+
+def get_is_company_subscription_active(user_company):
+
+    try:
+
+        company_current_active_subscription, current_subscription_plan_str = get_company_current_membership(
+            user_company)
+
+        if company_current_active_subscription is not None:
+            return company_current_active_subscription.active
+
+        return False  # no active subscription found
+    except Exception as e:
+        logger.error(f"EU587 Error in get_is_company_subscription_active: {e}")
+        return False
+
+
+def get_contact_type_default():
+    """ Docstring """
+    return ['client']
+
+
+def assign_new_num(items_list_qs, num):
+    """
+    Generate next sequential number based on the numeric suffix of the field `num`.
+    Example: existing numbers ['CMR1', 'CMR2'] → returns 'CMR3'
+    """
+    items_list = []
+
+    try:
+        # Extract numeric parts
+        for item in items_list_qs.iterator():
+            value = getattr(item, num, None)
+            if not value:
+                continue
+            match = re.search(r'\d+$', str(value))
+            if match:
+                items_list.append(int(match.group()))
+
+        if items_list:
+            max_int = max(items_list)
+            # Get last object's non-numeric prefix
+            query = {f"{num}__endswith": str(max_int)}
+            last_obj = items_list_qs.filter(Q(**query)).first()
+            if last_obj:
+                last_value = getattr(last_obj, num, "")
+                prefix = last_value[0:-len(str(max_int))] if last_value else ""
+                new_num = f"{prefix}{max_int + 1}"
+            else:
+                # fallback, just use number
+                new_num = str(max_int + 1)
+        else:
+            # No existing numbers → start with 1
+            new_num = "1"
+
+        return new_num
+
+    except Exception as e:
+        logger.error(f"EU433 Error in assign_new_num: {e}")
+        return "1"  # fallback
+
+
+def _totalsEntries(entriesList):
+    piecesList = []
+    weightList = []
+    volumeList = []
+    ldmList = []
+    if isinstance(entriesList, QuerySet):
+
+        if any(entry.action == 'loading' for entry in entriesList):
+            for entry in entriesList:
+                if entry.action == 'loading':
+                    for item in entry.entrydetails.all():
+                        piecesList.append(float(item.pieces or 0))
+                        weightList.append(float(item.weight or 0))
+                        volumeList.append(float(item.volume or 0))
+                        ldmList.append(float(item.ldm or 0))
+        else:
+            for entry in entriesList:
+                if entry.action == 'unloading':
+                    for item in entry.entrydetails.all():
+                        piecesList.append(float(item.pieces or 0))
+                        weightList.append(float(item.weight or 0))
+                        volumeList.append(float(item.volume or 0))
+                        ldmList.append(float(item.ldm or 0))
+    else:
+        return [0, 0, 0, 0]
+    return [sum(piecesList), sum(weightList), sum(volumeList), sum(ldmList)]
+
+
+def tripLoadsTotals(trip):
+    piecesArray = []
+    weightArray = []
+    volumeArray = []
+    ldmArray = []
+    if trip and trip.trip_loads:
+        for load in trip.trip_loads.all():
+            arrayTotalsLoadings = _totalsEntries(load.entry_loads.all())
+            piecesArray.append(arrayTotalsLoadings[0])
+            weightArray.append(arrayTotalsLoadings[1])
+            volumeArray.append(arrayTotalsLoadings[2])
+            ldmArray.append(arrayTotalsLoadings[3])
+    return [
+        round(sum(piecesArray)),
+        round(sum(weightArray), 2),
+        round(sum(volumeArray), 2),
+        round(sum(ldmArray), 2)
+    ]
+
+
+def default_notification_status_3():
+    return [False, False, False]
+
+
+def upload_to(instance, filename):
+    company_prefix = instance.company.uf[:5] if instance.company else 'GEN'
+    return f"umma-uploads/{company_prefix}/{filename}"

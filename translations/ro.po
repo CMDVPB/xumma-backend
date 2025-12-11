@@ -1,0 +1,12 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "documents_from_spv_received"
+msgstr "Documentele din SPV au fost primite"
+
+msgid "error_in_invoice"
+msgstr "Factura {num} trimisa in SPV are erori"
+
+msgid "error_to_send_inv_to_spv_try_again"
+msgstr "A aparut o eroare la trimiterea facturii numarul {num} in SPV. Te rugam sa incerci s-o trimiti din nou."

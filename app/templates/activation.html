@@ -1,0 +1,89 @@
+{% block subject %}
+{% if lang == 'ro' %}
+Activare cont - {{ site_name }}
+{% elif lang == 'ru' %}
+Активация аккаунта - {{ site_name }}
+{% else %}
+Account activation - {{ site_name }}
+{% endif %}
+{% endblock subject %}
+
+
+{% block html_body %}
+{% if lang == 'ro' %}
+<p>Primesti acest e-mail deoarece trebuie sa finalizezi procesul de activare.</p>
+<br>
+<p>Te rog sa accesezi urmatorul link pentru a activa contul:</p>
+<br>
+<!--[if !mso]><!-->
+<p><a style="display: inline-block; background-color: #757ce8; border-radius: 25px; color: white; padding: 14px 25px; text-align: center; text-decoration: none; width: 240px; min-width: 240px;"
+    href="{{ protocol }}://{{ domain }}/{{ url|safe }}">Click aici</a></p>
+<!--<![endif]-->
+<!--[if mso]>
+<table role="presentation" width="240" cellspacing="0" cellpadding="0" style="width: 240px; background-color: #757ce8; border-radius: 25px; padding: 14px 25px; text-align: center; text-decoration: none;">
+    <tr>
+        <td>
+            <a style="color: white;" href="{{ protocol }}://{{ domain }}/{{ url|safe }}">
+                Click aici
+            </a>
+        </td>
+    </tr>
+</table>
+<![endif]-->
+<br>
+<p>Iti multumim ca folosesti serviciul nostru!</p>
+<br>
+<p>Echipa {{ site_name }}</p>
+
+{% elif lang == 'ru' %}
+<p>Вы получили это письмо, потому что вам нужно завершить процесс активации.</p>
+<br>
+<p>Для активации учетной записи перейдите на следующую страницу:</p>
+<br>
+<!--[if !mso]><!-->
+<p><a style="display: inline-block; background-color: #757ce8; border-radius: 25px; color: white; padding: 14px 25px; text-align: center; text-decoration: none; min-width: 240px;"
+    href="{{ protocol }}://{{ domain }}/{{ url|safe }}">Кликните сюда</a></p>
+<!--<![endif]-->
+<!--[if mso]>
+<table role="presentation" width="240" cellspacing="0" cellpadding="0" style="width: 240px; background-color: #757ce8; border-radius: 25px; padding: 14px 25px; text-align: center; text-decoration: none;">
+    <tr>
+        <td>
+            <a style="color: white;" href="{{ protocol }}://{{ domain }}/{{ url|safe }}">
+                Кликните сюда
+            </a>
+        </td>
+    </tr>
+</table>
+<![endif]-->
+<br>
+<p>Спасибо за использование нашего сервиса!</p>
+<br>
+<p>Команда {{ site_name }}</p>
+
+{% else %}
+<p>You're receiving this email because you need to finish activation process.</p>
+<br>
+<p>Please go to the following page to activate account:</p>
+<br>
+<!--[if !mso]><!-->
+<p><a style="display: inline-block; background-color: #757ce8; border-radius: 25px; color: white; padding: 14px 25px; text-align: center; text-decoration: none; min-width: 240px;"
+    href="{{ protocol }}://{{ domain }}/{{ url|safe }}">Click here</a></p>
+    <!--<![endif]-->
+<!--[if mso]>
+<table role="presentation" width="240" cellspacing="0" cellpadding="0" style="width: 240px; background-color: #757ce8; border-radius: 25px; padding: 14px 25px; text-align: center; text-decoration: none;">
+    <tr>
+        <td>
+            <a style="color: white;" href="{{ protocol }}://{{ domain }}/{{ url|safe }}">
+                Click here
+            </a>
+        </td>
+    </tr>
+</table>
+<![endif]-->
+<br>
+<p>Thanks for using our service!</p>
+<br>
+
+<p>Team {{ site_name }}</p>
+{% endif %}
+{% endblock html_body %}

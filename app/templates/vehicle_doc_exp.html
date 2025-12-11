@@ -1,0 +1,30 @@
+{% if lang == 'ro' %}
+<p>Auto - <b>{{ variable_2 }}</b></p>
+
+<p>Primesti acest e-mail deoarece ai documente care expira pe data de <b>{{ date }}</b>.</p>
+<p>Iti multumim ca folosesti serviciul nostru!</p>
+
+<br>
+<p>Echipa <b>{{ site_name }}</b></p>
+
+{% elif lang == 'ru' %}
+<p>Авто - <b>{{ variable_2 }}</b></p>
+
+<p>Вы получили это письмо, потому есть документы срок действия которых истекает <b>{{ date }}</b>.</p>
+<p>Спасибо за использование нашего сервиса!</p>
+
+<br>
+<p>Команда <b>{{ site_name }}</b></p>
+
+
+{% else %}
+<p>Vehicle- <b>{{ variable_2 }}</b></p>
+
+<p>You're receiving this email because vehicle has documents which expire <b>{{ date }}</b>.</p>
+<p>Thanks for using our service!</p>
+
+<br>
+<p>Team <b>{{ site_name }}</b></p>
+
+
+{% endif %}
