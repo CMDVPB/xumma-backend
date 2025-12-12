@@ -136,6 +136,8 @@ class Load(models.Model):
     customer_notes = models.CharField(max_length=200, blank=True, null=True)
     load_add_ons = ArrayField(models.CharField(
         max_length=20, null=True, blank=True), blank=True, null=True, size=3)
+    load_stages = ArrayField(models.CharField(
+        max_length=20), blank=True, null=True, size=3)
     doc_lang = models.CharField(choices=DOC_LANG_CHOICES,
                                 max_length=2, blank=True, null=True, default='ro')
     is_locked = models.BooleanField(default=False)
