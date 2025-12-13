@@ -77,6 +77,7 @@ INSTALLED_APPS = [
     'bch',
     'dff',
     'dtt',
+    'eff',
     'eml',
 ]
 
@@ -295,7 +296,7 @@ DJOSER = {
 
     'PASSWORD_RESET_CONFIRM_URL': 'api/password/reset/confirm/{uid}/{token}',
     'USERNAME_RESET_CONFIRM_URL': 'api/username/reset/confirm/{uid}/{token}',
-    'ACTIVATION_URL': 'api/activate/{uid}/{token}',
+    'ACTIVATION_URL': 'auth/jwt/api/activate/{uid}/{token}',
     'SEND_ACTIVATION_EMAIL': True,
     'PASSWORD_CHANGED_EMAIL_CONFIRMATION': True,
     'SET_PASSWORD_RETYPE': True,

@@ -171,6 +171,39 @@ def assign_new_num(items_list_qs, num):
         return "1"  # fallback
 
 
+def assign_new_num_inv(items_list_qs, num):
+    """Assigns the next number with zero-padding based on the highest existing number."""
+
+    items_list = []
+    new_num = ''
+
+    try:
+        for item in items_list_qs.iterator():
+            # Capture optional prefix (letters) and numeric part
+            match = re.match(r'(\D*)(\d+)$', str(getattr(item, num)))
+            if match:
+                prefix, number_part = match.groups()
+                items_list.append((prefix, int(number_part), len(number_part)))
+
+        if not items_list:
+            return '001'  # Default value if no records are found
+
+        # Find the highest numeric value
+        prefix, max_int, num_length = max(items_list, key=lambda x: x[1])
+
+        # Generate the next number with leading zeros preserved
+        next_number_str = str(max_int + 1).zfill(num_length)
+
+        # Construct new number (with or without prefix)
+        new_num = f'{prefix}{next_number_str}'
+
+        return new_num
+
+    except Exception as e:
+        logger.error(f"EU433 Error in assign_new_num: {e}")
+        return new_num
+
+
 def _totalsEntries(entriesList):
     piecesList = []
     weightList = []
@@ -226,3 +259,40 @@ def default_notification_status_3():
 def upload_to(instance, filename):
     company_prefix = instance.company.uf[:5] if instance.company else 'GEN'
     return f"umma-uploads/{company_prefix}/{filename}"
+
+
+def get_default_empty_strings_20():
+    return ['0']*20
+
+
+def company_latest_exp_date_subscription(user_company):
+    today_date = timezone.now().date()
+
+    try:
+        company_latest_exp_date_subscription = user_company.company_subscriptions.\
+            filter(
+                Q(date_start__date__lte=today_date) &
+                Q(date_exp__date__gte=today_date) &
+                Q(active=True)
+            ).select_related("plan").order_by('-date_exp').first()
+
+        if not company_latest_exp_date_subscription:
+            return ""
+
+        subscription_type = company_latest_exp_date_subscription.plan.membership_type
+        subscription_exp_date = company_latest_exp_date_subscription.date_exp
+
+        year = subscription_exp_date.year
+        month = subscription_exp_date.month
+        day = subscription_exp_date.day
+
+        return_string = f'{subscription_type}_{year}-{month}-{day}'
+
+        # print('U068', return_string)
+
+        return return_string
+
+    except Exception as e:
+        logger.error(
+            f'ERRORLOG793 company_latest_exp_date_subscription. Error: {e}')
+        return ""

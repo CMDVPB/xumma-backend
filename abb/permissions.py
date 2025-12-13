@@ -7,6 +7,43 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+class IsManager(permissions.BasePermission):
+    """
+    Custom permission to only allow only Managers to perform an action.
+    """
+
+    def has_permission(self, request, view):
+        # print('6400', request.user)
+        return request.user and request.user.groups.filter(name='level_manager').exists()
+
+
+class isTeamLeader(permissions.BasePermission):
+
+    def has_team_leader_permission(self, request, view, obj):
+        if request.user.is_team_leader:
+            return True
+        return False
+
+
+class AddNewUserPermission(permissions.BasePermission):
+
+    def has_permission(self, request, view):
+        level_group_name = 'level_manager'
+
+        try:
+            logger.info(
+                f'PS2400 AddNewUserPermission, manager: {request.user}')
+
+            if not request.user.groups.filter(name__exact=level_group_name).exists():
+                return False
+            else:
+                return True
+
+        except Exception as e:
+            logger.error(f'EP445 AddNewUserPermission, error: {e}')
+            return False
+
+
 class HasGroupPermission(permissions.BasePermission):
     """
     Ensure user is in required groups.
@@ -126,7 +163,7 @@ class AssignedUserManagerOrReadOnlyIfLocked(permissions.BasePermission):
 
             if (not obj.is_locked) or (obj.assigned_user == request.user) or \
                     (obj.is_locked and request.method in permissions.SAFE_METHODS) or (obj.is_locked and obj.assigned_user is None) or \
-            (obj.assigned_user in company_users and request.user.groups.filter(name__exact=level_group_name).exists() ):
+                (obj.assigned_user in company_users and request.user.groups.filter(name__exact=level_group_name).exists() ):
                 # print('5810')
                 return True
 

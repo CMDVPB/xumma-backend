@@ -6,10 +6,10 @@ from phonenumber_field.modelfields import PhoneNumberField
 from abb.utils import hex_uuid, default_notification_status_3, upload_to
 
 from app.models import Company
-from axx.models import Load
-from att.models import Contact, Person, CompanyVehicle
+from axx.models import Inv, Load
+from att.models import Contact, Person, VehicleCompany
 
-from .utils import user_photo_upload_path
+from .utils import dynamic_upload_path, user_photo_upload_path
 
 import logging
 logger = logging.getLogger(__name__)
@@ -87,7 +87,7 @@ class Document(models.Model):
         Person, on_delete=models.CASCADE, blank=True, null=True, related_name='person_documents')
 
     company_vehicle = models.ForeignKey(
-        CompanyVehicle, on_delete=models.CASCADE, blank=True, null=True, related_name='company_vehicle_documents')
+        VehicleCompany, on_delete=models.CASCADE, blank=True, null=True, related_name='company_vehicle_documents')
 
     notifications = ArrayField(models.BooleanField(
     ), default=default_notification_status_3, size=3)
@@ -101,58 +101,6 @@ class Document(models.Model):
             logger.error(
                 f"ERRORLOG673 Document. check_exp_date_less_than_time. Error: {e}")
             return False
-
-
-class ImageUpload(models.Model):
-    uf = models.CharField(max_length=36, default=hex_uuid, unique=True)
-    company = models.ForeignKey(
-        Company, on_delete=models.CASCADE, null=True, blank=True, related_name='company_image_uploads')
-
-    unique_field = models.UUIDField(
-        default=hex_uuid, editable=False)
-    file_name = models.CharField(
-        max_length=500, blank=True, null=True)
-    file_obj = models.FileField(blank=True, null=True, upload_to=upload_to)
-    file_size = models.PositiveIntegerField(blank=True, null=True)
-
-    user = models.ForeignKey(
-        User, on_delete=models.CASCADE, null=True, blank=True, related_name='user_image_uploads')
-
-    load = models.ForeignKey(
-        Load, on_delete=models.CASCADE, null=True, blank=True, related_name='load_image_uploads')
-
-    company_vehicle = models.ForeignKey(
-        CompanyVehicle, on_delete=models.CASCADE, null=True, blank=True, related_name='company_vehicle_image_uploads')
-
-    class Meta:
-        indexes = [
-            models.Index(fields=['user']),
-            models.Index(fields=['load']),
-            models.Index(fields=['company']),
-            models.Index(fields=['company_vehicle']),
-        ]
-
-    def save(self, *args, **kwargs):
-        if self.file_obj:
-            if self.company:
-                company_short_uf = self.company.uf[:5]
-                file_name_split = self.file_obj.name.rsplit('.', 1)
-                name_part = file_name_split[0]
-                ext_part = file_name_split[1] if len(
-                    file_name_split) > 1 else ''
-                self.file_obj.name = f"{company_short_uf}_{name_part}{'.' + ext_part if ext_part else ''}"
-            self.file_size = int(self.file_obj.size)
-            self.file_name = self.file_obj.name
-        super().save(*args, **kwargs)
-
-    @property
-    def s3_url(self):
-        if self.file_obj:
-            return self.file_obj.url
-        return ""
-
-    def __str__(self):
-        return str(self.file_obj) or ''
 
 
 class UserPhoto(models.Model):
@@ -173,3 +121,72 @@ class UserPhoto(models.Model):
 
     def __str__(self):
         return f"Photo of {self.user.username}"
+
+
+class ImageUpload(models.Model):
+    uf = models.CharField(max_length=36, default=hex_uuid)
+    company = models.ForeignKey(
+        Company, on_delete=models.CASCADE, null=True, blank=True, related_name='company_imageuploads')
+    unique_field = models.UUIDField(
+        default=hex_uuid, editable=False)
+    file_name = models.CharField(
+        max_length=500, blank=True, null=True)
+    file_obj = models.FileField(blank=True, null=True, upload_to='uploads/')
+    file_size = models.PositiveIntegerField(blank=True, null=True)
+
+    load = models.ForeignKey(
+        Load, on_delete=models.CASCADE, null=True, blank=True, related_name='load_imageuploads')
+
+    def save(self, *args, **kwargs):
+
+        if self.file_obj:
+            # print('M676', )
+            if self.company:
+                company_short_uf = self.company.uf[0: 5]
+
+                print('M678', company_short_uf)
+
+                file_name_split = (self.file_obj.name).rsplit(
+                    '.', 1)
+                self.file_obj.name = company_short_uf + '_' + \
+                    file_name_split[0] + '.'+file_name_split[1]
+                self.file_name = file_name_split[0]
+
+            self.file_size = int(self.file_obj.size)
+            self.file_name = self.file_obj.name
+
+            super(ImageUpload, self).save(*args, **kwargs)
+
+    @property
+    def s3_url(self):
+        return self.file_obj.url
+
+    def __str__(self):
+        return str(self.file_obj) or ''
+
+
+class FileUpload(models.Model):
+    uf = models.CharField(max_length=36, default=hex_uuid)
+    created_at = models.DateTimeField(auto_now_add=True)
+    company = models.ForeignKey(
+        Company, on_delete=models.CASCADE, related_name='company_fileuploads')
+    inv = models.ForeignKey(Inv, on_delete=models.CASCADE,
+                            blank=True, null=True, related_name='inv_fileuploads')
+
+    file_obj = models.FileField(
+        blank=True, null=True, upload_to=dynamic_upload_path)
+    file_size = models.PositiveIntegerField(blank=True, null=True)
+    file_name = models.CharField(max_length=1000, blank=True, null=True)
+
+    def save(self, *args, **kwargs):
+        if self.file_obj:
+            self.file_size = int(self.file_obj.size)
+
+        super(FileUpload, self).save(*args, **kwargs)
+
+    @property
+    def s3_url(self):
+        return self.file_obj.url if self.file_obj else None
+
+    def __str__(self):
+        return str(self.file_name or self.id or 'File name')

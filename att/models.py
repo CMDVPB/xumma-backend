@@ -57,7 +57,7 @@ class VehicleBrand(models.Model):
         return self.brand_name
 
 
-class CompanyVehicle(ProtectedDeleteMixin, models.Model):
+class VehicleCompany(ProtectedDeleteMixin, models.Model):
     protected_related = ["vehicle_tractor_route_sheets",
                          "vehicle_tractor_route_sheets"]
 
@@ -87,11 +87,13 @@ class CompanyVehicle(ProtectedDeleteMixin, models.Model):
     change_oil_interval = models.PositiveIntegerField(null=True, blank=True)
     buy_price = models.PositiveIntegerField(null=True, blank=True)
     sell_price = models.PositiveIntegerField(null=True, blank=True)
+
     length = models.PositiveIntegerField(null=True, blank=True)
     width = models.PositiveIntegerField(null=True, blank=True)
     height = models.PositiveIntegerField(null=True, blank=True)
     weight_capacity = models.PositiveIntegerField(null=True, blank=True)
     volume_capacity = models.PositiveIntegerField(null=True, blank=True)
+
     interval_taho = models.PositiveIntegerField(null=True, blank=True)
     last_date_unload_taho = models.DateField(null=True, blank=True)
 
@@ -108,8 +110,8 @@ class CompanyVehicle(ProtectedDeleteMixin, models.Model):
     is_archived = models.BooleanField(default=False)
 
     class Meta:
-        verbose_name = "Company Vehicle"
-        verbose_name_plural = "Company Vehicles"
+        verbose_name = "Vehicle Company"
+        verbose_name_plural = "Vehicles Company"
         ordering = ['reg_number']
         constraints = [
             models.UniqueConstraint(fields=[
@@ -119,7 +121,7 @@ class CompanyVehicle(ProtectedDeleteMixin, models.Model):
     def save(self, *args, **kwargs):
 
         try:
-            super(CompanyVehicle, self).save(*args, **kwargs)
+            super(VehicleCompany, self).save(*args, **kwargs)
         except IntegrityError as e:
             logger.error(f'ERRORLOG951 class CompanyVehicle. save. Error: {e}')
             raise YourCustomApiExceptionName(409, 'unique_together')
@@ -266,6 +268,8 @@ class Person(ProtectedDeleteMixin, models.Model):
 
 
 class VehicleUnit(ProtectedDeleteMixin, models.Model):
+    ''' Used for vehicle units of contacts '''
+
     protected_related = ["vehicle_tractor_route_sheets",
                          "vehicle_tractor_route_sheets"]
 
@@ -275,10 +279,10 @@ class VehicleUnit(ProtectedDeleteMixin, models.Model):
     reg_number = models.CharField(max_length=20)
     vehicle_type = models.CharField(
         choices=VEHICLE_TYPES, max_length=10, null=True, blank=True)
-    payload = models.PositiveIntegerField(null=True, blank=True)
-    volume = models.PositiveIntegerField(null=True, blank=True)
     comment = models.CharField(
         max_length=500, blank=True, null=True)
+    payload = models.PositiveIntegerField(null=True, blank=True)
+    volume = models.PositiveIntegerField(null=True, blank=True)
 
     contact = models.ForeignKey(
         Contact, on_delete=models.CASCADE, blank=True, null=True, related_name='contact_vehicle_units')
@@ -348,6 +352,23 @@ class PaymentTerm(models.Model):
         return str(self.id) or ''
 
 
+class Term(models.Model):
+    uf = models.CharField(max_length=36, default=hex_uuid,
+                          db_index=True, unique=True)
+    company = models.ForeignKey(
+        Company, on_delete=models.CASCADE, null=True, blank=True, related_name='company_terms')
+    term_short = models.CharField(max_length=100, blank=True, null=True)
+    term_description = models.CharField(
+        max_length=40000, blank=True, null=True)
+
+    class Meta:
+        verbose_name = "Term"
+        verbose_name_plural = "Terms"
+
+    def __str__(self) -> str:
+        return str(self.id) or ''
+
+
 class AuthorizationCEMTCategories(models.Model):
     ''' Categories for Authorizations, CEMTS '''
     uf = models.CharField(max_length=36, default=hex_uuid,
@@ -392,7 +413,7 @@ class AuthorizationCEMT(models.Model):
         AuthorizationCEMTCategories, on_delete=models.CASCADE, null=True,
         blank=True, related_name="category_authorization_cemts")
     company_vehicle = models.ForeignKey(
-        CompanyVehicle, on_delete=models.CASCADE, null=True,
+        VehicleCompany, on_delete=models.CASCADE, null=True,
         blank=True, related_name="company_vehicle_authorization_cemts")
 
     is_standard_authorization = models.BooleanField(default=False)

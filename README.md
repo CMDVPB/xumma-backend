@@ -19,3 +19,9 @@
   celery -A xumma beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
 - start in production:
   docker compose
+
+### How to start (needs to be created in Admin)
+
+- add Groups: level_manager, level_leader, level_dispatcher, level_finance, level_driver
+- add Groups: type_shipper, type_forwarder, type_carrier
+- add Memberships: basic, pro, premium

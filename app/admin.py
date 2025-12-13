@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import User, DocumentSeries, Membership, Subscription, SMTPSettings
+from .models import Company, User, DocumentSeries, Membership, Subscription, SMTPSettings
 from .admin_utils import DocumentSeriesNumberRangeFilter
 
 
@@ -41,6 +41,17 @@ class UserAdmin(admin.ModelAdmin):
                     'get_full_name', 'base_country', 'is_superuser', 'is_staff', 'is_active', 'lang', 'phone')
 
     search_fields = ('id', 'email', 'username', 'groups__name')
+
+
+@admin.register(Company)
+class CompanyAdmin(admin.ModelAdmin):
+
+    def company_users(self, obj):
+        return ", ".join([k.email for k in obj.user.all()])
+
+    list_display = ('id', 'company_name', 'company_users',)
+
+    search_fields = ("company_name", 'uf')
 
 
 @admin.register(DocumentSeries)

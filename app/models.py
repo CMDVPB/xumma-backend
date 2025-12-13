@@ -9,11 +9,10 @@ from django.contrib.postgres.fields import ArrayField
 from django.utils import timezone
 from cryptography.fernet import Fernet
 
-
 from abb.models import Country
-from abb.utils import hex_uuid, get_default_notification_status_3
+from abb.utils import get_default_empty_strings_20, hex_uuid, get_default_notification_status_3
 from abb.constants import BASE_COUNTRIES, BASE_COUNTRIES_LIST, APP_LANGS, MEMBERSHIP_CHOICES
-
+from abb.validators import validate_columns_arrayfield_length_exactly_20
 
 import logging
 logger = logging.getLogger(__name__)
@@ -34,7 +33,7 @@ class UserAccountManager(BaseUserManager):
 
         # print('M240', kwargs)
 
-        base_country = kwargs.get('base_country', 'ro')
+        base_country = kwargs.get('base_country', 'md')
         if base_country not in BASE_COUNTRIES_LIST:
             base_country = 'ro'
 
@@ -106,6 +105,26 @@ class User(AbstractUser):
 
     def __str__(self):
         return self.email
+
+
+class UserSettings(models.Model):
+    uf = models.CharField(max_length=36, default=hex_uuid, db_index=True)
+    user = models.OneToOneField(
+        User, on_delete=models.CASCADE, related_name='user_settings')
+    theme = models.CharField(max_length=20, default='light')
+    notifications_enabled = models.BooleanField(default=True)
+    simplified_load = models.BooleanField(default=False)
+    default_document_tab = ArrayField(models.CharField(
+        max_length=20, null=True, blank=True), default=get_default_empty_strings_20,
+        size=20, validators=[validate_columns_arrayfield_length_exactly_20]
+    )
+
+    class Meta:
+        verbose_name = "User Settings"
+        verbose_name_plural = "User Settings"
+
+    def __str__(self) -> str:
+        return f"Settings for {self.user}"
 
 
 class UserPermission(models.Model):

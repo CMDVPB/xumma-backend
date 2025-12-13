@@ -1,0 +1,29 @@
+{% if lang == 'ro' %}
+<p>Iti multumim ca folosesti serviciul nostru!</p>
+<p>Primiti acest e-mail deoarece abonamentul dvstra expira pe <b>{{ expiry_date }}</b>.</p>
+
+<br>
+
+<p>Va multumim ca ati ales  <b>{{ site_name }}</b>. Asteptam cu nerabdare sa va servim inca multi ani.</p>
+<p>Echipa <b>{{ site_name }}</b></p>
+
+{% elif lang == 'ru' %}
+<p>Спасибо за использование нашего сервиса!</p>
+<p>Вы получии это письмо, потому что срок действия подписки истекает <b>{{ expiry_date }}</b>.</p>
+
+<br>
+
+<p>Благодарим вас за выбор  <b>{{ site_name }}</b>. Мы надеемся служить вам еще много лет.</p>
+<p>Команда <b>{{ site_name }}</b></p>
+
+{% else %}
+<p>Thanks for using our service!</p>
+<p>You're receiving this email because subscription is about to expire on <b>{{ expiry_date }}</b>.</p>
+
+<br>
+
+<p>Thank you for choosing  <b>{{ site_name }}</b>. We look forward to serving you for many more years.</p>
+<p>Team <b>{{ site_name }}</b></p>
+
+
+{% endif %}

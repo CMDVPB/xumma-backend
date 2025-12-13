@@ -8,6 +8,9 @@ from djoser.conf import settings as djoser_settings
 from djoser.serializers import UserCreateSerializer
 
 
+import logging
+logger = logging.getLogger(__name__)
+
 User = get_user_model()
 
 

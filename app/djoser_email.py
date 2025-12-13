@@ -5,7 +5,7 @@ from djoser.email import ActivationEmail, PasswordResetEmail, PasswordChangedCon
 
 
 class ActivationEmail(ActivationEmail):
-    template_name = 'drf/activation.html'
+    template_name = 'dff/activation.html'
 
     def get_context_data(self):
         context = super().get_context_data()
@@ -19,7 +19,7 @@ class ActivationEmail(ActivationEmail):
 
 
 class PasswordResetEmail(PasswordResetEmail):
-    template_name = 'drf/password_reset.html'
+    template_name = 'dff/password_reset.html'
 
     def get_context_data(self):
         context = super().get_context_data()
@@ -33,7 +33,7 @@ class PasswordResetEmail(PasswordResetEmail):
 
 
 class PasswordChangedConfirmationEmail(PasswordChangedConfirmationEmail):
-    template_name = "drf/password_changed_confirmation.html"
+    template_name = "dff/password_changed_confirmation.html"
 
     def get_context_data(self):
         context = super().get_context_data()
