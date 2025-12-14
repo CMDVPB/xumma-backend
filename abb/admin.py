@@ -1,6 +1,11 @@
 from django.contrib import admin
 
-from .models import Country, Currency, ExchangeRate
+from .models import BodyType, Country, Currency, ExchangeRate
+
+
+@admin.register(BodyType)
+class BodyTypeAdmin(admin.ModelAdmin):
+    list_display = ('serial_number', 'bt', 'description')
 
 
 @admin.register(Country)

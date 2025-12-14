@@ -17,15 +17,15 @@ logger = logging.getLogger(__name__)
 
 class EmissionClass(models.Model):
     """
-    Vehicle emission classes (Euro 1, Euro 2, Euro 3, Euro 4, Euro 5, Euro 6)
+    Vehicle emission classes (Euro 0, Euro 1, Euro 2, Euro 3, Euro 4, Euro 5, Euro 6)
     """
     uf = models.CharField(max_length=36, default=hex_uuid, db_index=True)
     company = models.ForeignKey(
         Company, on_delete=models.CASCADE, related_name='company_emission_classes')
 
     created_at = models.DateTimeField(auto_now_add=True)
-    class_code = models.CharField(max_length=20, unique=True)
-    class_name = models.CharField(max_length=50)
+    code = models.CharField(max_length=20, unique=True)
+    name = models.CharField(max_length=50)
     description = models.TextField(blank=True, null=True)
 
     is_active = models.BooleanField(default=True)
@@ -33,10 +33,10 @@ class EmissionClass(models.Model):
     class Meta:
         verbose_name = "Emission Class"
         verbose_name_plural = "Emission Classes"
-        ordering = ["-class_code"]
+        ordering = ["code"]
 
     def __str__(self):
-        return self.class_name
+        return self.name
 
 
 class VehicleBrand(models.Model):
@@ -44,22 +44,28 @@ class VehicleBrand(models.Model):
                           db_index=True, unique=True)
     company = models.ForeignKey(
         Company, on_delete=models.CASCADE, null=True, blank=True, related_name='company_vehicle_brands')
-    brand_name = models.CharField(max_length=100, unique=True)
-    active = models.BooleanField(default=True)
+
+    name = models.CharField(max_length=100, unique=True)
+    serial_number = models.PositiveSmallIntegerField(
+        unique=True, null=True, blank=True)
+
+    is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         verbose_name = "Vehicle Brand"
         verbose_name_plural = "Vehicle Brands"
-        ordering = ["brand_name"]
+        ordering = ["name"]
 
     def __str__(self):
-        return self.brand_name
+        return self.name
 
 
 class VehicleCompany(ProtectedDeleteMixin, models.Model):
-    protected_related = ["vehicle_tractor_route_sheets",
-                         "vehicle_tractor_route_sheets"]
+    # protected_related = ["vehicle_tractor_route_sheets",
+    #                      "vehicle_tractor_route_sheets"]
+
+    protected_related = []
 
     uf = models.CharField(max_length=36, default=hex_uuid,
                           db_index=True, unique=True)
@@ -104,7 +110,7 @@ class VehicleCompany(ProtectedDeleteMixin, models.Model):
     has_sanitary_certificate = models.BooleanField(default=False)
     has_l_paket = models.BooleanField(default=False)
 
-    is_available = models.BooleanField(default=False)
+    is_available = models.BooleanField(default=True)
     is_rented = models.BooleanField(default=False)
     is_service_vehicle = models.BooleanField(default=False)
     is_archived = models.BooleanField(default=False)

@@ -16,8 +16,8 @@ MEMBERSHIP_CHOICES = (('basic', 'basic'), ('pro', 'pro'),
                       ('premium', 'premium'))
 
 
-VEHICLE_TYPES = (('tractor', 'Tractor'),
-                 ('trailer', 'Trailer'), ('truck', 'Truck'))
+VEHICLE_TYPES = (('truck', 'Truck'), ('tractor', 'Tractor'),
+                 ('trailer', 'Trailer'))
 
 
 LOAD_SIZE = (('ltl', 'LTL'), ('ftl', 'FTL'), ('xpr', 'XPR'))
