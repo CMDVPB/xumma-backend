@@ -107,10 +107,7 @@ class UserSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
 
     class Meta:
         model = User
-        fields = ('email', 'first_name', 'last_name', 'phone', 'messanger', 'image', 'lang', 'base_doc_lang', 'uf',
-                  'rows_per_page', 'myitems_all', 'order_by', 'load_columns', 'trip_columns', 'tor_columns',
-                  'ctr_columns', 'quote_columns', 'inv_columns', 'exp_columns',
-                  'payment_term',
+        fields = ('email', 'first_name', 'last_name', 'phone', 'messanger', 'image', 'lang', 'uf',
                   'company'
                   )
 

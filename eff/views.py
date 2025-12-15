@@ -21,7 +21,9 @@ from rest_framework.permissions import IsAuthenticated
 
 from abb.permissions import IsSubscriptionActiveOrReadOnly
 from abb.utils import get_user_company
+from app.models import Company
 from att.models import TargetGroup
+from dff.serializers.serializers_company import CompanySerializer
 from dff.serializers.serializers_other import TargetGroupSerializer  # used for FBV
 
 import logging
@@ -59,7 +61,8 @@ class TargetGroupListCreate(ListCreateAPIView):
             user_company = get_user_company(self.request.user)
             serializer.save(company=user_company)
         except Exception as e:
-            print('E519', e)
+            logger.error(
+                f'ERRORLOG241 TargetGroupListCreate. perform_create. Error: {e}')
             serializer.save()
 
 
@@ -74,9 +77,10 @@ class TargetGroupDetail(RetrieveUpdateDestroyAPIView):
             user = self.request.user
             user_company = get_user_company(user)
             return TargetGroup.objects.filter(company__id=user_company.id).distinct()
-        except:
-            print('E283')
-            return []
+        except Exception as e:
+            logger.error(
+                f'ERRORLOG519 TargetGroupDetail. get_queryset. Error: {e}')
+            return TargetGroup.objects.none()
 
     def patch(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -90,3 +94,30 @@ class TargetGroupDetail(RetrieveUpdateDestroyAPIView):
 
         else:
             raise exceptions.ValidationError(detail='not_unique',)
+
+
+class CompanyDetail(RetrieveUpdateDestroyAPIView):
+    serializer_class = CompanySerializer
+
+    def get_queryset(self):
+        try:
+            queryset = Company.objects.filter(
+                user=self.request.user).distinct()
+
+            return queryset
+        except Exception as e:
+            logger.error(
+                f'ERRORLOG357 CompanyDetail. get_queryset. Error: {e}')
+
+            return Company.objects.none()
+
+    def get_object(self):
+        try:
+            return self.get_queryset().first()
+        except:
+            raise exceptions.NotFound()
+
+    def delete(self, request, pk, format=None):
+        company = self.get_object(pk)
+        company.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)

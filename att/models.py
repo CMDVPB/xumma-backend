@@ -110,9 +110,9 @@ class VehicleCompany(ProtectedDeleteMixin, models.Model):
     has_sanitary_certificate = models.BooleanField(default=False)
     has_l_paket = models.BooleanField(default=False)
 
-    is_available = models.BooleanField(default=True)
     is_rented = models.BooleanField(default=False)
     is_service_vehicle = models.BooleanField(default=False)
+    is_available = models.BooleanField(default=True)
     is_archived = models.BooleanField(default=False)
 
     class Meta:
