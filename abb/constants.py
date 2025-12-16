@@ -39,3 +39,7 @@ DOCUMENT_TYPES = [
 
 ALLOWED_TYPE_ACCOUNT_GROUPS_TO_ADD = (
     'type_shipper', 'type_forwarder', 'type_carrier')
+
+
+ACTION_CHOICES = (('loading', 'Loading'), ('unloading', 'Unloading'),
+                  ('parking', 'Parking'), ('clearance', 'Customs stop'))

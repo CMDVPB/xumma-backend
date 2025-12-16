@@ -3,10 +3,12 @@ from django.contrib.auth import get_user_model
 from django.contrib.postgres.fields import ArrayField
 from phonenumber_field.modelfields import PhoneNumberField
 
+from abb.constants import ACTION_CHOICES
+from abb.models import Country
 from abb.utils import hex_uuid, default_notification_status_3, upload_to
 
 from app.models import Company
-from axx.models import Inv, Load
+from axx.models import Ctr, Inv, Load, Tor
 from att.models import Contact, Person, VehicleCompany
 
 from .utils import dynamic_upload_path, user_photo_upload_path
@@ -190,3 +192,67 @@ class FileUpload(models.Model):
 
     def __str__(self):
         return str(self.file_name or self.id or 'File name')
+
+
+class Entry(models.Model):
+    ''' entry '''
+    uf = models.CharField(max_length=36, default=hex_uuid)
+    action = models.CharField(
+        choices=ACTION_CHOICES, max_length=20, null=True, blank=True)
+    contact = models.ForeignKey(
+        Contact, on_delete=models.SET_NULL, blank=True, null=True, related_name='contact_entries')
+    date_load = models.DateTimeField(null=True, blank=True)
+
+    time_load_min = models.DateTimeField(null=True, blank=True)
+    time_load_max = models.DateTimeField(null=True, blank=True)
+
+    zip_load = models.CharField(max_length=20, blank=True, null=True)
+    country_load = models.ForeignKey(
+        Country, on_delete=models.SET_NULL, blank=True, null=True, related_name='country_load_entries')
+    city_load = models.CharField(max_length=50, blank=True, null=True)
+    shipperinstructions1 = models.CharField(
+        max_length=250, blank=True, null=True)
+    shipperinstructions2 = models.CharField(
+        max_length=250, blank=True, null=True)
+
+    palletexchange = models.BooleanField(blank=True, null=True, default=False)
+    tail_lift = models.BooleanField(blank=True, null=True, default=False)
+    dangerousgoods = models.BooleanField(blank=True, null=True, default=False)
+    dangerousgoods_class = models.CharField(
+        max_length=30, blank=True, null=True)
+    temp_control = models.BooleanField(blank=True, null=True, default=False)
+    temp_control_details = models.CharField(
+        max_length=40, blank=True, null=True)
+
+    load = models.ForeignKey(
+        Load, on_delete=models.CASCADE, blank=True, null=True, related_name='entry_loads')
+    tor = models.ForeignKey(
+        Tor,  on_delete=models.CASCADE, blank=True, null=True, related_name='entry_tors')
+    ctr = models.ForeignKey(
+        Ctr, on_delete=models.CASCADE, blank=True, null=True,  related_name='entry_ctrs')
+    inv = models.ForeignKey(
+        Inv, on_delete=models.CASCADE, blank=True, null=True, related_name='entry_invs')
+
+    order = models.PositiveSmallIntegerField(blank=True, null=True)
+
+    class Meta:
+        verbose_name = "Entry"
+        verbose_name_plural = "Entries"
+
+    def __str__(self):
+        return str(self.id) or ''
+
+
+class Detail(models.Model):
+    ''' sales Order '''
+    uf = models.CharField(max_length=36, default=hex_uuid)
+    pieces = models.CharField(max_length=10, null=True, blank=True)
+    weight = models.CharField(max_length=10, null=True, blank=True)
+    ldm = models.CharField(max_length=10, null=True, blank=True)
+    volume = models.CharField(max_length=10, null=True, blank=True)
+    dims = models.CharField(max_length=150, blank=True, null=True)
+    entry = models.ForeignKey(Entry, on_delete=models.CASCADE,
+                              blank=True, null=True, related_name='entrydetails')
+
+    def __str__(self):
+        return str(self.entry) or ''
