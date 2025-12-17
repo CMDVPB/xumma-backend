@@ -58,7 +58,7 @@ class ContactListCreate(ListCreateAPIView):
             # queryset = queryset.prefetch_related(
             #     Prefetch('contact_bank_accounts', queryset=bank_accounts)).all()
 
-            return queryset.distinct().order_by(Case(When(is_my_company=True, then=0), default=1), 'company_name')
+            return queryset.distinct().order_by('company_name')
 
         except Exception as e:
             print('E587', e)

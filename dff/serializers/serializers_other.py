@@ -6,8 +6,10 @@ from drf_writable_nested.mixins import UniqueFieldsMixin, NestedCreateMixin, Nes
 from rest_framework import serializers
 
 from abb.serializers import CountrySerializer, CurrencySerializer
-from att.models import Contact, BankAccount, Person, TargetGroup, VehicleUnit
-from ayy.models import Document
+from app.serializers import UserBasicSerializer
+from att.models import Contact, BankAccount, PaymentTerm, Person, TargetGroup, Term, VehicleUnit
+from axx.models import Load
+from ayy.models import CMR, Comment, Document, History, ImageUpload
 
 
 class DocumentSerializer(WritableNestedModelSerializer):
@@ -80,6 +82,13 @@ class BankAccountSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
                   )
 
 
+class VehicleUnitBasicReadSerializer(WritableNestedModelSerializer):
+
+    class Meta:
+        model = VehicleUnit
+        fields = ('reg_number', 'uf')
+
+
 class VehicleUnitSerializer(WritableNestedModelSerializer):
 
     vehicle_gendocs = DocumentSerializer(many=True)
@@ -139,6 +148,12 @@ class VehicleUnitSerializer(WritableNestedModelSerializer):
         model = VehicleUnit
         fields = ('id', 'reg_number', 'vehicle_type', 'payload',
                   'volume', 'comment', 'contact', 'vehicle_gendocs', 'uf')
+
+
+class PersonBasicReadSerializer(WritableNestedModelSerializer):
+    class Meta:
+        model = Person
+        fields = ('last_name', 'first_name', 'is_driver', 'uf')
 
 
 class PersonSerializer(WritableNestedModelSerializer):
@@ -240,6 +255,27 @@ class PersonSerializer(WritableNestedModelSerializer):
                   'phone', 'comment', 'is_driver', "archived", 'uf')
 
 
+class ContactTripListSerializer(WritableNestedModelSerializer):
+    contact_vehicle_units = VehicleUnitBasicReadSerializer(many=True)
+
+    class Meta:
+        model = Contact
+        fields = ('company_name', 'uf',
+                  'contact_vehicle_units'
+                  )
+
+
+class ContactBasicReadSerializer(WritableNestedModelSerializer):
+
+    country_code_post = CountrySerializer(allow_null=True)
+
+    class Meta:
+        model = Contact
+        fields = ('fiscal_code', 'company_name', 'zip_code_post', 'city_post', 'address_post', 'lat', 'lon', 'uf',
+                  'country_code_post',
+                  )
+
+
 class ContactSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
     contact_persons = PersonSerializer(many=True)
 
@@ -302,13 +338,12 @@ class ContactSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
     class Meta:
         model = Contact
         fields = ('company_name', 'alias_company_name', 'is_same_address', 'contact_type', 'uf',
-                  'fiscal_code', 'vat_code', 'reg_com', 'subscribed_capital', 'is_my_company',
+                  'fiscal_code', 'vat_code', 'reg_com', 'subscribed_capital',
                   'is_vat_payer', 'is_vat_on_receipt', 'email', 'phone', 'messanger',
                   'country_code_legal', 'zip_code_legal', 'city_legal', 'address_legal', 'county_legal', 'sect_legal',
                   'country_code_post', 'zip_code_post', 'city_post', 'address_post', 'bank_name', 'comment1', 'comment2',
                   'lat', 'lon',
                   'contact_persons', 'contact_vehicle_units', 'contact_bank_accounts', )
-        read_only_fields = ['is_my_company']
 
 
 class TargetGroupSerializer(WritableNestedModelSerializer):
@@ -378,3 +413,142 @@ class TargetGroupSerializer(WritableNestedModelSerializer):
     class Meta:
         model = TargetGroup
         fields = ('group_name', 'description', 'target_group_persons', 'uf')
+
+
+class PaymentTermSerializer(WritableNestedModelSerializer):
+
+    def create(self, validated_data):
+        # print('1614:', validated_data)
+        relations, reverse_relations = self._extract_relations(validated_data)
+
+        # Create or update direct relations (foreign key, one-to-one)
+        self.update_or_create_direct_relations(
+            validated_data,
+            relations,
+        )
+
+        # Create instance with atomic
+        with transaction.atomic():
+            instance = super(NestedCreateMixin,
+                             self).create(validated_data)
+            self.update_or_create_reverse_relations(
+                instance, reverse_relations)
+
+        return instance
+
+    def update(self, instance, validated_data):
+        # print('3347', validated_data, instance)
+        relations, reverse_relations = self._extract_relations(validated_data)
+
+        # Create or update direct relations (foreign key, one-to-one)
+        self.update_or_create_direct_relations(
+            validated_data,
+            relations,
+        )
+
+        # Update instance with atomic
+        with transaction.atomic():
+            instance = super(NestedUpdateMixin, self).update(
+                instance,
+                validated_data,
+            )
+            self.update_or_create_reverse_relations(
+                instance, reverse_relations)
+            self.delete_reverse_relations_if_need(instance, reverse_relations)
+            instance.refresh_from_db()
+            return instance
+
+    class Meta:
+        model = PaymentTerm
+        fields = ('note_short', 'note_description', 'uf')
+
+
+class TermSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
+
+    class Meta:
+        model = Term
+        fields = ('term_short', 'term_description', 'uf')
+
+
+class CommentSerializer(WritableNestedModelSerializer):
+    class Meta:
+        model = Comment
+        fields = ('comment', 'uf')
+
+
+class ImageSerializer(WritableNestedModelSerializer):
+
+    load = serializers.SlugRelatedField(
+        allow_null=True, slug_field='uf', queryset=Load.objects.all(), write_only=True)
+
+    def to_internal_value(self, data):
+        # print('4574',)
+
+        if 'load' in data and data['load'] == '':
+            data['load'] = None
+
+        return super(ImageSerializer, self).to_internal_value(data)
+
+    class Meta:
+        model = ImageUpload
+        fields = ('load', 'unique_field', 'company',
+                  'file_name', 'file_obj', 's3_url')
+
+
+class CMRSerializer(serializers.ModelSerializer):
+
+    def save(self, **kwargs):
+        self._save_kwargs = defaultdict(dict, kwargs)
+
+        # Extract parent load from kwargs
+        parent_load = kwargs.get("load")
+        if not parent_load:
+            raise serializers.ValidationError(
+                "E681 A valid parent instance is required.")
+
+        # Attach load to validated data
+        self.validated_data["load"] = parent_load
+
+        # 1. If uf exists, update by uf
+        uf_value = self.validated_data.get('uf')
+        if uf_value:
+            instance = CMR.objects.filter(uf=uf_value).first()
+            if instance:
+                return self.update(instance, self.validated_data)
+
+        # 2. Otherwise check if this load already has a CMR (OneToOne rule)
+        existing = CMR.objects.filter(load=parent_load).first()
+        if existing:
+            return self.update(existing, self.validated_data)
+
+        # 3. New CMR: copy company from Load
+        if parent_load.company:
+            self.validated_data["company"] = parent_load.company
+
+        # Create new CMR
+        return self.create(self.validated_data)
+
+    class Meta:
+        model = CMR
+        fields = [
+            "number",
+            "list_of_documents",
+            "special_agreement",
+            "payment",
+            "cod",
+            "cod_amount",
+            "place_load",
+            "place_unload",
+            "place_issue",
+            "date_issue",
+            "uf",
+        ]
+        read_only_fields = ["uf"]  # generated fields
+
+
+class HistorySerializer(WritableNestedModelSerializer):
+    changed_by = UserBasicSerializer(allow_null=True)
+
+    class Meta:
+        model = History
+        fields = ('date_registered', 'action', 'status', 'changed_by', 'uf')

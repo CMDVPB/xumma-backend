@@ -43,3 +43,22 @@ ALLOWED_TYPE_ACCOUNT_GROUPS_TO_ADD = (
 
 ACTION_CHOICES = (('loading', 'Loading'), ('unloading', 'Unloading'),
                   ('parking', 'Parking'), ('clearance', 'Customs stop'))
+
+
+UNIT_MEASUREMENT_CHOICES = (
+    ('pc', 'Piece'), ('kg', 'Kg'), ('t', 'Tonne'), ('cbm', 'CBM'), ('lt', 'Litre'))
+
+
+VAT_CHOICES = ((21, '21%'), (20, '20%'), (19, '19%'),
+               (11, '11%'), (9, '9%'), (5, '5%'), (0, '0%'))
+
+VAT_TYPE_CHOICES = (('normal', 'Normal'), ('reduced', 'Reduced'), ('zero', 'Zero'),
+                    ('sfdd', 'SFDD'), ('sdd', 'SDD'), ('reverse_charge', 'Reverse charge'), ('exempt', 'Exempt'))
+
+
+VAT_EXEMPTION_REASON = (('vatex-eu-g', 'VATEX-EU-G'),
+                        ('vatex-eu-ic', 'VATEX-EU-IC'), ('vatex-eu-o', 'VATEX-EU-O'), ('vatex-eu-ae', 'VATEX-EU-AE'))
+
+
+DOC_LANG_CHOICES = (('ro', 'Romanian'), ('en', 'English'),
+                    ('ru', 'Russian'), ('rr', 'Romanian/Russian'))

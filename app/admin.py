@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Company, User, DocumentSeries, Membership, Subscription, SMTPSettings
+from .models import Company, User, DocumentSeries, Membership, Subscription, SMTPSettings, UserSettings
 from .admin_utils import DocumentSeriesNumberRangeFilter
 
 
@@ -106,3 +106,10 @@ class SMTPSettingsAdmin(admin.ModelAdmin):
     list_display = ('id', 'user', 'email', 'username', 'server')
 
     search_fields = ('user__email', 'email', 'username', 'server')
+
+
+@admin.register(UserSettings)
+class UserSettingsAdmin(admin.ModelAdmin):
+    list_display = ('id', 'user', )
+
+    search_fields = ('user__email',)

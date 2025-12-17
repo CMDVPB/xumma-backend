@@ -4,6 +4,7 @@ from django.conf import settings
 from django.utils import timezone
 from django.db.models import Q
 from django.db.models.query import QuerySet
+from django.core.exceptions import ValidationError
 
 import logging
 logger = logging.getLogger(__name__)
@@ -296,3 +297,55 @@ def company_latest_exp_date_subscription(user_company):
         logger.error(
             f'ERRORLOG793 company_latest_exp_date_subscription. Error: {e}')
         return ""
+
+
+def is_valid_queryparam(param):
+    # print('8383', param)
+    return param != '' and param is not None and param != [''] and param != []
+
+
+def check_not_unique_num(item, queryset, new_item_num, num):
+    if item and item.uf:
+        queryset = queryset.exclude(uf=item.uf)
+    all_items_list = queryset
+    new_item_num = new_item_num
+
+    if new_item_num != None or new_item_num != '':
+        num_list = list()
+        for list_item in all_items_list:
+            num_list.append(getattr(list_item, num))
+
+        # print('4761', num_list)
+
+        if new_item_num in num_list:
+            return True
+        else:
+            return False
+
+
+def check_not_unique_num_inv(queryset, new_item_num, num, series=None, exclude_uf=None):
+    if not new_item_num:
+        return False
+
+    if exclude_uf:
+        queryset = queryset.exclude(uf=exclude_uf)
+
+    if series:
+        queryset = queryset.filter(series__uf=series)
+
+    return queryset.filter(**{num: new_item_num}).exists()
+
+
+def get_order_by_default():
+    """ Docstring """
+    return ['1', '1', '1', '1', '1', '1', '1']
+
+
+def validate_columns_arrayfield_length_min_5(value):
+
+    if len(value) < 5:
+        print('3434', value)
+        raise ValidationError(
+            message=('min_field_array_length_5'), code="invalid")
+    # print('3535', value)
+    pass

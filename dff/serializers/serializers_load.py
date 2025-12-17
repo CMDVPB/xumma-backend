@@ -1,0 +1,473 @@
+
+
+from collections import defaultdict
+from django.db import transaction
+from django.contrib.auth import get_user_model
+from drf_writable_nested.serializers import WritableNestedModelSerializer
+from drf_writable_nested.mixins import UniqueFieldsMixin, NestedCreateMixin, NestedUpdateMixin
+from rest_framework import serializers
+
+from abb.custom_serializers import SlugRelatedGetOrCreateField
+from abb.serializers import CurrencySerializer
+from app.serializers import UserBasicSerializer
+from att.models import Contact, PaymentTerm, Person, VehicleUnit
+from att.serializers import BodyTypeSerializer, IncotermSerializer, ModeTypeSerializer, StatusTypeSerializer
+from axx.models import Ctr, Exp, Inv, Load, Tor
+from dff.serializers.serializers_entry_detail import EntryBasicReadListSerializer, EntrySerializer
+from dff.serializers.serializers_item_inv import ItemInvSerializer
+from dff.serializers.serializers_other import CMRSerializer, CommentSerializer, ContactBasicReadSerializer, ContactSerializer, HistorySerializer, ImageSerializer, VehicleUnitSerializer
+
+
+User = get_user_model()
+
+
+class LoadTripListSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
+
+    class Meta:
+        model = Load
+        fields = ('uf', )
+
+
+class TorLoadListSerializer(WritableNestedModelSerializer):
+
+    carrier = ContactSerializer(allow_null=True)
+    vehicle_tractor = VehicleUnitSerializer(allow_null=True)
+    vehicle_trailer = VehicleUnitSerializer(allow_null=True)
+
+    class Meta:
+        model = Tor
+        fields = ('is_tor', 'uf',
+                  'carrier', 'vehicle_tractor',
+                  'vehicle_trailer'
+                  )
+
+
+class LoadBasicReadSerializer(WritableNestedModelSerializer):
+    bill_to = ContactBasicReadSerializer(allow_null=True)
+    status = StatusTypeSerializer(allow_null=True)
+    currency = CurrencySerializer(allow_null=True)
+    load_iteminvs = ItemInvSerializer(many=True)
+
+    class Meta:
+        model = Load
+        fields = ('sn', 'uf'
+                  'bill_to', 'currency', 'status',
+                  'load_iteminvs',
+                  )
+
+
+class LoadTripGetSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
+    ''' used only for list view GET requests '''
+
+    assigned_user = UserBasicSerializer(allow_null=True)
+    bill_to = ContactBasicReadSerializer(allow_null=True)
+    mode = ModeTypeSerializer(allow_null=True)
+    bt = BodyTypeSerializer(allow_null=True)
+    currency = CurrencySerializer(allow_null=True)
+    status = StatusTypeSerializer(allow_null=True)
+    incoterm = IncotermSerializer(allow_null=True)
+
+    carrier = ContactBasicReadSerializer(allow_null=True)
+    entry_loads = EntryBasicReadListSerializer(many=True)
+    load_iteminvs = ItemInvSerializer(many=True)
+    load_comments = CommentSerializer(many=True)
+
+    def to_representation(self, instance):
+        response = super().to_representation(instance)
+
+        # print('3748', instance)
+
+        response['trip'] = instance.trip.uf if instance.trip else None
+        response['trip_num'] = instance.trip.rn if instance.trip else None
+
+        response['load_tors'] = TorSerializer(
+            instance.load_tors, many=True).data if instance.load_tors else None
+        response['load_exps'] = ExpSerializer(
+            instance.load_exps, many=True).data if instance.load_exps else None
+
+        return response
+
+    class Meta:
+        model = Load
+        fields = ('sn', 'date_order', 'customer_ref', 'customer_notes', 'load_detail', 'load_size', 'load_add_ons', 'load_address',
+                  'unload_address', 'hb', 'mb', 'booking_number', 'comment1', 'uf',
+                  'assigned_user', 'bill_to', 'mode', 'bt', 'currency', 'status', 'incoterm', 'carrier',
+                  'load_comments', 'load_tors', 'entry_loads', 'load_iteminvs',
+                  )
+
+
+class LoadListSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
+    ''' used only for list view GET requests '''
+
+    assigned_user = UserBasicSerializer(allow_null=True)
+    bill_to = ContactBasicReadSerializer(allow_null=True)
+    mode = ModeTypeSerializer(allow_null=True)
+    bt = BodyTypeSerializer(allow_null=True)
+    currency = CurrencySerializer(allow_null=True)
+    status = StatusTypeSerializer(allow_null=True)
+    incoterm = IncotermSerializer(allow_null=True)
+    vehicle_tractor = VehicleUnitSerializer(allow_null=True)
+    vehicle_trailer = VehicleUnitSerializer(allow_null=True)
+
+    carrier = ContactBasicReadSerializer(allow_null=True)
+    entry_loads = EntryBasicReadListSerializer(many=True)
+    load_iteminvs = ItemInvSerializer(many=True)
+    load_comments = CommentSerializer(many=True)
+    load_tors = TorLoadListSerializer(many=True)
+    load_imageuploads = ImageSerializer(many=True, read_only=True)
+
+    def to_representation(self, instance):
+        response = super().to_representation(instance)
+
+        # print('3748', instance)
+
+        response['trip'] = instance.trip.uf if instance.trip else None
+        response['trip_num'] = instance.trip.rn if instance.trip else None
+
+        return response
+
+    class Meta:
+        model = Load
+        fields = ('sn', 'date_order', 'customer_ref', 'customer_notes', 'load_detail', 'load_size', 'load_add_ons',
+                  'date_due', 'date_due_freight_cost', 'freight_cost', 'freight_price_received',
+                  'freight_cost_paid',
+                  'load_boards_id', 'load_board_data', 'load_board_comments',
+                  'load_address', 'unload_address', 'hb', 'mb', 'booking_number', 'comment1', 'uf',
+                  'assigned_user', 'bill_to', 'mode', 'bt', 'currency', 'status', 'incoterm', 'carrier', 'vehicle_tractor', 'vehicle_trailer',
+                  'load_comments', 'load_tors', 'entry_loads', 'load_iteminvs',
+                  'load_imageuploads'
+                  )
+        read_only_fields = ['load_board_data']
+        depth = 2
+
+
+class LoadSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
+
+    assigned_user = serializers.SlugRelatedField(
+        allow_null=True, slug_field='uf', queryset=User.objects.all(), write_only=True)
+    bill_to = serializers.SlugRelatedField(
+        allow_null=True, slug_field='uf', queryset=Contact.objects.all(), write_only=True)
+    person = SlugRelatedGetOrCreateField(
+        allow_null=True, slug_field='uf', queryset=Person.objects.all(), write_only=True)
+    payment_term = SlugRelatedGetOrCreateField(
+        allow_null=True, slug_field='uf', queryset=PaymentTerm.objects.all(), write_only=True)
+
+    carrier = serializers.SlugRelatedField(
+        allow_null=True, slug_field='uf', queryset=Contact.objects.all(), write_only=True)
+    person_carrier = SlugRelatedGetOrCreateField(
+        allow_null=True, slug_field='uf', queryset=Person.objects.all(), write_only=True)
+    driver = SlugRelatedGetOrCreateField(
+        allow_null=True, slug_field='uf', queryset=Person.objects.all(), write_only=True)
+    vehicle_tractor = SlugRelatedGetOrCreateField(
+        allow_null=True, slug_field='uf', queryset=VehicleUnit.objects.all(), write_only=True)
+    vehicle_trailer = SlugRelatedGetOrCreateField(
+        allow_null=True, slug_field='uf', queryset=VehicleUnit.objects.all(), write_only=True)
+
+    load_tors = serializers.SlugRelatedField(
+        many=True, slug_field='uf', queryset=Tor.objects.all(), write_only=True)
+    load_ctrs = serializers.SlugRelatedField(
+        many=True, slug_field='uf', queryset=Ctr.objects.all(), write_only=True)
+    load_invs = serializers.SlugRelatedField(
+        many=True, slug_field='uf', queryset=Inv.objects.all(), write_only=True)
+    load_exps = serializers.SlugRelatedField(
+        many=True, slug_field='uf', queryset=Exp.objects.all(), write_only=True)
+
+    mode = ModeTypeSerializer(allow_null=True)
+    incoterm = IncotermSerializer(allow_null=True)
+    bt = BodyTypeSerializer(allow_null=True)
+    status = StatusTypeSerializer(allow_null=True)
+    currency = CurrencySerializer(allow_null=True)
+    cmr = CMRSerializer(allow_null=True)
+
+    entry_loads = EntrySerializer(many=True)
+    load_iteminvs = ItemInvSerializer(many=True)
+    load_comments = CommentSerializer(many=True)
+    load_histories = HistorySerializer(many=True, read_only=True)
+    load_imageuploads = ImageSerializer(many=True, read_only=True)
+
+    def to_internal_value(self, data):
+
+        for idx, item in enumerate(data['entry_loads']):
+            data['entry_loads'][idx]['order'] = idx
+
+        try:
+            data['bill_to'] = data['bill_to'].get('uf', None)
+        except:
+            pass
+        try:
+            data['person'] = data['person'].get('uf', None)
+        except:
+            pass
+
+        try:
+            data['payment_term'] = data['payment_term'].get('uf', None)
+        except:
+            pass
+        try:
+            tor_uf_list = []
+            for tor in data['load_tors']:
+                tor_uf = tor.get('uf', None)
+                if tor_uf:
+                    tor_uf_list.append(tor_uf)
+            data['load_tors'] = tor_uf_list
+        except:
+            pass
+        try:
+            tor_uf_list = []
+            for tor in data['load_ctrs']:
+                tor_uf = tor.get('uf', None)
+                if tor_uf:
+                    tor_uf_list.append(tor_uf)
+            data['load_ctrs'] = tor_uf_list
+        except:
+            pass
+        try:
+            inv_uf_list = []
+            for inv in data['load_invs']:
+                inv_uf = inv.get('uf', None)
+                if inv_uf:
+                    inv_uf_list.append(inv_uf)
+
+            data['load_invs'] = inv_uf_list
+        except:
+            pass
+        try:
+            item_uf_list = []
+            for item in data['load_exps']:
+                item_uf = item.get('uf', None)
+                if item_uf:
+                    item_uf_list.append(item_uf)
+
+            data['load_exps'] = item_uf_list
+        except:
+            pass
+        try:
+            data['carrier'] = data['carrier'].get('uf', None)
+        except:
+            pass
+        try:
+            data['person'] = data['person'].get('uf', None)
+        except:
+            pass
+        try:
+            data['person_carrier'] = data['person_carrier'].get('uf', None)
+        except:
+            pass
+        try:
+            data['driver'] = data['driver'].get('uf', None)
+        except:
+            pass
+        try:
+            data['vehicle_tractor'] = data['vehicle_tractor'].get('uf', None)
+        except:
+            pass
+        try:
+            data['vehicle_trailer'] = data['vehicle_trailer'].get('uf', None)
+        except:
+            pass
+
+        if 'sn' in data and data['sn'] == '':
+            data['sn'] = None
+        if 'freight_price_received' in data and data['freight_price_received'] == '':
+            data['freight_price_received'] = None
+        if 'freight_cost' in data and data['freight_cost'] == '':
+            data['freight_cost'] = None
+        if 'freight_cost_paid' in data and data['freight_cost_paid'] == '':
+            data['freight_cost_paid'] = None
+        if 'mode' in data and data['mode'] == '':
+            data['mode'] = None
+        if 'incoterm' in data and data['incoterm'] == '':
+            data['incoterm'] = None
+        if 'bt' in data and data['bt'] == '':
+            data['bt'] = None
+        if 'status' in data and data['status'] == '':
+            data['status'] = None
+        if 'currency' in data and data['currency'] == '':
+            data['currency'] = None
+        if 'cmr' in data and (data['cmr'] == '' or data['cmr'] == None):
+            data['cmr'] = None
+        if 'assigned_user' in data and data['assigned_user'] == '':
+            data['assigned_user'] = None
+        if 'is_locked' in data and (data['is_locked'] == '' or data['is_locked'] == None):
+            data['is_locked'] = False
+        if 'is_simpleload' in data and (data['is_simpleload'] == '' or data['is_simpleload'] == None):
+            data['is_simpleload'] = False
+        if 'customer' in data and data['customer'] == '':
+            data['customer'] = None
+        if 'invs' in data and data['invs'] == '':
+            data['invs'] = None
+        if 'payment_term' in data and data['payment_term'] == '':
+            data['payment_term'] = None
+        if 'load_ctrs' in data and data['load_ctrs'] == '':
+            data['load_ctrs'] = None
+
+        return super(LoadSerializer, self).to_internal_value(data)
+
+    def to_representation(self, instance):
+        response = super().to_representation(instance)
+
+        # print('8787', instance)
+        response['assigned_user'] = UserSerializer(
+            instance.assigned_user).data if instance.assigned_user else None
+        response['bill_to'] = ContactSerializer(
+            instance.bill_to).data if instance.bill_to else None
+        response['person'] = PersonSerializer(
+            instance.person).data if instance.person else None
+        response['payment_term'] = NoteSerializer(
+            instance.payment_term).data if instance.payment_term else None
+        response['trip'] = instance.trip.uf if instance.trip else None
+        response['trip_num'] = instance.trip.rn if instance.trip else None
+
+        response['carrier'] = ContactSerializer(
+            instance.carrier).data if instance.carrier else None
+        response['person_carrier'] = PersonSerializer(
+            instance.person_carrier).data if instance.person_carrier else None
+        response['driver'] = PersonSerializer(
+            instance.driver).data if instance.driver else None
+        response['vehicle_tractor'] = VehicleUnitSerializer(
+            instance.vehicle_tractor).data if instance.vehicle_tractor else None
+        response['vehicle_trailer'] = VehicleUnitSerializer(
+            instance.vehicle_trailer).data if instance.vehicle_trailer else None
+
+        response['load_tors'] = TorSerializer(
+            instance.load_tors, many=True).data if instance.load_tors else None
+        response['load_ctrs'] = CtrSerializer(
+            instance.load_ctrs, many=True).data if instance.load_ctrs else None
+        response['load_invs'] = InvSerializer(
+            instance.load_invs, many=True).data if instance.load_invs else None
+        response['load_exps'] = ExpSerializer(
+            instance.load_exps, many=True).data if instance.load_exps else None
+
+        return response
+
+    def create(self, validated_data):
+        # print('1614:', validated_data)
+
+        # Extract nested CMR data before relations pop it
+        cmr_data = validated_data.pop('cmr', None)
+
+        relations, reverse_relations = self._extract_relations(validated_data)
+
+        # Create or update direct relations (foreign key, one-to-one)
+        self.update_or_create_direct_relations(
+            validated_data,
+            relations,
+        )
+
+        # Create instance with atomic
+        with transaction.atomic():
+            instance = super(NestedCreateMixin, self).create(validated_data)
+            self.update_or_create_reverse_relations(
+                instance, reverse_relations)
+
+            # ✅ Handle CMR update/create automatically
+            if cmr_data:
+
+                CMR.objects.update_or_create(
+                    load=instance,
+                    defaults={**cmr_data, "company": instance.company},
+                )
+
+        return instance
+
+    def update(self, instance, validated_data):
+        # print('3347', validated_data)
+
+        # # Extract nested CMR data before relations pop it
+        # cmr_data = validated_data.pop('cmr', None)
+
+        relations, reverse_relations = self._extract_relations(validated_data)
+
+        # Create or update direct relations (foreign key, one-to-one)
+        self.update_or_create_direct_relations(validated_data, relations)
+
+        # Update instance with atomic
+        with transaction.atomic():
+            instance = super(NestedUpdateMixin, self).update(
+                instance,
+                validated_data,
+            )
+            self.update_or_create_reverse_relations(
+                instance, reverse_relations)
+            self.delete_reverse_relations_if_need(instance, reverse_relations)
+
+            # # ✅ Handle CMR update/create automatically
+            # if cmr_data:
+
+            #     CMR.objects.update_or_create(
+            #         load=instance,
+            #         defaults={**cmr_data, "company": instance.company},
+            #     )
+
+            instance.refresh_from_db()
+            return instance
+
+    class Meta:
+        model = Load
+        fields = ('assigned_user', 'sn', 'date_order', 'customer_ref', 'customer_notes', 'is_locked', 'is_simpleload',
+                  'load_detail', 'load_size', 'load_add_ons', 'date_due', 'date_due_freight_cost', 'freight_cost', 'freight_price_received',
+                  'freight_cost_paid', 'load_boards_id', 'doc_lang', 'load_address', 'unload_address',
+                  'load_boards_date_published', 'load_board_date_load_min', 'load_board_date_load_max', 'load_board_data', 'load_board_comments',
+                  'hb', 'mb', 'booking_number', 'comment1', 'bill_to', 'person', 'currency', 'mode', 'bt', 'status', 'incoterm', 'cmr',
+                  'load_comments', 'payment_term', 'entry_loads', 'load_iteminvs', 'load_tors', 'load_ctrs', 'load_imageuploads', 'load_invs',
+                  'load_histories', 'load_exps', 'uf',
+                  'carrier', 'person_carrier', 'driver', 'vehicle_tractor', 'vehicle_trailer',
+                  )
+        read_only_fields = ['load_board_data', 'load_board_comments']
+
+        depth = 2
+
+
+class LoadPatchSerializer(WritableNestedModelSerializer):
+    load_iteminvs = ItemInvSerializer(many=True)
+
+    def update(self, instance, validated_data):
+        print('6464', validated_data)
+
+        relations, reverse_relations = self._extract_relations(validated_data)
+
+        # Create or update direct relations (foreign key, one-to-one)
+        self.update_or_create_direct_relations(
+            validated_data,
+            relations,
+        )
+
+        # Update instance with atomic
+        with transaction.atomic():
+            instance = super(NestedUpdateMixin, self).update(
+                instance,
+                validated_data,
+            )
+            self.update_or_create_reverse_relations(
+                instance, reverse_relations)
+            self.delete_reverse_relations_if_need(instance, reverse_relations)
+            instance.refresh_from_db()
+            return instance
+
+    class Meta:
+        model = Load
+        # Only include the fields to allow patching
+        fields = ['load_iteminvs', "freight_cost",
+                  "freight_price_received", "freight_cost_paid"]
+
+        # Should never be updated
+        read_only_fields = ["id", "company", "assigned_user", "uf"]
+
+
+class LoadBasicSerializer(WritableNestedModelSerializer):
+    currency = CurrencySerializer(allow_null=True)
+    load_iteminvs = ItemInvSerializer(many=True)
+
+    def to_representation(self, instance):
+        response = super().to_representation(instance)
+
+        response['bill_to'] = ContactSerializer(
+            instance.bill_to).data if instance.bill_to else None
+
+        return response
+
+    class Meta:
+        model = Load
+        fields = ('sn', 'bill_to', 'currency', 'load_iteminvs', 'uf')
+
+        depth = 2

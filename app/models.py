@@ -10,8 +10,8 @@ from django.utils import timezone
 from cryptography.fernet import Fernet
 
 from abb.models import Country
-from abb.utils import get_default_empty_strings_20, hex_uuid, get_default_notification_status_3
-from abb.constants import BASE_COUNTRIES, BASE_COUNTRIES_LIST, APP_LANGS, MEMBERSHIP_CHOICES
+from abb.utils import get_default_empty_strings_20, get_order_by_default, hex_uuid, get_default_notification_status_3, validate_columns_arrayfield_length_min_5
+from abb.constants import BASE_COUNTRIES, BASE_COUNTRIES_LIST, APP_LANGS, DOC_LANG_CHOICES, MEMBERSHIP_CHOICES
 from abb.validators import validate_columns_arrayfield_length_exactly_20
 
 import logging
@@ -118,6 +118,30 @@ class UserSettings(models.Model):
         max_length=20, null=True, blank=True), default=get_default_empty_strings_20,
         size=20, validators=[validate_columns_arrayfield_length_exactly_20]
     )
+
+    base_doc_lang = models.CharField(
+        choices=DOC_LANG_CHOICES, max_length=2, blank=True, null=True)
+    rows_per_page = models.PositiveSmallIntegerField(
+        blank=True, null=True, default=20)
+    myitems_all = models.CharField(
+        max_length=10, blank=True, null=True, default='all')
+    order_by = ArrayField(models.CharField(
+        max_length=20, null=True, blank=True), default=get_order_by_default, size=7)
+
+    load_columns = ArrayField(models.CharField(
+        max_length=20, null=True, blank=True), null=True, blank=True, size=20, validators=[validate_columns_arrayfield_length_min_5])
+    trip_columns = ArrayField(models.CharField(
+        max_length=20, null=True, blank=True), null=True, blank=True, size=20, validators=[validate_columns_arrayfield_length_min_5])
+    tor_columns = ArrayField(models.CharField(
+        max_length=20, null=True, blank=True), null=True, blank=True, size=20, validators=[validate_columns_arrayfield_length_min_5])
+    ctr_columns = ArrayField(models.CharField(
+        max_length=20, null=True, blank=True), null=True, blank=True, size=20, validators=[validate_columns_arrayfield_length_min_5])
+    quote_columns = ArrayField(models.CharField(
+        max_length=20, null=True, blank=True), null=True, blank=True, size=20, validators=[validate_columns_arrayfield_length_min_5])
+    inv_columns = ArrayField(models.CharField(
+        max_length=20, null=True, blank=True), null=True, blank=True, size=20, validators=[validate_columns_arrayfield_length_min_5])
+    exp_columns = ArrayField(models.CharField(
+        max_length=20, null=True, blank=True), null=True, blank=True, size=20, validators=[validate_columns_arrayfield_length_min_5])
 
     class Meta:
         verbose_name = "User Settings"
