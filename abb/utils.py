@@ -215,7 +215,7 @@ def _totalsEntries(entriesList):
         if any(entry.action == 'loading' for entry in entriesList):
             for entry in entriesList:
                 if entry.action == 'loading':
-                    for item in entry.entrydetails.all():
+                    for item in entry.entry_details.all():
                         piecesList.append(float(item.pieces or 0))
                         weightList.append(float(item.weight or 0))
                         volumeList.append(float(item.volume or 0))
@@ -223,7 +223,7 @@ def _totalsEntries(entriesList):
         else:
             for entry in entriesList:
                 if entry.action == 'unloading':
-                    for item in entry.entrydetails.all():
+                    for item in entry.entry_details.all():
                         piecesList.append(float(item.pieces or 0))
                         weightList.append(float(item.weight or 0))
                         volumeList.append(float(item.volume or 0))

@@ -6,8 +6,11 @@ ENV PYTHONUNBUFFERED=1
 
 WORKDIR /usr/src/app
 
-# install system dependencies
+# INSTALL SYSTEM DEPENDANCIES
 RUN apt-get update
+
+# CREATE STATIC DIRECTORY HERE
+RUN mkdir -p /usr/src/app/static
 
 COPY ./requirements.txt .
 

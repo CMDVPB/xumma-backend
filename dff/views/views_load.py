@@ -21,6 +21,7 @@ from rest_framework.exceptions import ValidationError
 from abb.pagination import LimitResultsSetPagination
 from abb.permissions import AssignedUserManagerOrReadOnlyIfLocked, AssignedUserOrManagerOrReadOnly
 from abb.utils import get_user_company, is_valid_queryparam
+from app.utils import is_user_member_group
 from axx.models import Ctr, Exp, Inv, Load, Tor
 from ayy.models import CMR, Comment, Entry, ImageUpload, ItemInv
 
@@ -419,7 +420,7 @@ class LoadDetailView(RetrieveUpdateDestroyAPIView):
                 'shipper__company',
                 'shipper__country_code_legal',
                 'shipper__country_code_post'
-            ).prefetch_related('entrydetails').all()
+            ).prefetch_related('entry_details').all()
 
             itemInvs_qs = ItemInv.objects.select_related(
                 'item_for_item_inv').select_related('item_for_item_cost').all()

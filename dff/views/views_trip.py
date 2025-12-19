@@ -1,4 +1,5 @@
 import time
+import logging
 from django.contrib.auth import get_user_model
 from django.db.models import QuerySet, Prefetch, Q, F
 from rest_framework import status
@@ -6,15 +7,14 @@ from rest_framework.generics import CreateAPIView, ListAPIView, RetrieveUpdateDe
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 
-
-import logging
-
 from abb.pagination import LimitResultsSetPagination
 from abb.permissions import AssignedUserManagerOrReadOnlyIfLocked, HasGroupPermission
 from abb.utils import check_not_unique_num, get_user_company, is_valid_queryparam
+from app.utils import is_user_member_group
 from axx.models import Exp, Load, Tor, Trip
 from ayy.models import Comment, Entry, ItemInv, RouteSheet
 from dff.serializers.serializers_trip import TripCreateUpdateSerializer, TripListSerializer, TripSerializer
+
 logger = logging.getLogger(__name__)
 
 
@@ -46,7 +46,7 @@ class TripListView(ListAPIView):
 
             lodad_entries = Entry.objects.select_related(
                 'shipper', 'shipper__company', 'shipper__country_code_legal', 'shipper__country_code_post').\
-                prefetch_related('entrydetails').all()
+                prefetch_related('entry_details').all()
 
             comments_qs = Comment.objects.all()
             trip_loads_qs = Load.objects.filter(company__id=user_company.id).prefetch_related(
@@ -288,7 +288,7 @@ class TripDetailView(RetrieveUpdateDestroyAPIView):
         load_comments = Comment.objects.all()
 
         load_entries = Entry.objects.select_related(
-            'shipper', 'shipper__company', 'shipper__country_code_legal', 'shipper__country_code_post').prefetch_related('entrydetails').all()
+            'shipper', 'shipper__company', 'shipper__country_code_legal', 'shipper__country_code_post').prefetch_related('entry_details').all()
 
         itemInvs = ItemInv.objects.select_related(
             'item_for_item_inv').select_related('item_for_item_cost').all()

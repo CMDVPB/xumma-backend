@@ -96,21 +96,10 @@ class UserCreate(CreateAPIView):
             ConfirmationEmail(self.request, context).send(to)
 
 
-class UserDetailSelf(generics.GenericAPIView, mixins.RetrieveModelMixin, mixins.UpdateModelMixin, mixins.DestroyModelMixin):
+class UserDetailSelfView(generics.GenericAPIView, mixins.RetrieveModelMixin, mixins.UpdateModelMixin, mixins.DestroyModelMixin):
     """ self get/update/delete user """
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated]
-
-    # def get_queryset(self, *args, **kwargs):
-    #     user_company = self.request.user.company_set.all().first()
-    #     company_users = user_company.user.all()
-    #     company_users_ids = [user.id for user in company_users]
-
-    #     queryset = User.objects.filter(id__in=company_users_ids)
-
-    #     print('4342', self.request,  len(queryset))
-
-    #     return queryset
 
     def get_object(self):
         # Directly return the current user

@@ -4,3 +4,11 @@ env/
 venv/
 *.pem
 .tar
+*.tar
+.vscode
+
+
+# Django stuff
+staticfiles/
+media/
+static/

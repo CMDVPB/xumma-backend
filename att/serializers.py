@@ -107,7 +107,5 @@ class VehicleCompanySerializer(WritableNestedModelSerializer):
     class Meta:
         model = VehicleCompany
         fields = ('reg_number', 'vin', 'vehicle_type', 'is_available', 'is_archived', 'uf',
-
-
                   'brand', 'vehicle_body', 'emission_class',
                   )

@@ -29,7 +29,9 @@ logger = logging.getLogger(__name__)
 
 class ContactListCreate(ListCreateAPIView):
     serializer_class = ContactSerializer
-    permission_classes = [IsAuthenticated, IsSubscriptionActiveOrReadOnly]
+    permission_classes = [IsAuthenticated,
+                          #   IsSubscriptionActiveOrReadOnly
+                          ]
     lookup_field = 'uf'
     http_method_names = ['head', 'get', 'post']
 

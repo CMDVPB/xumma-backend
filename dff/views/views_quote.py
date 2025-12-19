@@ -55,7 +55,7 @@ class QuoteListView(ListAPIView):
                 'item_for_item_inv').all()
 
             entries = Entry.objects.select_related(
-                'shipper', 'shipper__country_code_post',).prefetch_related('entrydetails').all()
+                'shipper', 'shipper__country_code_post',).prefetch_related('entry_details').all()
 
             queryset = queryset.prefetch_related(
                 Prefetch('inv_comments', queryset=comments)).prefetch_related(

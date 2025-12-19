@@ -7,7 +7,7 @@ from abb.constants import ACTION_CHOICES, UNIT_MEASUREMENT_CHOICES, VAT_CHOICES,
 from abb.models import Country, Currency
 from abb.utils import assign_new_num, hex_uuid, default_notification_status_3, upload_to
 
-from app.models import Company
+from app.models import CategoryGeneral, Company, TypeGeneral
 from axx.models import Ctr, Exp, Inv, Load, Tor, Trip
 from att.models import Contact, Person, VehicleCompany
 
@@ -284,8 +284,8 @@ class Entry(models.Model):
     uf = models.CharField(max_length=36, default=hex_uuid)
     action = models.CharField(
         choices=ACTION_CHOICES, max_length=20, null=True, blank=True)
-    contact = models.ForeignKey(
-        Contact, on_delete=models.SET_NULL, blank=True, null=True, related_name='contact_entries')
+    shipper = models.ForeignKey(
+        Contact, on_delete=models.SET_NULL, blank=True, null=True, related_name='shipper_entries')
     date_load = models.DateTimeField(null=True, blank=True)
 
     time_load_min = models.DateTimeField(null=True, blank=True)
@@ -551,3 +551,95 @@ class History(models.Model):
 
     def __str__(self):
         return str(self.id) or ''
+
+### Base Model ###
+
+
+# class TransportDocument(models.Model):
+
+#     company = models.ForeignKey(
+#         Company,
+#         on_delete=models.CASCADE,
+#         related_name="%(class)ss"
+#     )
+
+#     series = models.CharField(max_length=20)
+#     number = models.CharField(max_length=50)
+
+#     issued_at = models.DateField()
+#     valid_from = models.DateField(null=True, blank=True)
+#     valid_until = models.DateField(null=True, blank=True)
+
+#     notes = models.TextField(blank=True)
+
+#     created_at = models.DateTimeField(auto_now_add=True)
+
+#     class Meta:
+#         abstract = True
+#         ordering = ["-issued_at"]
+
+#     def __str__(self):
+#         return f"{self.series} {self.number}"
+
+
+class CMRStockBatch(models.Model):
+    uf = models.CharField(max_length=36, default=hex_uuid, db_index=True)
+
+    company = models.ForeignKey(
+        Company,
+        on_delete=models.CASCADE,
+        related_name="company_cmr_stock"
+    )
+
+    series = models.CharField(max_length=20)
+
+    number_from = models.PositiveIntegerField()
+    number_to = models.PositiveIntegerField()
+
+    received_at = models.DateField()
+
+    total_count = models.PositiveIntegerField(editable=False)
+    used_count = models.PositiveIntegerField(default=0)
+
+    notes = models.TextField(max_length=1000, blank=True)
+
+    class Meta:
+        unique_together = ("company", "series", "number_from", "number_to")
+
+    def save(self, *args, **kwargs):
+        self.total_count = self.number_to - self.number_from + 1
+        super().save(*args, **kwargs)
+
+    @property
+    def available_count(self):
+        return self.total_count - self.used_count
+
+
+class AuthorizationStockBatch(models.Model):
+    uf = models.CharField(max_length=36, default=hex_uuid, db_index=True)
+
+    company = models.ForeignKey(
+        Company,
+        on_delete=models.CASCADE,
+        related_name="company_authorizations_stock"
+    )
+
+    series = models.CharField(max_length=20)
+    number = models.CharField(max_length=20)
+    received_at = models.DateField(null=True, blank=True)
+    date_expire = models.DateField(null=True, blank=True)
+    price = models.SmallIntegerField(null=True, blank=True)
+    notes = models.TextField(max_length=1000, blank=True)
+
+    type_authorization = models.ForeignKey(TypeGeneral, on_delete=models.SET_NULL,
+                                           null=True, blank=True, related_name='type_authorizations')
+    category_authorization = models.ForeignKey(CategoryGeneral, on_delete=models.SET_NULL,
+                                               null=True, blank=True, related_name='category_authorizations')
+    vehicle_authorization = models.ForeignKey(VehicleCompany, on_delete=models.SET_NULL,
+                                              null=True, blank=True, related_name='vehicle_authorizations')
+    countries_authorization = models.ManyToManyField(
+        Country, related_name="authorization_countries")
+
+    class Meta:
+        unique_together = ('type_authorization', "company",
+                           "number", "category_authorization")

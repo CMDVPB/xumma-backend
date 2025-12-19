@@ -1,3 +1,4 @@
+import logging
 import smtplib
 from datetime import datetime, timedelta
 from django.db import IntegrityError
@@ -5,20 +6,21 @@ from django.utils import timezone
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
-from rest_framework.generics import ListAPIView, RetrieveUpdateDestroyAPIView, CreateAPIView, DestroyAPIView, RetrieveUpdateAPIView
+from rest_framework.generics import ListAPIView, ListCreateAPIView, RetrieveUpdateDestroyAPIView, \
+    CreateAPIView, DestroyAPIView, RetrieveUpdateAPIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework import permissions, status, exceptions
 from rest_framework.decorators import authentication_classes, api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 
+from abb.utils import get_user_company
 from app.models import SMTPSettings, UserSettings
 from app.serializers import UserSettingsSerializer
+from ayy.models import AuthorizationStockBatch, CMRStockBatch
+from dff.serializers.serializers_document import AuthorizationStockBatchSerializer, CMRStockBatchSerializer
 
-
-import logging
 logger = logging.getLogger(__name__)
-
 
 User = get_user_model()
 
@@ -39,7 +41,85 @@ class UserSettingsView(RetrieveUpdateDestroyAPIView):
         return self.partial_update(request, *args, **kwargs)
 
 
-### SMTP Settings ###
+class CMRStockBatchListCreateView(ListCreateAPIView):
+    serializer_class = CMRStockBatchSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        try:
+            user_company = get_user_company(self.request.user)
+
+            queryset = CMRStockBatch.objects.filter(
+                company__id=user_company.id)
+
+            return queryset.distinct()
+
+        except Exception as e:
+            logger.error(
+                f'ERRORLOG691 CMRStockBatchView. get_queryset. Error: {e}')
+            return CMRStockBatch.objects.none()
+
+
+class CMRStockBatchDetailsView(RetrieveUpdateDestroyAPIView):
+    serializer_class = CMRStockBatchSerializer
+    permission_classes = [IsAuthenticated]
+    lookup_field = 'uf'
+
+    def get_queryset(self):
+        try:
+            user_company = get_user_company(self.request.user)
+
+            queryset = CMRStockBatch.objects.filter(
+                company__id=user_company.id)
+
+            return queryset.distinct()
+
+        except Exception as e:
+            logger.error(
+                f'ERRORLOG691 CMRStockBatchView. get_queryset. Error: {e}')
+            return CMRStockBatch.objects.none()
+
+
+class AuthorizationStockBatchListCreateView(ListCreateAPIView):
+    serializer_class = AuthorizationStockBatchSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        try:
+            user_company = get_user_company(self.request.user)
+
+            queryset = AuthorizationStockBatch.objects.filter(
+                company__id=user_company.id)
+
+            return queryset.distinct()
+
+        except Exception as e:
+            logger.error(
+                f'ERRORLOG691 AuthorizationStockBatchListCreateView. get_queryset. Error: {e}')
+            return AuthorizationStockBatch.objects.none()
+
+
+class AuthorizationStockBatchDetailsView(RetrieveUpdateDestroyAPIView):
+    serializer_class = AuthorizationStockBatchSerializer
+    permission_classes = [IsAuthenticated]
+    lookup_field = 'uf'
+
+    def get_queryset(self):
+        try:
+            user_company = get_user_company(self.request.user)
+
+            queryset = AuthorizationStockBatch.objects.filter(
+                company__id=user_company.id)
+
+            return queryset.distinct()
+
+        except Exception as e:
+            logger.error(
+                f'ERRORLOG657 AuthorizationStockBatchDetailsView. get_queryset. Error: {e}')
+            return AuthorizationStockBatch.objects.none()
+
+
+### Start SMTP Settings ###
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def test_smtp_connection_view(request):
@@ -153,3 +233,4 @@ def get_post_delete_user_smtp_settings(request):
     except Exception as e:
         print('EV579', e)
         return Response({'error': 'Something went wrong', 'details': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+### End SMTP Settings ###

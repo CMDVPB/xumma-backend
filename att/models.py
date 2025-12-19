@@ -253,8 +253,6 @@ class Person(ProtectedDeleteMixin, models.Model):
 
     uf = models.CharField(max_length=36, default=hex_uuid,
                           db_index=True, unique=True)
-    site = models.ForeignKey(
-        ContactSite, on_delete=models.CASCADE, related_name="site_persons")
 
     first_name = models.CharField(max_length=80)
     last_name = models.CharField(max_length=80, blank=True, null=True)
@@ -265,6 +263,12 @@ class Person(ProtectedDeleteMixin, models.Model):
 
     is_driver = models.BooleanField(default=False, null=True, blank=True)
     archived = models.BooleanField(default=False)
+
+    contact = models.ForeignKey(Contact, on_delete=models.CASCADE,
+                                blank=True, null=True, related_name='contact_persons')
+
+    site = models.ForeignKey(
+        ContactSite, on_delete=models.CASCADE, blank=True, null=True, related_name="site_persons")
 
     target_group = models.ManyToManyField(
         TargetGroup, related_name="target_group_persons")

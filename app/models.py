@@ -31,7 +31,7 @@ class UserAccountManager(BaseUserManager):
             **kwargs
         )
 
-        # print('M240', kwargs)
+        print('M240', kwargs)
 
         base_country = kwargs.get('base_country', 'md')
         if base_country not in BASE_COUNTRIES_LIST:
@@ -465,3 +465,39 @@ class SMTPSettings(models.Model):
 
     def __str__(self):
         return f"{self.user}'s SMTP Settings"
+
+
+class CategoryGeneral(models.Model):
+    '''
+    CategoryGeneral can be used as categories model for different other modules filtering by serial_number
+    '''
+
+    uf = models.CharField(max_length=36, default=hex_uuid,
+                          db_index=True, unique=True)
+    company = models.ForeignKey(
+        Company, on_delete=models.CASCADE, null=True, blank=True, related_name='company_categories')
+
+    serial_number = models.SmallIntegerField(unique=True)
+    name = models.CharField(max_length=100)
+
+    class Meta:
+        verbose_name = "Category General"
+        verbose_name_plural = "Categories General"
+
+
+class TypeGeneral(models.Model):
+    '''
+    TypeGeneral can be used as type model for different other modules filtering by serial_number
+    '''
+
+    uf = models.CharField(max_length=36, default=hex_uuid,
+                          db_index=True, unique=True)
+    company = models.ForeignKey(
+        Company, on_delete=models.CASCADE, null=True, blank=True, related_name='company_types_general')
+
+    serial_number = models.SmallIntegerField(unique=True)
+    name = models.CharField(max_length=100)
+
+    class Meta:
+        verbose_name = "Type General"
+        verbose_name_plural = "Type General"

@@ -9,13 +9,17 @@ from rest_framework import serializers
 
 from abb.custom_serializers import SlugRelatedGetOrCreateField
 from abb.serializers import CurrencySerializer
-from app.serializers import UserBasicSerializer
+from app.serializers import UserBasicSerializer, UserSerializer
 from att.models import Contact, PaymentTerm, Person, VehicleUnit
 from att.serializers import BodyTypeSerializer, IncotermSerializer, ModeTypeSerializer, StatusTypeSerializer
 from axx.models import Ctr, Exp, Inv, Load, Tor
+from dff.serializers.serializers_ctr import CtrSerializer
 from dff.serializers.serializers_entry_detail import EntryBasicReadListSerializer, EntrySerializer
+from dff.serializers.serializers_exp import ExpSerializer
+from dff.serializers.serializers_inv import InvSerializer
 from dff.serializers.serializers_item_inv import ItemInvSerializer
-from dff.serializers.serializers_other import CMRSerializer, CommentSerializer, ContactBasicReadSerializer, ContactSerializer, HistorySerializer, ImageSerializer, VehicleUnitSerializer
+from dff.serializers.serializers_other import CMRSerializer, CommentSerializer, ContactBasicReadSerializer, ContactSerializer, HistorySerializer, ImageSerializer, PaymentTermSerializer, PersonSerializer, VehicleUnitSerializer
+from dff.serializers.serializers_tor import TorSerializer
 
 
 User = get_user_model()
@@ -128,17 +132,14 @@ class LoadListSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
 
     class Meta:
         model = Load
-        fields = ('sn', 'date_order', 'customer_ref', 'customer_notes', 'load_detail', 'load_size', 'load_add_ons',
-                  'date_due', 'date_due_freight_cost', 'freight_cost', 'freight_price_received',
-                  'freight_cost_paid',
-                  'load_boards_id', 'load_board_data', 'load_board_comments',
-                  'load_address', 'unload_address', 'hb', 'mb', 'booking_number', 'comment1', 'uf',
+        fields = ('sn', 'date_order', 'customer_ref', 'customer_notes', 'load_detail', 'load_size', 'load_add_ons', 'uf',
+                  'date_due',
+                  'load_address', 'unload_address', 'hb', 'mb', 'booking_number', 'comment1',
                   'assigned_user', 'bill_to', 'mode', 'bt', 'currency', 'status', 'incoterm', 'carrier', 'vehicle_tractor', 'vehicle_trailer',
                   'load_comments', 'load_tors', 'entry_loads', 'load_iteminvs',
                   'load_imageuploads'
                   )
         read_only_fields = ['load_board_data']
-        depth = 2
 
 
 class LoadSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
@@ -290,8 +291,7 @@ class LoadSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
             data['assigned_user'] = None
         if 'is_locked' in data and (data['is_locked'] == '' or data['is_locked'] == None):
             data['is_locked'] = False
-        if 'is_simpleload' in data and (data['is_simpleload'] == '' or data['is_simpleload'] == None):
-            data['is_simpleload'] = False
+
         if 'customer' in data and data['customer'] == '':
             data['customer'] = None
         if 'invs' in data and data['invs'] == '':
@@ -313,7 +313,7 @@ class LoadSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
             instance.bill_to).data if instance.bill_to else None
         response['person'] = PersonSerializer(
             instance.person).data if instance.person else None
-        response['payment_term'] = NoteSerializer(
+        response['payment_term'] = PaymentTermSerializer(
             instance.payment_term).data if instance.payment_term else None
         response['trip'] = instance.trip.uf if instance.trip else None
         response['trip_num'] = instance.trip.rn if instance.trip else None
@@ -404,18 +404,14 @@ class LoadSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
 
     class Meta:
         model = Load
-        fields = ('assigned_user', 'sn', 'date_order', 'customer_ref', 'customer_notes', 'is_locked', 'is_simpleload',
-                  'load_detail', 'load_size', 'load_add_ons', 'date_due', 'date_due_freight_cost', 'freight_cost', 'freight_price_received',
-                  'freight_cost_paid', 'load_boards_id', 'doc_lang', 'load_address', 'unload_address',
-                  'load_boards_date_published', 'load_board_date_load_min', 'load_board_date_load_max', 'load_board_data', 'load_board_comments',
+        fields = ('assigned_user', 'sn', 'date_order', 'customer_ref', 'customer_notes', 'is_locked', 'uf',
+                  'load_detail', 'load_size', 'load_add_ons', 'date_due', 'doc_lang', 'load_address', 'unload_address',
                   'hb', 'mb', 'booking_number', 'comment1', 'bill_to', 'person', 'currency', 'mode', 'bt', 'status', 'incoterm', 'cmr',
                   'load_comments', 'payment_term', 'entry_loads', 'load_iteminvs', 'load_tors', 'load_ctrs', 'load_imageuploads', 'load_invs',
-                  'load_histories', 'load_exps', 'uf',
+                  'load_histories', 'load_exps',
                   'carrier', 'person_carrier', 'driver', 'vehicle_tractor', 'vehicle_trailer',
                   )
         read_only_fields = ['load_board_data', 'load_board_comments']
-
-        depth = 2
 
 
 class LoadPatchSerializer(WritableNestedModelSerializer):

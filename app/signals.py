@@ -42,24 +42,48 @@ def create_company_add_user_to_company_and_user_to_group_level_signal(user, requ
         pass
 
 
-@receiver(user_registered)
-def manager_add_new_user_to_company_and_add_user_to_group_level_signal(user, request, **kwargs):
+# @receiver(user_registered)
+# def manager_add_new_user_to_company_and_add_user_to_group_level_signal(user, request, **kwargs):
 
-    logger.info(
-        f'SG777 manager_add_new_user_to_company user: {user}, request.user: {request.user}')
+#     allowed_levels = {
+#         "level_manager",
+#         "level_finance",
+#         "level_leader",
+#         "level_dispatcher",
+#         "level_driver",
+#     }
 
-    if user and request.user.is_authenticated and is_user_member_group(request.user, 'level_manager'):
-        try:
-            manager_company = request.user.company_set.all().first()
-            user.company_set.add(manager_company)
-            user.groups.add(Group.objects.get(name='level_dispatcher'))
-            print('S767', manager_company)
-        except Exception as e:
-            print('ES139', e)
-            raise ValueError('Group could not be created')
+#     logger.info(
+#         f'SG777 manager_add_new_user_to_company user: {user}, request.user: {request.user}')
 
-    else:
-        pass
+#     print('Signal5970', request.data)
+
+#     if not user or not request or not request.user.is_authenticated:
+#         return
+
+#     if not is_user_member_group(request.user, "level_manager"):
+#         return
+
+#     requested_level = request.data.get('level')
+
+#     try:
+#         manager_company = request.user.company_set.all().first()
+#         if manager_company:
+#             user.company_set.add(manager_company)
+
+#         if requested_level in allowed_levels:
+#             group = Group.objects.filter(name=requested_level).first()
+#             if group:
+#                 user.groups.add(group)
+#             else:
+#                 logger.warning(f"Group '{requested_level}' does not exist")
+
+#         print('S767', manager_company)
+
+#     except Exception as e:
+#         logger.error(
+#             f'ERRORLOG139 manager_add_new_user_to_company_and_add_user_to_group_level_signal. Error: {e}')
+#         raise ValueError('Group could not be created')
 
 
 @receiver(user_registered)

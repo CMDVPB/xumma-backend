@@ -21,6 +21,7 @@ __pycache__/
 # Django stuff
 staticfiles/
 media/
+static/
 
 # IDE / Editor files
 .idea/

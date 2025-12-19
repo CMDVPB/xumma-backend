@@ -22,6 +22,6 @@
 
 ### How to start (needs to be created in Admin)
 
-- add Groups: level_manager, level_leader, level_dispatcher, level_finance, level_driver
+- add Groups: level_manager, level_leader, level_dispatcher, level_finance, level_driver, level_employee
 - add Groups: type_shipper, type_forwarder, type_carrier
 - add Memberships: basic, pro, premium

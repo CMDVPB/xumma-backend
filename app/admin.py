@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Company, User, DocumentSeries, Membership, Subscription, SMTPSettings, UserSettings
+from .models import CategoryGeneral, Company, TypeGeneral, User, DocumentSeries, Membership, Subscription, SMTPSettings, UserSettings
 from .admin_utils import DocumentSeriesNumberRangeFilter
 
 
@@ -17,7 +17,8 @@ class UserAdmin(admin.ModelAdmin):
          'fields': ('first_name', 'last_name',)}),
         ('Permissions', {'fields': ('is_active', 'is_staff',
          'is_superuser', 'groups', 'user_permissions')}),
-        ('Important dates', {'fields': ('last_login', 'date_joined')}),
+        ('Important dates', {
+         'fields': ('last_login', 'date_joined', 'date_registered', 'date_of_birth')}),
         ('Settings', {'fields': ('lang', 'base_country')}),
     )
 
@@ -113,3 +114,15 @@ class UserSettingsAdmin(admin.ModelAdmin):
     list_display = ('id', 'user', )
 
     search_fields = ('user__email',)
+
+
+@admin.register(CategoryGeneral)
+class CategoryGeneralAdmin(admin.ModelAdmin):
+
+    list_display = ('id', 'company', 'serial_number', 'name')
+
+
+@admin.register(TypeGeneral)
+class TypeGeneralAdmin(admin.ModelAdmin):
+
+    list_display = ('id', 'company', 'serial_number', 'name')

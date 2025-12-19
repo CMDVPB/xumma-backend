@@ -341,9 +341,9 @@ class ContactSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
                   'fiscal_code', 'vat_code', 'reg_com', 'subscribed_capital',
                   'is_vat_payer', 'is_vat_on_receipt', 'email', 'phone', 'messanger',
                   'country_code_legal', 'zip_code_legal', 'city_legal', 'address_legal', 'county_legal', 'sect_legal',
-                  'country_code_post', 'zip_code_post', 'city_post', 'address_post', 'bank_name', 'comment1', 'comment2',
+                  'country_code_post', 'zip_code_post', 'city_post', 'address_post', 'comment1', 'comment2',
                   'lat', 'lon',
-                  'contact_persons', 'contact_vehicle_units', 'contact_bank_accounts', )
+                  'contact_persons', 'contact_vehicle_units', 'contact_bank_accounts')
 
 
 class TargetGroupSerializer(WritableNestedModelSerializer):

@@ -13,7 +13,6 @@ from att.serializers import BodyTypeSerializer, IncotermSerializer, ModeTypeSeri
 from axx.models import Inv, Load, Series
 from dff.serializers.serializers_entry_detail import EntrySerializer
 from dff.serializers.serializers_item_inv import ItemInvSerializer
-from dff.serializers.serializers_load import LoadBasicReadSerializer
 from dff.serializers.serializers_other import CommentSerializer, ContactBasicReadSerializer, ContactSerializer, HistorySerializer, PaymentTermSerializer, PersonSerializer, TermSerializer
 
 import logging
@@ -179,6 +178,8 @@ class InvSerializer(WritableNestedModelSerializer):
         return super(InvSerializer, self).to_internal_value(data_copy)
 
     def to_representation(self, instance):
+        from dff.serializers.serializers_load import LoadBasicReadSerializer
+
         response = super().to_representation(instance)
 
         response['assigned_user'] = UserSerializer(
@@ -240,8 +241,6 @@ class InvSerializer(WritableNestedModelSerializer):
         model = Inv
         fields = ('assigned_user', 'qn', 'vn', 'date_inv', 'date_due', 'an', 'date_act', 'bill_to',
                   'payment_term', 'currency', 'is_locked', 'iteminv_invs', 'load_size', 'load_add_ons', 'doc_lang', 'is_quote', 'uf',
-                  'spv_document_type', 'spv_sent_status', 'spv_ind_upload', 'spv_ind_upload_date', 'spv_ind_upload_status', 'spv_error_code',
-                  'spv_error_message', 'spv_error_message_array',
                   'series', 'load',
                   'inv_comments', 'entry_invs', 'contract_terms', 'load_detail', 'load_address', 'unload_address',
                   'date_load', 'customer_ref', 'note_act', 'customer_notes', 'date_unload', 'person', 'mode', 'bt', 'incoterm',

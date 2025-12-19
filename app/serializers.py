@@ -45,7 +45,7 @@ class UserBasicPlusSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
             response['level'] = level.name
         except Exception as e:
             print('ES475', e)
-            response['level'] = 'level_dispatcher'
+            response['level'] = ''
             pass
 
         return response
@@ -108,7 +108,6 @@ class UserSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
     class Meta:
         model = User
         fields = ('email', 'first_name', 'last_name', 'phone', 'messanger', 'image', 'lang', 'uf',
-
                   'company',
                   )
 

@@ -21,7 +21,7 @@ class EntryBasicReadListSerializer(WritableNestedModelSerializer):
 
     shipper = ContactBasicReadSerializer(allow_null=True)
     country_load = CountrySerializer(allow_null=True)
-    entrydetails = DetailSerializer(many=True)
+    entry_details = DetailSerializer(many=True)
 
     class Meta:
         model = Entry
@@ -37,7 +37,7 @@ class EntrySerializer(WritableNestedModelSerializer):
         allow_null=True, slug_field='uf', queryset=Contact.objects.all())
     country_load = CountrySerializer(allow_null=True)
 
-    entrydetails = DetailSerializer(many=True)
+    entry_details = DetailSerializer(many=True)
 
     def to_internal_value(self, data):
         try:
@@ -61,9 +61,10 @@ class EntrySerializer(WritableNestedModelSerializer):
         return super(EntrySerializer, self).to_internal_value(data)
 
     def to_representation(self, instance):
+
         response = super().to_representation(instance)
 
-        response['load'] = instance.load.id if instance.load and instance.load.id else None
+        # response['load'] = instance.load.id if instance.load and instance.load.id else None
 
         response['shipper'] = ContactSerializer(
             instance.shipper).data if instance.shipper else None
@@ -116,4 +117,4 @@ class EntrySerializer(WritableNestedModelSerializer):
         fields = ('action', 'shipper', 'date_load', 'time_load_min', 'time_load_max',
                   'shipperinstructions1', 'shipperinstructions2', 'tail_lift', 'palletexchange',
                   'dangerousgoods', 'dangerousgoods_class', 'temp_control', 'temp_control_details', 'order',
-                  'country_load', 'zip_load', 'city_load', 'entrydetails', 'uf')
+                  'country_load', 'zip_load', 'city_load', 'entry_details', 'uf')
