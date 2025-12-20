@@ -119,6 +119,9 @@ class Trip(models.Model):
     load_order = ArrayField(ArrayField(models.CharField(
         max_length=36, null=True, blank=True), null=True, blank=True), null=True, blank=True)
 
+    drivers = models.ManyToManyField(
+        User, through="TripDriver", related_name="drivers_trip",  blank=True)
+
     def save(self, *args, **kwargs):
         if self.rn == None or self.rn == '':
             items_list_qs, num_new = None, None
@@ -163,6 +166,29 @@ class Trip(models.Model):
 
     def __str__(self):
         return str(self.rn) or ''
+
+
+class TripDriver(models.Model):
+    trip = models.ForeignKey(
+        Trip,
+        on_delete=models.SET_NULL,
+        related_name="driver_links",
+        null=True
+    )
+
+    driver = models.ForeignKey(
+        User,
+        on_delete=models.RESTRICT,
+        related_name="trip_links"
+    )
+
+    class Meta:
+        verbose_name = "Trip driver"
+        verbose_name_plural = "Trip drivers"
+        unique_together = ("trip", "driver")
+
+    def __str__(self):
+        return f"{self.driver} → Trip #{self.trip_id}"
 
 
 class Load(models.Model):
@@ -211,6 +237,11 @@ class Load(models.Model):
     load_address = models.CharField(max_length=100, blank=True, null=True)
     unload_address = models.CharField(max_length=100, blank=True, null=True)
     load_detail = models.CharField(max_length=300, blank=True, null=True)
+
+    is_loaded = models.BooleanField(default=False)
+    is_cleared = models.BooleanField(default=False)
+    is_unloaded = models.BooleanField(default=False)
+    is_invoiced = models.BooleanField(default=False)
 
     mode = models.ForeignKey(ModeType, on_delete=models.SET_NULL,
                              null=True, blank=True, related_name='modetype_loads')

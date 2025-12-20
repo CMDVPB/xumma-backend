@@ -17,8 +17,8 @@ from rest_framework.permissions import IsAuthenticated
 from abb.utils import get_user_company
 from app.models import SMTPSettings, UserSettings
 from app.serializers import UserSettingsSerializer
-from ayy.models import AuthorizationStockBatch, CMRStockBatch
-from dff.serializers.serializers_document import AuthorizationStockBatchSerializer, CMRStockBatchSerializer
+from ayy.models import AuthorizationStockBatch, CMRStockBatch, CTIRStockBatch
+from dff.serializers.serializers_document import AuthorizationStockBatchSerializer, CMRStockBatchSerializer, CTIRStockBatchSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -117,6 +117,45 @@ class AuthorizationStockBatchDetailsView(RetrieveUpdateDestroyAPIView):
             logger.error(
                 f'ERRORLOG657 AuthorizationStockBatchDetailsView. get_queryset. Error: {e}')
             return AuthorizationStockBatch.objects.none()
+
+
+class CTIRStockBatchListCreateView(ListCreateAPIView):
+    serializer_class = CTIRStockBatchSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        try:
+            user_company = get_user_company(self.request.user)
+
+            queryset = CTIRStockBatch.objects.filter(
+                company__id=user_company.id)
+
+            return queryset.distinct()
+
+        except Exception as e:
+            logger.error(
+                f'ERRORLOG691 CTIRStockBatchListCreateView. get_queryset. Error: {e}')
+            return CTIRStockBatch.objects.none()
+
+
+class CTIRStockBatchDetailsView(RetrieveUpdateDestroyAPIView):
+    serializer_class = CTIRStockBatchSerializer
+    permission_classes = [IsAuthenticated]
+    lookup_field = 'uf'
+
+    def get_queryset(self):
+        try:
+            user_company = get_user_company(self.request.user)
+
+            queryset = CTIRStockBatch.objects.filter(
+                company__id=user_company.id)
+
+            return queryset.distinct()
+
+        except Exception as e:
+            logger.error(
+                f'ERRORLOG657 CTIRStockBatchDetailsView. get_queryset. Error: {e}')
+            return CTIRStockBatch.objects.none()
 
 
 ### Start SMTP Settings ###

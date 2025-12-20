@@ -78,6 +78,9 @@ class TripListView(ListAPIView):
         try:
             myitems = self.request.query_params.get('myitems', None)
             text_query = self.request.query_params.get('textQuery', None)
+            vehicle_query = self.request.query_params.get('vehicleQuery', None)
+
+            print('2030', vehicle_query)
 
             if is_valid_queryparam(myitems) and myitems == 'myitems':
                 queryset = queryset.filter(
@@ -91,6 +94,9 @@ class TripListView(ListAPIView):
                                            | Q(vehicle_tractor__reg_number__icontains=text_query)
                                            | Q(vehicle_trailer__reg_number__icontains=text_query)
                                            )
+            elif vehicle_query is not None:
+                queryset = queryset.filter(Q(vehicle_tractor__icontains=vehicle_query) | Q(
+                    vehicle_trailer__icontains=vehicle_query))
 
             else:
                 sortByQuery = self.request.query_params.get(

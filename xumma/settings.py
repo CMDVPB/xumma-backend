@@ -141,6 +141,8 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 
+    'django.middleware.locale.LocaleMiddleware',
+
     ### AxesMiddleware should be the last middleware in the MIDDLEWARE list. ###
     'axes.middleware.AxesMiddleware',
 ]

@@ -8,11 +8,11 @@ from abb.models import Country, Currency
 class CountrySerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
     class Meta:
         model = Country
-        fields = ('id', 'label', 'value', 'value_iso3', 'value_numeric', 'uf')
+        fields = ('label', 'value', 'value_iso3', 'value_numeric', 'uf')
 
 
 class CurrencySerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
     class Meta:
         model = Currency
-        fields = ('id', 'currency_code', 'currency_name',
+        fields = ('currency_code', 'currency_name',
                   'currency_symbol', 'currency_numeric', 'uf')

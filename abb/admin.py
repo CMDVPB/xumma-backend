@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import BodyType, Country, Currency, ExchangeRate
+from .models import BodyType, Country, Currency, ExchangeRate, StatusType, StatusTypeTranslation
 
 
 @admin.register(BodyType)
@@ -38,3 +38,13 @@ class ExchangeRateAdmin(admin.ModelAdmin):
     nbu.boolean = True
 
     list_display = ('date', 'nbr', 'nbm', 'nbu')
+
+
+@admin.register(StatusType)
+class StatusTypeAdmin(admin.ModelAdmin):
+    list_display = ('serial_number', 'order_number', 'st', 'description')
+
+
+@admin.register(StatusTypeTranslation)
+class StatusTypeTranslationAdmin(admin.ModelAdmin):
+    list_display = ('status', 'language', 'label')

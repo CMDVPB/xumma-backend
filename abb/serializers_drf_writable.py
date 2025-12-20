@@ -1,5 +1,4 @@
 from collections import OrderedDict, defaultdict
-from typing import List, Tuple
 from django.core.exceptions import FieldDoesNotExist
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.models import ContentType
@@ -7,28 +6,9 @@ from django.db.models import ProtectedError, SET_NULL, SET_DEFAULT
 from django.db.models.fields.related import ForeignObjectRel, ManyToManyRel
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
-from rest_framework.validators import UniqueValidator
-from drf_writable_nested.serializers import WritableNestedModelSerializer
-from drf_writable_nested.mixins import UniqueFieldsMixin
-
-
-from abb.models import Country, Currency
 
 
 shall_print = False
-
-
-class CountrySerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
-    class Meta:
-        model = Country
-        fields = ('id', 'label', 'value', 'value_iso3', 'value_numeric')
-
-
-class CurrencySerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
-    class Meta:
-        model = Currency
-        fields = ('id', 'currency_code', 'currency_name',
-                  'currency_symbol', 'currency_numeric', 'uf')
 
 
 class CustomBaseNestedModelSerializer(serializers.ModelSerializer):

@@ -12,7 +12,7 @@ from abb.utils import get_user_company
 from app.serializers import UserSerializer
 from att.models import Contact, Person, VehicleUnit
 from att.serializers import BodyTypeSerializer, ModeTypeSerializer, StatusTypeSerializer
-from axx.models import Load, Trip
+from axx.models import Load, Trip, TripDriver
 from ayy.models import Comment, RouteSheet
 from dff.serializers.serializers_load import LoadTripGetSerializer, LoadTripListSerializer
 from dff.serializers.serializers_other import CommentSerializer, ContactSerializer, ContactTripListSerializer, HistorySerializer, PersonBasicReadSerializer, PersonSerializer, VehicleUnitBasicReadSerializer, VehicleUnitSerializer
@@ -100,6 +100,9 @@ class TripCreateUpdateSerializer(serializers.ModelSerializer):
         child=serializers.CharField(), write_only=True, required=False
     )
 
+    drivers = serializers.SlugRelatedField(
+        many=True, slug_field='uf', queryset=User.objects.all(), required=False)
+
     class Meta:
         model = Trip
         fields = (
@@ -108,11 +111,11 @@ class TripCreateUpdateSerializer(serializers.ModelSerializer):
             'load_size', 'load_order',
             'person', 'driver', 'vehicle_tractor', 'vehicle_trailer', 'carrier', 'bt', 'currency', 'status', 'mode',
             'trip_histories',
-            'trip_route_sheets', 'trip_loads',
+            'trip_route_sheets', 'trip_loads', 'drivers',
         )
 
     def to_internal_value(self, data):
-        # print('6780',)
+        print('6778', data.get('drivers'))
 
         if 'person' in data and data['person'] == '':
             data['person'] = None
@@ -235,7 +238,10 @@ class TripCreateUpdateSerializer(serializers.ModelSerializer):
         # Extract M2M and nested data
         trip_load_ufs = validated_data.pop("trip_loads", None)
         route_sheets_ufs = validated_data.pop("trip_route_sheets", None)
+        drivers = validated_data.pop("drivers", None)
         comments_data = validated_data.pop('trip_comments', [])
+
+        print('6780', drivers)
 
         # Normal fields update
         for key, value in validated_data.items():
@@ -288,6 +294,10 @@ class TripCreateUpdateSerializer(serializers.ModelSerializer):
                     })
 
                 instance.trip_route_sheets.set(rs_qs)
+
+            if drivers is not None:
+                print('DRIVRE IS NOT NONE')
+                self._update_trip_drivers(instance, drivers)
 
             # ✅ Update comments (simple version)
             if comments_data:
@@ -359,15 +369,46 @@ class TripCreateUpdateSerializer(serializers.ModelSerializer):
 
         return data
 
+    def _update_trip_drivers(self, instance, drivers):
+        """
+        drivers: list[User]
+        """
+
+        # drivers are already validated User instances
+        users_qs = User.objects.filter(
+            id__in=[u.id for u in drivers],
+            company=instance.company
+        )
+
+        found_ids = set(users_qs.values_list("id", flat=True))
+        requested_ids = {u.id for u in drivers}
+        missing_ids = requested_ids - found_ids
+
+        if missing_ids:
+            raise serializers.ValidationError({
+                "drivers": ["one_or_more_drivers_not_in_company"]
+            })
+
+        TripDriver.objects.filter(trip=instance).delete()
+
+        TripDriver.objects.bulk_create([
+            TripDriver(trip=instance, driver=user)
+            for user in users_qs
+        ])
+
 
 class TripListSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
+
+    status = serializers.SlugRelatedField(
+        allow_null=True, slug_field='uf', queryset=StatusType.objects.all())
+
     carrier = ContactTripListSerializer(allow_null=True)
     driver = PersonBasicReadSerializer(allow_null=True)
     vehicle_tractor = VehicleUnitBasicReadSerializer(allow_null=True)
     vehicle_trailer = VehicleUnitBasicReadSerializer(allow_null=True)
     bt = BodyTypeSerializer(allow_null=True)
     mode = ModeTypeSerializer(allow_null=True)
-    status = StatusTypeSerializer(allow_null=True)
+
     trip_loads = LoadTripListSerializer(many=True)
     trip_comments = CommentSerializer(many=True)
 
@@ -412,21 +453,27 @@ class TripSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
     vehicle_trailer = SlugRelatedGetOrCreateField(
         allow_null=True, slug_field='uf', queryset=VehicleUnit.objects.all(), write_only=True)
 
+    currency = serializers.SlugRelatedField(
+        allow_null=True, slug_field='uf', queryset=Currency.objects.all())
+    status = serializers.SlugRelatedField(
+        allow_null=True, slug_field='uf', queryset=StatusType.objects.all())
+
     trip_loads = serializers.SlugRelatedField(
         many=True, slug_field='uf', queryset=Load.objects.all(), write_only=True)
     trip_route_sheets = serializers.SlugRelatedField(
         many=True, slug_field='uf', queryset=RouteSheet.objects.all(), write_only=True)
 
+    drivers = serializers.SlugRelatedField(
+        many=True, slug_field='uf', queryset=User.objects.all())
+
     mode = ModeTypeSerializer(allow_null=True)
     bt = BodyTypeSerializer(allow_null=True)
-    currency = CurrencySerializer(allow_null=True)
-    status = StatusTypeSerializer(allow_null=True)
 
     trip_comments = CommentSerializer(many=True)
     trip_histories = HistorySerializer(many=True, read_only=True)
 
     def to_internal_value(self, data):
-        # print('8271', data.get('rn'))
+        print('8274', data.get('drivers'))
 
         try:
             data['carrier'] = data['carrier'].get('uf', None)
@@ -553,5 +600,5 @@ class TripSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
                   'vehicle_trailer', 'carrier', 'load_size', 'load_order', 'mode', 'bt', 'currency', 'status', 'is_locked',
                   'km_departure', 'km_arrival', 'trip_number', 'date_trip', 'date_departure', 'date_arrival',
                   'trip_details', 'l_departure', 'l_arrival', 'trip_add_info', 'trip_loads', 'trip_comments', 'trip_histories', 'uf',
-                  'trip_route_sheets',
+                  'trip_route_sheets', 'drivers',
                   )

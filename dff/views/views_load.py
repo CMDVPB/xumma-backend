@@ -382,9 +382,9 @@ class LoadDetailView(RetrieveUpdateDestroyAPIView):
         # Use a different serializer for PATCH & simpleload requests
 
         data = self.request.data
-        simple_load = data.get('simpleLoad', False)
+        load_status_umpdate = data.get('loadStatusUpdate', False)
 
-        if self.request.method == "PATCH" and simple_load:
+        if self.request.method == "PATCH" and load_status_umpdate:
             return LoadPatchSerializer
         return super().get_serializer_class()
 

@@ -122,6 +122,7 @@ class StatusType(models.Model):
     st = models.CharField(
         max_length=25, blank=True, null=True)
     description = models.CharField(max_length=150, blank=True, null=True)
+    code = models.CharField(max_length=10, blank=True, null=True, unique=True)
 
     class Meta:
         verbose_name = "Status"
@@ -129,4 +130,28 @@ class StatusType(models.Model):
         ordering = ['serial_number']
 
     def __str__(self):
-        return self.st or ''
+        return (self.st or self.code or self.serial_number or '') + " - " + self.description or ''
+
+
+class StatusTypeTranslation(models.Model):
+    status = models.ForeignKey(
+        StatusType,
+        related_name="translations",
+        on_delete=models.CASCADE
+    )
+
+    language = models.CharField(
+        max_length=2,
+        db_index=True
+    )
+
+    label = models.CharField(max_length=255)
+
+    class Meta:
+        unique_together = ("status", "language")
+        indexes = [
+            models.Index(fields=["language"]),
+        ]
+
+    def __str__(self):
+        return f"{self.status.code} [{self.language}]"

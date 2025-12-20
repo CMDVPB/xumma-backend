@@ -122,26 +122,26 @@ class UserSettings(models.Model):
     base_doc_lang = models.CharField(
         choices=DOC_LANG_CHOICES, max_length=2, blank=True, null=True)
     rows_per_page = models.PositiveSmallIntegerField(
-        blank=True, null=True, default=20)
+        blank=True, null=True, default=15)
     myitems_all = models.CharField(
         max_length=10, blank=True, null=True, default='all')
     order_by = ArrayField(models.CharField(
         max_length=20, null=True, blank=True), default=get_order_by_default, size=7)
 
     load_columns = ArrayField(models.CharField(
-        max_length=20, null=True, blank=True), null=True, blank=True, size=20, validators=[validate_columns_arrayfield_length_min_5])
+        max_length=20, null=True, blank=True), null=True, blank=True, size=25, validators=[validate_columns_arrayfield_length_min_5])
     trip_columns = ArrayField(models.CharField(
-        max_length=20, null=True, blank=True), null=True, blank=True, size=20, validators=[validate_columns_arrayfield_length_min_5])
+        max_length=20, null=True, blank=True), null=True, blank=True, size=25, validators=[validate_columns_arrayfield_length_min_5])
     tor_columns = ArrayField(models.CharField(
-        max_length=20, null=True, blank=True), null=True, blank=True, size=20, validators=[validate_columns_arrayfield_length_min_5])
+        max_length=20, null=True, blank=True), null=True, blank=True, size=25, validators=[validate_columns_arrayfield_length_min_5])
     ctr_columns = ArrayField(models.CharField(
-        max_length=20, null=True, blank=True), null=True, blank=True, size=20, validators=[validate_columns_arrayfield_length_min_5])
+        max_length=20, null=True, blank=True), null=True, blank=True, size=25, validators=[validate_columns_arrayfield_length_min_5])
     quote_columns = ArrayField(models.CharField(
-        max_length=20, null=True, blank=True), null=True, blank=True, size=20, validators=[validate_columns_arrayfield_length_min_5])
+        max_length=20, null=True, blank=True), null=True, blank=True, size=25, validators=[validate_columns_arrayfield_length_min_5])
     inv_columns = ArrayField(models.CharField(
-        max_length=20, null=True, blank=True), null=True, blank=True, size=20, validators=[validate_columns_arrayfield_length_min_5])
+        max_length=20, null=True, blank=True), null=True, blank=True, size=25, validators=[validate_columns_arrayfield_length_min_5])
     exp_columns = ArrayField(models.CharField(
-        max_length=20, null=True, blank=True), null=True, blank=True, size=20, validators=[validate_columns_arrayfield_length_min_5])
+        max_length=20, null=True, blank=True), null=True, blank=True, size=25, validators=[validate_columns_arrayfield_length_min_5])
 
     class Meta:
         verbose_name = "User Settings"
@@ -478,11 +478,13 @@ class CategoryGeneral(models.Model):
         Company, on_delete=models.CASCADE, null=True, blank=True, related_name='company_categories')
 
     serial_number = models.SmallIntegerField(unique=True)
-    name = models.CharField(max_length=100)
+    code = models.CharField(unique=True)
+    label = models.CharField(max_length=100)
 
     class Meta:
         verbose_name = "Category General"
         verbose_name_plural = "Categories General"
+        ordering = ['serial_number']
 
 
 class TypeGeneral(models.Model):
@@ -496,8 +498,10 @@ class TypeGeneral(models.Model):
         Company, on_delete=models.CASCADE, null=True, blank=True, related_name='company_types_general')
 
     serial_number = models.SmallIntegerField(unique=True)
-    name = models.CharField(max_length=100)
+    code = models.CharField(unique=True)
+    label = models.CharField(max_length=100)
 
     class Meta:
         verbose_name = "Type General"
         verbose_name_plural = "Type General"
+        ordering = ['serial_number']

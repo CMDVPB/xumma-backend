@@ -119,10 +119,10 @@ class UserSettingsAdmin(admin.ModelAdmin):
 @admin.register(CategoryGeneral)
 class CategoryGeneralAdmin(admin.ModelAdmin):
 
-    list_display = ('id', 'company', 'serial_number', 'name')
+    list_display = ('id', 'company', 'serial_number', 'code', 'label')
 
 
 @admin.register(TypeGeneral)
 class TypeGeneralAdmin(admin.ModelAdmin):
 
-    list_display = ('id', 'company', 'serial_number', 'name')
+    list_display = ('id', 'company', 'serial_number', 'code', 'label')

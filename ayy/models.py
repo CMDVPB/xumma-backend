@@ -624,11 +624,12 @@ class AuthorizationStockBatch(models.Model):
         related_name="company_authorizations_stock"
     )
 
-    series = models.CharField(max_length=20)
+    series = models.CharField(max_length=20, null=True, blank=True)
     number = models.CharField(max_length=20)
     received_at = models.DateField(null=True, blank=True)
     date_expire = models.DateField(null=True, blank=True)
-    price = models.SmallIntegerField(null=True, blank=True)
+    price = models.DecimalField(
+        max_digits=6, decimal_places=2, null=True, blank=True)
     notes = models.TextField(max_length=1000, blank=True)
 
     type_authorization = models.ForeignKey(TypeGeneral, on_delete=models.SET_NULL,
@@ -643,3 +644,24 @@ class AuthorizationStockBatch(models.Model):
     class Meta:
         unique_together = ('type_authorization', "company",
                            "number", "category_authorization")
+
+
+class CTIRStockBatch(models.Model):
+    uf = models.CharField(max_length=36, default=hex_uuid, db_index=True)
+
+    company = models.ForeignKey(
+        Company,
+        on_delete=models.CASCADE,
+        related_name="company_ctir_stock"
+    )
+
+    series = models.CharField(max_length=20, null=True, blank=True)
+    number = models.CharField(max_length=30)
+    received_at = models.DateField()
+    date_expire = models.DateField(null=True, blank=True)
+    price = models.DecimalField(
+        max_digits=6, decimal_places=2, null=True, blank=True)
+    notes = models.TextField(max_length=1000, blank=True)
+
+    class Meta:
+        unique_together = ("company", "number")

@@ -9,21 +9,56 @@ from rest_framework.generics import CreateAPIView, ListAPIView, ListCreateAPIVie
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView  # exception_handler
-from rest_framework_simplejwt.authentication import JWTAuthentication  # used for FBV
-from rest_framework_simplejwt.exceptions import InvalidToken  # used for FBV
-from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework import permissions, status
 from rest_framework.permissions import IsAuthenticated
 
 from abb.models import BodyType, Incoterm, ModeType, StatusType
 from abb.pagination import LimitResultsSetPagination
 from abb.utils import get_user_company
+from app.models import CategoryGeneral, TypeGeneral
 from att.models import EmissionClass, VehicleBrand, VehicleCompany
-from att.serializers import BodyTypeSerializer, EmissionClassdSerializer, IncotermSerializer, ModeTypeSerializer, StatusTypeSerializer, VehicleBrandSerializer, VehicleCompanySerializer
+from att.serializers import BodyTypeSerializer, CategoryGeneralSerializer, EmissionClassdSerializer, IncotermSerializer, ModeTypeSerializer, StatusTypeSerializer, TypeGeneralSerializer, \
+    VehicleBrandSerializer, VehicleCompanySerializer
 
 
 import logging
 logger = logging.getLogger(__name__)
+
+
+class TypeGeneralListView(ListAPIView):
+    serializer_class = TypeGeneralSerializer
+
+    def get_queryset(self):
+        try:
+            user = self.request.user
+            user_company = get_user_company(user)
+            return TypeGeneral.objects.filter(company__id=user_company.id).order_by('serial_number').distinct()
+        except Exception as e:
+            logger.error(
+                f'ERRORLOG509 TypeGeneralListView. get_queryset. Error: {e}')
+            return TypeGeneral.objects.none()
+
+    # @method_decorator(cache_page(60*60*24))
+    def get(self, request, *args, **kwargs):
+        return self.list(request, *args, **kwargs)
+
+
+class CategoryGeneralListView(ListAPIView):
+    serializer_class = CategoryGeneralSerializer
+
+    def get_queryset(self):
+        try:
+            user = self.request.user
+            user_company = get_user_company(user)
+            return CategoryGeneral.objects.filter(company__id=user_company.id).order_by('serial_number').distinct()
+        except Exception as e:
+            logger.error(
+                f'ERRORLOG507 CategoryGeneralListView. get_queryset. Error: {e}')
+            return CategoryGeneral.objects.none()
+
+    # @method_decorator(cache_page(60*60*24))
+    def get(self, request, *args, **kwargs):
+        return self.list(request, *args, **kwargs)
 
 
 class StatusTypeListView(ListAPIView):
@@ -113,7 +148,6 @@ class VehicleBrandListView(ListAPIView):
 class VehicleCompanyCreateView(CreateAPIView):
     serializer_class = VehicleCompanySerializer
     permission_classes = [IsAuthenticated]
-    http_method_names = ['post']
 
     def get_queryset(self):
         try:

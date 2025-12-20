@@ -5,7 +5,23 @@ from drf_writable_nested.serializers import WritableNestedModelSerializer
 from drf_writable_nested.mixins import UniqueFieldsMixin, NestedCreateMixin, NestedUpdateMixin
 
 from abb.models import BodyType, Incoterm, ModeType, StatusType
+from abb.utils import get_request_language
+from app.models import CategoryGeneral, TypeGeneral
 from att.models import EmissionClass, VehicleBrand, VehicleCompany
+
+
+class TypeGeneralSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = TypeGeneral
+        fields = ('serial_number', 'code', 'label', 'uf')
+
+
+class CategoryGeneralSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = CategoryGeneral
+        fields = ('serial_number', 'code', 'label', 'uf')
 
 
 class IncotermSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
@@ -47,10 +63,25 @@ class VehicleBrandSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
 
 class StatusTypeSerializer(WritableNestedModelSerializer):
     serial_number = serializers.CharField(read_only=True)
+    label = serializers.SerializerMethodField(read_only=True)
+
+    def get_label(self, obj):
+        request = self.context.get("request")
+        lang = get_request_language(request)
+
+        translation = obj.translations.filter(language=lang).first()
+
+        if translation:
+            return translation.label
+
+        # fallback to Romanian
+        fallback = obj.translations.filter(language="ro").first()
+        return fallback.label if fallback else obj.code
 
     class Meta:
         model = StatusType
-        fields = ('st', 'description', 'serial_number', 'uf')
+        fields = ('serial_number', 'order_number',
+                  'description', 'label', 'uf')
 
 
 class VehicleCompanySerializer(WritableNestedModelSerializer):

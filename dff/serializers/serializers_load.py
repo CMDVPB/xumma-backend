@@ -8,6 +8,7 @@ from drf_writable_nested.mixins import UniqueFieldsMixin, NestedCreateMixin, Nes
 from rest_framework import serializers
 
 from abb.custom_serializers import SlugRelatedGetOrCreateField
+from abb.models import Currency, StatusType
 from abb.serializers import CurrencySerializer
 from app.serializers import UserBasicSerializer, UserSerializer
 from att.models import Contact, PaymentTerm, Person, VehicleUnit
@@ -133,7 +134,7 @@ class LoadListSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
     class Meta:
         model = Load
         fields = ('sn', 'date_order', 'customer_ref', 'customer_notes', 'load_detail', 'load_size', 'load_add_ons', 'uf',
-                  'date_due',
+                  'date_due', 'is_loaded', 'is_cleared', 'is_unloaded', 'is_invoiced',
                   'load_address', 'unload_address', 'hb', 'mb', 'booking_number', 'comment1',
                   'assigned_user', 'bill_to', 'mode', 'bt', 'currency', 'status', 'incoterm', 'carrier', 'vehicle_tractor', 'vehicle_trailer',
                   'load_comments', 'load_tors', 'entry_loads', 'load_iteminvs',
@@ -152,6 +153,11 @@ class LoadSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
         allow_null=True, slug_field='uf', queryset=Person.objects.all(), write_only=True)
     payment_term = SlugRelatedGetOrCreateField(
         allow_null=True, slug_field='uf', queryset=PaymentTerm.objects.all(), write_only=True)
+
+    currency = serializers.SlugRelatedField(
+        allow_null=True, slug_field='uf', queryset=Currency.objects.all())
+    status = serializers.SlugRelatedField(
+        allow_null=True, slug_field='uf', queryset=StatusType.objects.all())
 
     carrier = serializers.SlugRelatedField(
         allow_null=True, slug_field='uf', queryset=Contact.objects.all(), write_only=True)
@@ -176,8 +182,6 @@ class LoadSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
     mode = ModeTypeSerializer(allow_null=True)
     incoterm = IncotermSerializer(allow_null=True)
     bt = BodyTypeSerializer(allow_null=True)
-    status = StatusTypeSerializer(allow_null=True)
-    currency = CurrencySerializer(allow_null=True)
     cmr = CMRSerializer(allow_null=True)
 
     entry_loads = EntrySerializer(many=True)
@@ -197,6 +201,10 @@ class LoadSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
             pass
         try:
             data['person'] = data['person'].get('uf', None)
+        except:
+            pass
+        try:
+            data['status'] = data['status'].get('uf', None)
         except:
             pass
 
@@ -406,6 +414,7 @@ class LoadSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
         model = Load
         fields = ('assigned_user', 'sn', 'date_order', 'customer_ref', 'customer_notes', 'is_locked', 'uf',
                   'load_detail', 'load_size', 'load_add_ons', 'date_due', 'doc_lang', 'load_address', 'unload_address',
+                  'is_loaded', 'is_cleared', 'is_unloaded', 'is_invoiced',
                   'hb', 'mb', 'booking_number', 'comment1', 'bill_to', 'person', 'currency', 'mode', 'bt', 'status', 'incoterm', 'cmr',
                   'load_comments', 'payment_term', 'entry_loads', 'load_iteminvs', 'load_tors', 'load_ctrs', 'load_imageuploads', 'load_invs',
                   'load_histories', 'load_exps',
@@ -415,8 +424,6 @@ class LoadSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
 
 
 class LoadPatchSerializer(WritableNestedModelSerializer):
-    load_iteminvs = ItemInvSerializer(many=True)
-
     def update(self, instance, validated_data):
         print('6464', validated_data)
 
@@ -443,8 +450,7 @@ class LoadPatchSerializer(WritableNestedModelSerializer):
     class Meta:
         model = Load
         # Only include the fields to allow patching
-        fields = ['load_iteminvs', "freight_cost",
-                  "freight_price_received", "freight_cost_paid"]
+        fields = ['is_loaded', "is_cleared", "is_unloaded", "is_invoiced"]
 
         # Should never be updated
         read_only_fields = ["id", "company", "assigned_user", "uf"]

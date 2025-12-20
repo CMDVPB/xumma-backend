@@ -349,3 +349,10 @@ def validate_columns_arrayfield_length_min_5(value):
             message=('min_field_array_length_5'), code="invalid")
     # print('3535', value)
     pass
+
+
+def get_request_language(request, default="ro"):
+    if not request:
+        return default
+
+    return getattr(request, "LANGUAGE_CODE", default)
