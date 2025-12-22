@@ -1,5 +1,6 @@
 import time
 from datetime import datetime
+from django.utils import timezone
 from django.forms.models import model_to_dict
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
@@ -85,9 +86,7 @@ class LoadListView(ListAPIView):
             entries_qs = (Entry.objects
                           .select_related(
                               'shipper',
-                              'shipper__company',
-                              'shipper__country_code_legal',
-                              'shipper__country_code_post'
+                              'shipper__country_code_site',
                           )
                           .prefetch_related('entry_details')
                           .all())
@@ -156,6 +155,8 @@ class LoadListView(ListAPIView):
                 )
 
             else:
+                order_pre_order_all_index = self.request.query_params.get(
+                    'buttonIndex', None)
                 sortByQuery = self.request.query_params.get(
                     'sortByQuery', None)
                 billtoQuery = self.request.query_params.get(
@@ -201,19 +202,31 @@ class LoadListView(ListAPIView):
                     'commentQuery', None)
                 assignedUserQuery = self.request.query_params.get(
                     'assignedUserQuery', None)
+                vehicleQuery = self.request.query_params.get(
+                    'vehicleQuery', None)
+                startDate = self.request.query_params.get(
+                    'startDate', None)
+                endDate = self.request.query_params.get(
+                    'endDate', None)
+                # print('2040', order_pre_order_all_index)
 
-                # print('2040',)
+                if is_valid_queryparam(order_pre_order_all_index):
+                    if order_pre_order_all_index == '0':
+                        queryset = queryset.filter(trip__isnull=False)
+                    elif order_pre_order_all_index == '1':
+                        queryset = queryset.filter(trip__isnull=True)
+                    else:
+                        pass
 
                 if is_valid_queryparam(sortByQuery):
-                    if sortByQuery is not None:
-                        if sortByQuery == '0':
-                            order_by = 'sn'
-                        elif sortByQuery == '1':
-                            order_by = 'date_order'
-                        elif sortByQuery == '2':
-                            order_by = 'status__order_number'
-                        else:
-                            order_by = 'date_order'
+                    if sortByQuery == '0':
+                        order_by = 'sn'
+                    elif sortByQuery == '1':
+                        order_by = 'date_order'
+                    elif sortByQuery == '2':
+                        order_by = 'status__order_number'
+                    else:
+                        order_by = 'date_order'
 
                 if is_valid_queryparam(billtoQuery):
                     queryset = queryset.filter(bill_to__uf=billtoQuery)
@@ -251,11 +264,11 @@ class LoadListView(ListAPIView):
 
                 if is_valid_queryparam(countryLoadQuery):
                     queryset = queryset.filter(Q(entry_loads__action='loading')
-                                               & Q(entry_loads__shipper__country_code_post__value=countryLoadQuery))
+                                               & Q(entry_loads__shipper__country_code_site__value=countryLoadQuery))
 
                 if is_valid_queryparam(countryUnloadQuery):
                     queryset = queryset.filter(Q(entry_loads__action='unloading')
-                                               & Q(entry_loads__shipper__country_code_post__value=countryUnloadQuery))
+                                               & Q(entry_loads__shipper__country_code_site__value=countryUnloadQuery))
 
                 if is_valid_queryparam(currencyQuery):
                     queryset = queryset.filter(currency=currencyQuery)
@@ -295,7 +308,22 @@ class LoadListView(ListAPIView):
                     queryset = queryset.filter(
                         assigned_user__email=assignedUserQuery)
 
-                # print('2260', queryset.count())
+                if is_valid_queryparam(vehicleQuery):
+                    queryset = queryset.filter(Q(trip__vehicle_tractor__reg_number__icontains=vehicleQuery)
+                                               | Q(trip__vehicle_trailer__reg_number__icontains=vehicleQuery)
+                                               )
+
+                if is_valid_queryparam(startDate):
+                    dts = datetime.strptime(startDate, "%Y-%m-%d")
+                    dts = timezone.make_aware(dts)
+                    queryset = queryset.filter(date_order__gte=dts)
+
+                if is_valid_queryparam(endDate):
+                    dte = datetime.strptime(endDate, "%Y-%m-%d")
+                    dte = timezone.make_aware(dte)
+                    queryset = queryset.filter(date_order__lte=dte)
+
+                print('2260', queryset.count())
 
             return queryset.distinct().order_by(F(order_by).desc(nulls_first=True),
                                                 '-date_created')
@@ -417,9 +445,7 @@ class LoadDetailView(RetrieveUpdateDestroyAPIView):
 
             entries_qs = Entry.objects.select_related(
                 'shipper',
-                'shipper__company',
-                'shipper__country_code_legal',
-                'shipper__country_code_post'
+                'shipper__country_code_site',
             ).prefetch_related('entry_details').all()
 
             itemInvs_qs = ItemInv.objects.select_related(

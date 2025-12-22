@@ -235,11 +235,15 @@ class ContactSite(models.Model):
     contact = models.ForeignKey(
         Contact, on_delete=models.CASCADE, related_name="contact_sites")
 
-    name_site = models.CharField(max_length=255)
-    address_site = models.CharField(max_length=255)
+    name_site = models.CharField(max_length=255, blank=True, null=True)
+    address_site = models.CharField(max_length=255, blank=True, null=True)
     city_site = models.CharField(max_length=100, blank=True, null=True)
+    zip_code_site = models.CharField(max_length=20, blank=True, null=True)
     country_code_site = models.ForeignKey(
-        Country, on_delete=models.SET_NULL, related_name='country_code_sites', null=True, blank=True)
+        Country, on_delete=models.PROTECT, related_name='country_code_sites', blank=True, null=True)
+
+    lat = models.FloatField(null=True, blank=True)
+    lon = models.FloatField(null=True, blank=True)
 
     def __str__(self):
         return f"{self.name_site} – {self.contact.company_name}"

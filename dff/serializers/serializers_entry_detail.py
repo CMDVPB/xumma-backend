@@ -6,9 +6,9 @@ from drf_writable_nested.mixins import UniqueFieldsMixin, NestedCreateMixin, Nes
 from rest_framework import serializers
 
 from abb.serializers import CountrySerializer
-from att.models import Contact
+from att.models import ContactSite
 from ayy.models import Detail, Entry
-from dff.serializers.serializers_other import ContactBasicReadSerializer, ContactSerializer
+from dff.serializers.serializers_other import ContactBasicReadSerializer, ContactSerializer, ContactSiteBasicReadSerializer, ContactSiteSerializer
 
 
 class DetailSerializer(WritableNestedModelSerializer):
@@ -19,7 +19,7 @@ class DetailSerializer(WritableNestedModelSerializer):
 
 class EntryBasicReadListSerializer(WritableNestedModelSerializer):
 
-    shipper = ContactBasicReadSerializer(allow_null=True)
+    shipper = ContactSiteBasicReadSerializer(allow_null=True)
     country_load = CountrySerializer(allow_null=True)
     entry_details = DetailSerializer(many=True)
 
@@ -32,9 +32,8 @@ class EntryBasicReadListSerializer(WritableNestedModelSerializer):
 
 
 class EntrySerializer(WritableNestedModelSerializer):
-    # shipper = ContactSerializer(allow_null=True)
     shipper = serializers.SlugRelatedField(
-        allow_null=True, slug_field='uf', queryset=Contact.objects.all())
+        allow_null=True, slug_field='uf', queryset=ContactSite.objects.all())
     country_load = CountrySerializer(allow_null=True)
 
     entry_details = DetailSerializer(many=True)
@@ -66,7 +65,7 @@ class EntrySerializer(WritableNestedModelSerializer):
 
         # response['load'] = instance.load.id if instance.load and instance.load.id else None
 
-        response['shipper'] = ContactSerializer(
+        response['shipper'] = ContactSiteSerializer(
             instance.shipper).data if instance.shipper else None
 
         return response

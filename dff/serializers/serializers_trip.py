@@ -10,12 +10,12 @@ from abb.models import BodyType, Currency, ModeType, StatusType
 from abb.serializers import CurrencySerializer
 from abb.utils import get_user_company
 from app.serializers import UserSerializer
-from att.models import Contact, Person, VehicleUnit
-from att.serializers import BodyTypeSerializer, ModeTypeSerializer, StatusTypeSerializer
+from att.models import Contact, Person, VehicleCompany, VehicleUnit
+from att.serializers import BodyTypeSerializer, ModeTypeSerializer, StatusTypeSerializer, VehicleCompanySerializer
 from axx.models import Load, Trip, TripDriver
 from ayy.models import Comment, RouteSheet
 from dff.serializers.serializers_load import LoadTripGetSerializer, LoadTripListSerializer
-from dff.serializers.serializers_other import CommentSerializer, ContactSerializer, ContactTripListSerializer, HistorySerializer, PersonBasicReadSerializer, PersonSerializer, VehicleUnitBasicReadSerializer, VehicleUnitSerializer
+from dff.serializers.serializers_other import CommentSerializer, ContactSerializer, ContactTripListSerializer, HistorySerializer, PersonBasicReadSerializer, PersonSerializer, VehicleCompanyBasicReadSerializer, VehicleUnitBasicReadSerializer, VehicleUnitSerializer
 from dff.serializers.serializers_route_sheet import RouteSheetSerializer
 
 
@@ -43,15 +43,13 @@ class TripCreateUpdateSerializer(serializers.ModelSerializer):
 
         if user_company:
             self.fields['assigned_user'].queryset = user_company.user.all()
+            # self.fields['drivers'].queryset = user_company.user.all()
             self.fields['carrier'].queryset = Contact.objects.filter(
                 company=user_company)
-            # Vehicle filtered through carrier's company
-            self.fields['vehicle_tractor'].queryset = VehicleUnit.objects.filter(
-                contact__company=user_company
-            )
-            # Vehicle filtered through carrier's company
-            self.fields['vehicle_trailer'].queryset = VehicleUnit.objects.filter(
-                contact__company=user_company
+            self.fields['vehicle_tractor'].queryset = VehicleCompany.objects.filter(
+                company=user_company)
+            self.fields['vehicle_trailer'].queryset = VehicleCompany.objects.filter(
+                company=user_company
             )
 
     # Slug based relations (write) with none()
@@ -62,24 +60,20 @@ class TripCreateUpdateSerializer(serializers.ModelSerializer):
         allow_null=True, slug_field='uf', queryset=Contact.objects.none(), write_only=True
     )
     vehicle_tractor = serializers.SlugRelatedField(
-        allow_null=True, slug_field='uf', queryset=VehicleUnit.objects.none(), write_only=True, required=False
+        allow_null=True, slug_field='uf', queryset=VehicleCompany.objects.none(), write_only=True, required=False
     )
     vehicle_trailer = serializers.SlugRelatedField(
-        allow_null=True, slug_field='uf', queryset=VehicleUnit.objects.none(), write_only=True, required=False
+        allow_null=True, slug_field='uf', queryset=VehicleCompany.objects.none(), write_only=True, required=False
     )
+
     # Slug based relations (write) without none()
     person = serializers.SlugRelatedField(
         allow_null=True, slug_field='uf', queryset=Person.objects.all(), write_only=True, required=False
     )
-    driver = serializers.SlugRelatedField(
-        allow_null=True, slug_field='uf', queryset=Person.objects.all(), write_only=True, required=False
-    )
     currency = serializers.SlugRelatedField(
-        allow_null=True, slug_field='uf', queryset=Currency.objects.all(), write_only=True, required=False
-    )
+        allow_null=True, slug_field='uf', queryset=Currency.objects.all(), required=False)
     status = serializers.SlugRelatedField(
-        allow_null=True, slug_field='uf', queryset=StatusType.objects.all(), write_only=True, required=False
-    )
+        allow_null=True, slug_field='uf', queryset=StatusType.objects.all(), required=False)
     mode = serializers.SlugRelatedField(
         allow_null=True, slug_field='serial_number', queryset=ModeType.objects.all(), write_only=True, required=False
     )
@@ -100,41 +94,26 @@ class TripCreateUpdateSerializer(serializers.ModelSerializer):
         child=serializers.CharField(), write_only=True, required=False
     )
 
-    drivers = serializers.SlugRelatedField(
-        many=True, slug_field='uf', queryset=User.objects.all(), required=False)
+    drivers = serializers.ListField(
+        child=serializers.CharField(),
+        required=False,
+        write_only=True,
+    )
 
     class Meta:
         model = Trip
         fields = (
-            'rn', 'assigned_user', 'date_order', 'is_locked', 'km_departure', 'km_arrival', 'trip_number', 'date_trip', 'uf',
+            'rn', 'assigned_user', 'date_order', 'is_locked', 'trip_number', 'date_trip', 'uf',
+            'km_departure', 'km_arrival', 'km_exit', 'km_entry',
             'date_departure', 'date_arrival', 'trip_details', 'l_departure', 'l_arrival', 'trip_add_info', 'trip_comments', 'doc_lang',
             'load_size', 'load_order',
-            'person', 'driver', 'vehicle_tractor', 'vehicle_trailer', 'carrier', 'bt', 'currency', 'status', 'mode',
+            'person', 'vehicle_tractor', 'vehicle_trailer', 'carrier', 'bt', 'currency', 'status', 'mode',
             'trip_histories',
             'trip_route_sheets', 'trip_loads', 'drivers',
         )
 
     def to_internal_value(self, data):
-        print('6778', data.get('drivers'))
-
-        if 'person' in data and data['person'] == '':
-            data['person'] = None
-        if 'driver' in data and data['driver'] == '':
-            data['driver'] = None
-        if 'vehicle_tractor' in data and data['vehicle_tractor'] == '':
-            data['vehicle_tractor'] = None
-        if 'vehicle_trailer' in data and data['vehicle_trailer'] == '':
-            data['vehicle_trailer'] = None
-        if 'mode' in data and data['mode'] == '':
-            data['mode'] = None
-        if 'bt' in data and data['bt'] == '':
-            data['bt'] = None
-        if 'status' in data and data['status'] == '':
-            data['status'] = None
-        if 'currency' in data and data['currency'] == '':
-            data['currency'] = None
-        if 'is_locked' in data and (data['is_locked'] == '' or data['is_locked'] == None):
-            data['is_locked'] = False
+        # print('6778', data.get('drivers'))
 
         return super(TripCreateUpdateSerializer, self).to_internal_value(data)
 
@@ -176,6 +155,7 @@ class TripCreateUpdateSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         trip_load_ufs = validated_data.pop("trip_loads", None)
         route_sheets_ufs = validated_data.pop("trip_route_sheets", None)
+        drivers = validated_data.pop("drivers", None)
         comments_data = validated_data.pop("trip_comments", [])
 
         with transaction.atomic():
@@ -226,6 +206,10 @@ class TripCreateUpdateSerializer(serializers.ModelSerializer):
                     })
 
                 instance.trip_route_sheets.set(rs_qs)
+
+            if drivers is not None:
+                print('DRIVRE IS NOT NONE in CREATE', drivers)
+                self._update_trip_drivers(instance, drivers)
 
             # Create comments
             for c in comments_data:
@@ -296,7 +280,7 @@ class TripCreateUpdateSerializer(serializers.ModelSerializer):
                 instance.trip_route_sheets.set(rs_qs)
 
             if drivers is not None:
-                print('DRIVRE IS NOT NONE')
+                print('DRIVRE IS NOT NONE', drivers)
                 self._update_trip_drivers(instance, drivers)
 
             # ✅ Update comments (simple version)
@@ -325,27 +309,15 @@ class TripCreateUpdateSerializer(serializers.ModelSerializer):
         data['bt'] = BodyTypeSerializer(
             instance.bt
         ).data if instance.bt else None
-        data['status'] = StatusTypeSerializer(
-            instance.status
-        ).data if instance.status else None
-
-        data['carrier'] = ContactSerializer(
-            instance.carrier
-        ).data if instance.carrier else None
-
         data['person'] = PersonSerializer(
             instance.person
         ).data if instance.person else None
 
-        data['driver'] = PersonSerializer(
-            instance.driver
-        ).data if instance.driver else None
-
-        data['vehicle_tractor'] = VehicleUnitSerializer(
+        data['vehicle_tractor'] = VehicleCompanySerializer(
             instance.vehicle_tractor
         ).data if instance.vehicle_tractor else None
 
-        data['vehicle_trailer'] = VehicleUnitSerializer(
+        data['vehicle_trailer'] = VehicleCompanySerializer(
             instance.vehicle_trailer
         ).data if instance.vehicle_trailer else None
 
@@ -371,22 +343,23 @@ class TripCreateUpdateSerializer(serializers.ModelSerializer):
 
     def _update_trip_drivers(self, instance, drivers):
         """
-        drivers: list[User]
+        drivers: list[str] (UFs)
         """
 
-        # drivers are already validated User instances
         users_qs = User.objects.filter(
-            id__in=[u.id for u in drivers],
+            uf__in=drivers,
             company=instance.company
         )
 
-        found_ids = set(users_qs.values_list("id", flat=True))
-        requested_ids = {u.id for u in drivers}
-        missing_ids = requested_ids - found_ids
+        found_ufs = set(users_qs.values_list("uf", flat=True))
+        requested_ufs = set(drivers)
+        missing_ufs = requested_ufs - found_ufs
 
-        if missing_ids:
+        if missing_ufs:
             raise serializers.ValidationError({
-                "drivers": ["one_or_more_drivers_not_in_company"]
+                "drivers": [
+                    f"drivers_not_in_company_or_not_found: {', '.join(missing_ufs)}"
+                ]
             })
 
         TripDriver.objects.filter(trip=instance).delete()
@@ -399,13 +372,32 @@ class TripCreateUpdateSerializer(serializers.ModelSerializer):
 
 class TripListSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        request = self.context.get('request')
+        user = getattr(request, "user", None)
+
+        if user and user.is_authenticated:
+            user_company = get_user_company(user)
+        else:
+            user_company = None
+
+        if user_company:
+            self.fields['drivers'].queryset = VehicleCompany.objects.filter(
+                company=user_company
+            )
+    # Slug based relations (write) with none()
+    drivers = serializers.SlugRelatedField(
+        many=True, slug_field='uf', queryset=User.objects.none())
+
+    # Slug based relations (write) with out none()
     status = serializers.SlugRelatedField(
         allow_null=True, slug_field='uf', queryset=StatusType.objects.all())
 
     carrier = ContactTripListSerializer(allow_null=True)
-    driver = PersonBasicReadSerializer(allow_null=True)
-    vehicle_tractor = VehicleUnitBasicReadSerializer(allow_null=True)
-    vehicle_trailer = VehicleUnitBasicReadSerializer(allow_null=True)
+    vehicle_tractor = VehicleCompanyBasicReadSerializer(allow_null=True)
+    vehicle_trailer = VehicleCompanyBasicReadSerializer(allow_null=True)
     bt = BodyTypeSerializer(allow_null=True)
     mode = ModeTypeSerializer(allow_null=True)
 
@@ -433,8 +425,9 @@ class TripListSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
     class Meta:
         model = Trip
         fields = ('rn', 'num_loads', 'load_size', 'date_order', 'uf',
-                  'carrier', 'driver', 'status', 'bt', 'mode', 'vehicle_tractor', 'vehicle_trailer',
+                  'carrier', 'status', 'bt', 'mode', 'vehicle_tractor', 'vehicle_trailer',
                   'trip_loads', 'trip_comments', 'totals_trip',
+                  'drivers'
                   )
 
 
@@ -446,12 +439,10 @@ class TripSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
         allow_null=True, slug_field='uf', queryset=Contact.objects.all(), write_only=True)
     person = SlugRelatedGetOrCreateField(
         allow_null=True, slug_field='uf', queryset=Person.objects.all(), write_only=True)
-    driver = SlugRelatedGetOrCreateField(
-        allow_null=True, slug_field='uf', queryset=Person.objects.all(), write_only=True)
     vehicle_tractor = SlugRelatedGetOrCreateField(
-        allow_null=True, slug_field='uf', queryset=VehicleUnit.objects.all(), write_only=True)
+        allow_null=True, slug_field='uf', queryset=VehicleCompany.objects.all(), write_only=True)
     vehicle_trailer = SlugRelatedGetOrCreateField(
-        allow_null=True, slug_field='uf', queryset=VehicleUnit.objects.all(), write_only=True)
+        allow_null=True, slug_field='uf', queryset=VehicleCompany.objects.all(), write_only=True)
 
     currency = serializers.SlugRelatedField(
         allow_null=True, slug_field='uf', queryset=Currency.objects.all())
@@ -473,7 +464,7 @@ class TripSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
     trip_histories = HistorySerializer(many=True, read_only=True)
 
     def to_internal_value(self, data):
-        print('8274', data.get('drivers'))
+        # print('8274', data.get('drivers'))
 
         try:
             data['carrier'] = data['carrier'].get('uf', None)
@@ -481,10 +472,6 @@ class TripSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
             pass
         try:
             data['person'] = data['person'].get('uf', None)
-        except:
-            pass
-        try:
-            data['driver'] = data['driver'].get('uf', None)
         except:
             pass
         try:
@@ -528,11 +515,9 @@ class TripSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
             instance.carrier).data if instance.carrier else None
         response['person'] = PersonSerializer(
             instance.person).data if instance.person else None
-        response['driver'] = PersonSerializer(
-            instance.driver).data if instance.driver else None
-        response['vehicle_tractor'] = VehicleUnitSerializer(
+        response['vehicle_tractor'] = VehicleCompanySerializer(
             instance.vehicle_tractor).data if instance.vehicle_tractor else None
-        response['vehicle_trailer'] = VehicleUnitSerializer(
+        response['vehicle_trailer'] = VehicleCompanySerializer(
             instance.vehicle_trailer).data if instance.vehicle_trailer else None
 
         response['trip_loads'] = LoadTripGetSerializer(
@@ -596,9 +581,9 @@ class TripSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
 
     class Meta:
         model = Trip
-        fields = ('rn', 'assigned_user', 'date_order', 'person', 'driver', 'vehicle_tractor', 'incl_loads_costs', 'doc_lang',
+        fields = ('rn', 'assigned_user', 'date_order', 'person', 'vehicle_tractor', 'incl_loads_costs', 'doc_lang',
                   'vehicle_trailer', 'carrier', 'load_size', 'load_order', 'mode', 'bt', 'currency', 'status', 'is_locked',
-                  'km_departure', 'km_arrival', 'trip_number', 'date_trip', 'date_departure', 'date_arrival',
+                  'km_departure', 'km_arrival', 'km_exit', 'km_entry', 'trip_number', 'date_trip', 'date_departure', 'date_arrival',
                   'trip_details', 'l_departure', 'l_arrival', 'trip_add_info', 'trip_loads', 'trip_comments', 'trip_histories', 'uf',
                   'trip_route_sheets', 'drivers',
                   )

@@ -3,7 +3,7 @@ from rest_framework.urlpatterns import format_suffix_patterns
 
 from dff.views.views_inv import InvCreateView, InvDetailView, InvListView
 from dff.views.views_load import LoadCreateView, LoadDetailView, LoadListView
-from dff.views.views_quote import QuoteCreateView, QuoteListView
+from dff.views.views_quote import QuoteCreateView, QuoteDetailView, QuoteListView
 from dff.views.views_trip import TripCreateView, TripDetailView, TripListView
 from dff.views.views_user import UserCreate, UserDetailSelfView, UserManagerCreate
 
@@ -29,7 +29,7 @@ urlpatterns = [
 
     path('quotes/', QuoteListView.as_view(), name='quotes'),
     path('quotes/create/', QuoteCreateView.as_view(), name='quote_create'),
-    # path('quotes/<str:uf>/', QuoteDetailView.as_view(), name='quote_detail'),
+    path('quotes/<str:uf>/', QuoteDetailView.as_view(), name='quote_detail'),
 
 ]
 

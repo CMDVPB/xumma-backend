@@ -1,7 +1,10 @@
 from django.urls import path
 from rest_framework.urlpatterns import format_suffix_patterns
 
-from dtt.views import AuthorizationStockBatchDetailsView, AuthorizationStockBatchListCreateView, CMRStockBatchDetailsView, CMRStockBatchListCreateView, CTIRStockBatchDetailsView, CTIRStockBatchListCreateView, UserSettingsView, get_post_delete_user_smtp_settings, test_smtp_connection_view
+from dtt.views import AuthorizationStockBatchDetailsView, AuthorizationStockBatchListCreateView, \
+    CMRStockBatchDetailsView, CMRStockBatchListCreateView, CTIRStockBatchDetailsView, CTIRStockBatchListCreateView, \
+    ContactSiteListView, UserSettingsView, \
+    get_post_delete_user_smtp_settings, test_smtp_connection_view
 
 urlpatterns = [
 
@@ -19,6 +22,8 @@ urlpatterns = [
 
     path('ctirs/', CTIRStockBatchListCreateView.as_view(), name='ctir_list_create'),
     path('ctirs/<str:uf>/', CTIRStockBatchDetailsView.as_view(), name='ctir_details'),
+
+    path('contact-sites/', ContactSiteListView.as_view(), name='contact_sites'),
 
 ]
 

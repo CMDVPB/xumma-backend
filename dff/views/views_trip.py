@@ -1,5 +1,7 @@
 import time
 import logging
+from datetime import datetime
+from django.utils import timezone
 from django.contrib.auth import get_user_model
 from django.db.models import QuerySet, Prefetch, Q, F
 from rest_framework import status
@@ -25,9 +27,9 @@ class TripListView(ListAPIView):
     ''' get list of trips '''
     pagination_class = LimitResultsSetPagination
     serializer_class = TripListSerializer
-    http_method_names = ['head', 'get']
     permission_classes = [IsAuthenticated, HasGroupPermission]
     required_groups = {
+        'OPTIONS': ['type_carrier'],
         'HEAD': ['type_carrier'],
         'GET': ['type_carrier'],
         'POST': ['type_carrier'],
@@ -40,12 +42,12 @@ class TripListView(ListAPIView):
             queryset = Trip.objects.filter(company__id=user_company.id)
 
             queryset = queryset.select_related(
-                'carrier', 'carrier__country_code_post').select_related('driver').select_related('status').select_related('bt').\
+                'carrier', 'carrier__country_code_post').select_related('status').select_related('bt').\
                 select_related('mode').select_related(
                     'vehicle_tractor').select_related('vehicle_trailer')
 
             lodad_entries = Entry.objects.select_related(
-                'shipper', 'shipper__company', 'shipper__country_code_legal', 'shipper__country_code_post').\
+                'shipper', 'shipper__company', 'shipper__country_code_site', 'shipper__country_code_site').\
                 prefetch_related('entry_details').all()
 
             comments_qs = Comment.objects.all()
@@ -55,10 +57,13 @@ class TripListView(ListAPIView):
             route_sheet_qs = RouteSheet.objects.filter(
                 company__id=user_company.id)
 
+            drivers = user_company.user.all()
+
             queryset = queryset.prefetch_related(
                 Prefetch('trip_comments', queryset=comments_qs),
                 Prefetch('trip_loads', queryset=trip_loads_qs),
-                Prefetch('trip_route_sheets', queryset=route_sheet_qs)
+                Prefetch('trip_route_sheets', queryset=route_sheet_qs),
+                Prefetch('drivers', queryset=drivers)
             )
 
             # print('2828')
@@ -78,25 +83,21 @@ class TripListView(ListAPIView):
         try:
             myitems = self.request.query_params.get('myitems', None)
             text_query = self.request.query_params.get('textQuery', None)
-            vehicle_query = self.request.query_params.get('vehicleQuery', None)
 
-            print('2030', vehicle_query)
+            print('2030',)
 
             if is_valid_queryparam(myitems) and myitems == 'myitems':
                 queryset = queryset.filter(
                     assigned_user__id=self.request.user.id)
 
             if text_query is not None:
-                print('2030', text_query, type(text_query))
+                print('2036', text_query, type(text_query))
                 queryset = queryset.filter(Q(rn__icontains=text_query)
                                            | Q(carrier__company_name__icontains=text_query)
                                            | Q(trip_loads__sn__icontains=text_query)
                                            | Q(vehicle_tractor__reg_number__icontains=text_query)
                                            | Q(vehicle_trailer__reg_number__icontains=text_query)
                                            )
-            elif vehicle_query is not None:
-                queryset = queryset.filter(Q(vehicle_tractor__icontains=vehicle_query) | Q(
-                    vehicle_trailer__icontains=vehicle_query))
 
             else:
                 sortByQuery = self.request.query_params.get(
@@ -126,8 +127,14 @@ class TripListView(ListAPIView):
                     'statusQuery', None)
                 commentQuery = self.request.query_params.get(
                     'commentQuery', None)
+                vehicleQuery = self.request.query_params.get(
+                    'vehicleQuery', None)
+                startDate = self.request.query_params.get(
+                    'startDate', None)
+                endDate = self.request.query_params.get(
+                    'endDate', None)
 
-                # print('3040', )
+                print('3040', startDate)
 
                 if is_valid_queryparam(sortByQuery):
                     if sortByQuery is not None:
@@ -175,12 +182,10 @@ class TripListView(ListAPIView):
                     queryset = queryset.filter(rn__lte=numMaxQuery)
 
                 if is_valid_queryparam(numMinQuery):
-                    queryset = queryset.filter(
-                        rn__gte=numMinQuery)
+                    queryset = queryset.filter(rn__gte=numMinQuery)
 
                 if is_valid_queryparam(numMaxQuery):
-                    queryset = queryset.filter(
-                        rn__lte=numMaxQuery)
+                    queryset = queryset.filter(rn__lte=numMaxQuery)
 
                 if is_valid_queryparam(relDocNumQuery):
                     queryset = queryset.filter(
@@ -194,10 +199,27 @@ class TripListView(ListAPIView):
                     queryset = queryset.filter(
                         trip_comments__comment__icontains=commentQuery)
 
-            return queryset.order_by(F(order_by).desc(nulls_first=True), 'date_created')
+                if is_valid_queryparam(vehicleQuery):
+                    queryset = queryset.filter(Q(vehicle_tractor__reg_number__icontains=vehicleQuery)
+                                               | Q(vehicle_trailer__reg_number__icontains=vehicleQuery)
+                                               )
+
+                if is_valid_queryparam(startDate):
+                    dts = datetime.strptime(startDate, "%Y-%m-%d")
+                    dts = timezone.make_aware(dts)
+                    queryset = queryset.filter(date_order__gte=dts)
+
+                if is_valid_queryparam(endDate):
+                    dte = datetime.strptime(endDate, "%Y-%m-%d")
+                    dte = timezone.make_aware(dte)
+                    queryset = queryset.filter(date_order__lte=dte)
+
+            return queryset.order_by(F(order_by).desc(nulls_first=True), '-date_order')
 
         except Exception as e:
-            print('E393', e)
+            logger.error(
+                f'ERRORLOG2017 TripListView. filter_queryset. Error: {e}')
+
             return queryset
 
 
@@ -279,7 +301,7 @@ class TripDetailView(RetrieveUpdateDestroyAPIView):
         queryset = Trip.objects.filter(company_id=user_company.id)
 
         queryset = queryset.select_related(
-            'carrier', 'carrier__country_code_post').select_related('driver').select_related('mode').select_related('bt').\
+            'carrier', 'carrier__country_code_post').select_related('mode').select_related('bt').\
             select_related('currency').select_related('status').select_related(
                 'vehicle_tractor').select_related('vehicle_trailer')
 
@@ -294,7 +316,7 @@ class TripDetailView(RetrieveUpdateDestroyAPIView):
         load_comments = Comment.objects.all()
 
         load_entries = Entry.objects.select_related(
-            'shipper', 'shipper__company', 'shipper__country_code_legal', 'shipper__country_code_post').prefetch_related('entry_details').all()
+            'shipper', 'shipper__company', 'shipper__country_code_site', 'shipper__country_code_site').prefetch_related('entry_details').all()
 
         itemInvs = ItemInv.objects.select_related(
             'item_for_item_inv').select_related('item_for_item_cost').all()
@@ -325,10 +347,13 @@ class TripDetailView(RetrieveUpdateDestroyAPIView):
             'currency',
         ).prefetch_related('drivers')
 
+        drivers_qs = user_company.user.all()
+
         queryset = queryset.prefetch_related(
             Prefetch('trip_comments', queryset=trip_comments),
             Prefetch('trip_loads', queryset=trip_loads),
             Prefetch('trip_route_sheets', queryset=route_sheet_qs),
+            Prefetch('drivers', queryset=drivers_qs),
 
         )
 

@@ -17,8 +17,10 @@ from rest_framework.permissions import IsAuthenticated
 from abb.utils import get_user_company
 from app.models import SMTPSettings, UserSettings
 from app.serializers import UserSettingsSerializer
+from att.models import ContactSite
 from ayy.models import AuthorizationStockBatch, CMRStockBatch, CTIRStockBatch
 from dff.serializers.serializers_document import AuthorizationStockBatchSerializer, CMRStockBatchSerializer, CTIRStockBatchSerializer
+from dff.serializers.serializers_other import ContactSiteListSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -156,6 +158,27 @@ class CTIRStockBatchDetailsView(RetrieveUpdateDestroyAPIView):
             logger.error(
                 f'ERRORLOG657 CTIRStockBatchDetailsView. get_queryset. Error: {e}')
             return CTIRStockBatch.objects.none()
+
+
+class ContactSiteListView(ListCreateAPIView):
+    serializer_class = ContactSiteListSerializer
+    permission_classes = [IsAuthenticated,
+                          #   IsSubscriptionActiveOrReadOnly
+                          ]
+    lookup_field = 'uf'
+
+    def get_queryset(self):
+        try:
+            user = self.request.user
+            user_company = get_user_company(user)
+            queryset = ContactSite.objects.select_related(
+                'contact').filter(contact__company__id=user_company.id)
+
+            return queryset.distinct().order_by('name_site')
+
+        except Exception as e:
+            print('E587', e)
+            return ContactSite.objects.none()
 
 
 ### Start SMTP Settings ###

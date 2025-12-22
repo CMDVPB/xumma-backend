@@ -6,6 +6,7 @@ from drf_writable_nested.mixins import UniqueFieldsMixin, NestedCreateMixin, Nes
 from rest_framework import serializers
 
 from abb.custom_serializers import SlugRelatedGetOrCreateField
+from abb.models import Currency
 from abb.serializers import CurrencySerializer
 from app.serializers import UserSerializer
 from att.models import Contact, PaymentTerm, Person, Term
@@ -35,12 +36,9 @@ class InvListSerializer(WritableNestedModelSerializer):
     class Meta:
         model = Inv
         fields = ('series', 'qn', 'vn', 'date_inv', 'date_due', 'load_detail', 'load_address', 'unload_address', 'is_quote', 'uf',
-                  'spv_sent_status', 'spv_ind_upload', 'spv_ind_upload_status', 'spv_error_code',
                   'status', 'bill_to', 'currency',
                   'iteminv_invs', 'inv_comments',
                   )
-        read_only_fields = ['spv_ind_upload',
-                            'spv_ind_upload_status', 'spv_error_code']
 
 
 class InvSerializer(WritableNestedModelSerializer):
@@ -54,6 +52,8 @@ class InvSerializer(WritableNestedModelSerializer):
         allow_null=True, slug_field='uf', queryset=Contact.objects.all(), write_only=True)
     person = SlugRelatedGetOrCreateField(
         allow_null=True, slug_field='uf', queryset=Person.objects.all(), write_only=True)
+    currency = serializers.SlugRelatedField(
+        allow_null=True, slug_field='uf', queryset=Currency.objects.all())
     payment_term = SlugRelatedGetOrCreateField(
         allow_null=True, slug_field='uf', queryset=PaymentTerm.objects.all(), write_only=True)
     contract_terms = SlugRelatedGetOrCreateField(
@@ -64,7 +64,6 @@ class InvSerializer(WritableNestedModelSerializer):
     mode = ModeTypeSerializer(allow_null=True,)
     bt = BodyTypeSerializer(allow_null=True)
     incoterm = IncotermSerializer(allow_null=True)
-    currency = CurrencySerializer(allow_null=True)
     status = StatusTypeSerializer(allow_null=True)
 
     inv_histories = HistorySerializer(many=True, read_only=True)
@@ -72,43 +71,11 @@ class InvSerializer(WritableNestedModelSerializer):
     inv_comments = CommentSerializer(many=True)
     entry_invs = EntrySerializer(many=True)
 
-    def validate(self, attrs):
-        instance = getattr(self, 'instance', None)
-
-        if instance:
-            sent = bool(instance.spv_ind_upload)
-            error = bool(instance.spv_error_code)
-            accepted = bool(instance.spv_ind_id_download)
-
-            if sent and (accepted or not error):
-                allowed = ['status']
-                disallowed = [field for field in attrs if field not in allowed]
-
-                if disallowed:
-                    raise serializers.ValidationError(
-                        f"Only status change is allowed after sending to ANAF SPV."
-                    )
-        return attrs
-
     def to_internal_value(self, data):
         data_copy = data.copy()
 
         if 'status' in data_copy and data_copy['status'] == '':
             data_copy['status'] = None
-
-        # If instance is SPV locked than allow only status change and skip the rest of the code
-        instance = getattr(self, 'instance', None)
-        if instance:
-            sent = bool(instance.spv_ind_upload)
-            error = bool(instance.spv_error_code)
-            accepted = bool(instance.spv_ind_id_download)
-            is_locked = sent and (accepted or not error)
-
-            # print('SR2244', is_locked, sent, error, accepted)
-
-            if is_locked:
-                # Only keep status field and skip all other normalization
-                return super(InvSerializer, self).to_internal_value({'status': data_copy.get('status', None)})
 
         for idx, item in enumerate(data_copy['entry_invs']):
             data_copy['entry_invs'][idx]['order'] = idx
@@ -245,6 +212,4 @@ class InvSerializer(WritableNestedModelSerializer):
                   'inv_comments', 'entry_invs', 'contract_terms', 'load_detail', 'load_address', 'unload_address',
                   'date_load', 'customer_ref', 'note_act', 'customer_notes', 'date_unload', 'person', 'mode', 'bt', 'incoterm',
                   'status', 'inv_histories')
-        read_only_fields = ['inv_histories',
-                            'spv_sent_status', 'spv_ind_upload', 'spv_ind_upload_date',
-                            'spv_ind_upload_status', 'spv_error_code', 'spv_error_message', 'spv_error_message_array']
+        read_only_fields = ['inv_histories']

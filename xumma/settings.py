@@ -407,6 +407,14 @@ CELERY_CELERY_EXCHANGE = 'celery'
 CELERY_CELERY_ROUTING_KEY = 'celery'
 
 
+### GOOGLE API KEY ###
+GOOGLE_MAPS_API_KEY = os.environ.get('GOOGLE_MAPS_API_KEY')
+
+### HERE API KEY ###
+HERE_ID = os.environ.get('HERE_ID')
+HERE_API_KEY = os.environ.get('HERE_API_KEY')
+
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,

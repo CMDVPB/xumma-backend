@@ -25,6 +25,7 @@ from abb.mixins_serializer import ReadWriteSerializerMixin
 from abb.pagination import LimitResultsSetPagination
 from abb.permissions import AssignedUserManagerOrReadOnlyIfLocked, AssignedUserOrManagerOrReadOnly, HasGroupPermission
 from abb.utils import check_not_unique_num, check_not_unique_num_inv, get_user_company, is_valid_queryparam
+from app.utils import is_user_member_group
 from axx.models import Inv
 from ayy.models import Comment, ItemInv
 from dff.serializers.serializers_inv import InvListSerializer, InvSerializer
@@ -256,9 +257,9 @@ class InvCreateView(CreateAPIView):
             queryset = Inv.objects.filter(company__id=user_company.id)
 
             return queryset
-        except:
-            print('E437')
-            return []
+        except Exception as e:
+            print('E437', e)
+            return Inv.objects.none()
 
     def post(self, request, *args, **kwargs):
 

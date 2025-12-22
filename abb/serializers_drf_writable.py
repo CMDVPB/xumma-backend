@@ -6,6 +6,9 @@ from django.db.models import ProtectedError, SET_NULL, SET_DEFAULT
 from django.db.models.fields.related import ForeignObjectRel, ManyToManyRel
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
+from rest_framework import serializers
+from rest_framework.validators import UniqueValidator
+from rest_framework.exceptions import ValidationError
 
 
 shall_print = False
@@ -255,8 +258,6 @@ class CustomNestedCreateMixin(CustomBaseNestedModelSerializer):
 
         return instance
 
-# Unchanged
-
 
 class CustomNestedUpdateMixin(CustomBaseNestedModelSerializer):
     shall_print = False
@@ -362,3 +363,69 @@ class CustomNestedUpdateMixin(CustomBaseNestedModelSerializer):
 class CustomWritableNestedModelSerializer(CustomNestedCreateMixin, CustomNestedUpdateMixin,
                                           serializers.ModelSerializer):
     pass
+
+
+class CustomsUniqueFieldsMixin(serializers.ModelSerializer):
+    """
+    Fixes unique validation for nested updates when objects
+    are matched by a custom lookup field (e.g. `uf`).
+    """
+
+    _unique_fields = []
+
+    # 🔥 define which field identifies the instance
+    lookup_field = 'uf'   # <-- IMPORTANT
+
+    def get_fields(self):
+        self._unique_fields = []
+
+        fields = super().get_fields()
+        for field_name, field in fields.items():
+            unique_validators = [
+                v for v in field.validators
+                if isinstance(v, UniqueValidator)
+            ]
+            if unique_validators:
+                self._unique_fields.append((field_name, unique_validators[0]))
+                field.validators = [
+                    v for v in field.validators
+                    if not isinstance(v, UniqueValidator)
+                ]
+        return fields
+
+    def _validate_unique_fields(self, validated_data, instance=None):
+        for field_name, unique_validator in self._unique_fields:
+
+            # 🔥 NEVER validate uniqueness of the lookup field itself
+            if field_name == self.lookup_field:
+                continue
+
+            if self.partial and field_name not in validated_data:
+                continue
+
+            value = validated_data.get(field_name)
+            if value is None:
+                continue
+
+            queryset = unique_validator.queryset
+
+            # exclude current instance
+            if instance is not None:
+                lookup_value = getattr(instance, self.lookup_field, None)
+                if lookup_value is not None:
+                    queryset = queryset.exclude(**{
+                        self.lookup_field: lookup_value
+                    })
+
+            if queryset.filter(**{field_name: value}).exists():
+                raise ValidationError({
+                    field_name: f'{field_name} must be unique.'
+                })
+
+    def create(self, validated_data):
+        self._validate_unique_fields(validated_data)
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        self._validate_unique_fields(validated_data, instance=instance)
+        return super().update(instance, validated_data)

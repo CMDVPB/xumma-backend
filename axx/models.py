@@ -9,7 +9,7 @@ from abb.custom_exceptions import YourCustomApiExceptionName
 from abb.models import Currency, BodyType, ModeType, StatusType, Incoterm
 from abb.utils import assign_new_num_inv, hex_uuid, assign_new_num, tripLoadsTotals
 from app.models import Company
-from att.models import Contact, Person, Term, VehicleUnit, PaymentTerm
+from att.models import Contact, Person, Term, VehicleCompany, VehicleUnit, PaymentTerm
 
 import logging
 logger = logging.getLogger(__name__)
@@ -88,6 +88,8 @@ class Trip(models.Model):
     trip_number = models.CharField(max_length=20, blank=True, null=True)
     km_departure = models.CharField(max_length=20, blank=True, null=True)
     km_arrival = models.CharField(max_length=20, blank=True, null=True)
+    km_exit = models.CharField(max_length=20, blank=True, null=True)
+    km_entry = models.CharField(max_length=20, blank=True, null=True)
     date_trip = models.DateTimeField(blank=True, null=True)
     date_departure = models.DateTimeField(blank=True, null=True)
     date_arrival = models.DateTimeField(blank=True, null=True)
@@ -101,12 +103,11 @@ class Trip(models.Model):
                                 related_name='carrier_trips')
     person = models.ForeignKey(Person, on_delete=models.SET_NULL,
                                blank=True, null=True, related_name='person_trips')
-    driver = models.ForeignKey(Person, on_delete=models.SET_NULL,
-                               blank=True, null=True, related_name='driver_trips')
+
     vehicle_tractor = models.ForeignKey(
-        VehicleUnit, on_delete=models.SET_NULL, blank=True, null=True, related_name='vehicle_tractor_trips')
+        VehicleCompany, on_delete=models.SET_NULL, blank=True, null=True, related_name='vehicle_tractor_trips')
     vehicle_trailer = models.ForeignKey(
-        VehicleUnit, on_delete=models.SET_NULL, blank=True, null=True, related_name='vehicle_trailer_trips')
+        VehicleCompany, on_delete=models.SET_NULL, blank=True, null=True, related_name='vehicle_trailer_trips')
     mode = models.ForeignKey(ModeType, on_delete=models.SET_NULL,
                              null=True, blank=True, related_name='modetype_trips')
     bt = models.ForeignKey(BodyType, on_delete=models.SET_NULL,

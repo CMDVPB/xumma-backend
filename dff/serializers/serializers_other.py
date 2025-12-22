@@ -5,9 +5,11 @@ from drf_writable_nested.serializers import WritableNestedModelSerializer
 from drf_writable_nested.mixins import UniqueFieldsMixin, NestedCreateMixin, NestedUpdateMixin
 from rest_framework import serializers
 
+from abb.models import Country
 from abb.serializers import CountrySerializer, CurrencySerializer
+from abb.serializers_drf_writable import CustomWritableNestedModelSerializer, CustomsUniqueFieldsMixin
 from app.serializers import UserBasicSerializer
-from att.models import Contact, BankAccount, PaymentTerm, Person, TargetGroup, Term, VehicleUnit
+from att.models import Contact, BankAccount, ContactSite, PaymentTerm, Person, TargetGroup, Term, VehicleCompany, VehicleUnit
 from axx.models import Load
 from ayy.models import CMR, Comment, Document, History, ImageUpload
 
@@ -80,6 +82,13 @@ class BankAccountSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
         fields = ('currency_code', 'iban_number', 'bank_name', 'bank_address', 'bank_code', 'add_instructions', 'include_in_inv', 'uf',
                   'contact',
                   )
+
+
+class VehicleCompanyBasicReadSerializer(WritableNestedModelSerializer):
+
+    class Meta:
+        model = VehicleCompany
+        fields = ('reg_number', 'uf')
 
 
 class VehicleUnitBasicReadSerializer(WritableNestedModelSerializer):
@@ -255,11 +264,24 @@ class PersonSerializer(WritableNestedModelSerializer):
                   'phone', 'comment', 'is_driver', "archived", 'uf')
 
 
+class ContactSiteForContactSerializer(CustomsUniqueFieldsMixin, CustomWritableNestedModelSerializer):
+    '''
+    To be used as child serializer for ContactSerializer
+    '''
+
+    class Meta:
+        model = ContactSite
+        lookup_field = 'uf'
+        fields = ('name_site', 'address_site', 'city_site', 'zip_code_site', 'country_code_site', 'lat', 'lon', 'uf',
+                  )
+
+
 class ContactTripListSerializer(WritableNestedModelSerializer):
     contact_vehicle_units = VehicleUnitBasicReadSerializer(many=True)
 
     class Meta:
         model = Contact
+
         fields = ('company_name', 'uf',
                   'contact_vehicle_units'
                   )
@@ -276,11 +298,15 @@ class ContactBasicReadSerializer(WritableNestedModelSerializer):
                   )
 
 
-class ContactSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
+class ContactSerializer(WritableNestedModelSerializer):
     contact_persons = PersonSerializer(many=True)
 
-    country_code_legal = CountrySerializer(allow_null=True)
-    country_code_post = CountrySerializer(allow_null=True)
+    country_code_legal = serializers.SlugRelatedField(
+        slug_field='uf', queryset=Country.objects.all(), write_only=True, required=True)
+    country_code_post = serializers.SlugRelatedField(
+        allow_null=True, slug_field='uf', queryset=Country.objects.all(), write_only=True, required=False)
+
+    contact_sites = ContactSiteForContactSerializer(many=True)
 
     contact_vehicle_units = VehicleUnitSerializer(many=True)
     contact_bank_accounts = BankAccountSerializer(many=True)
@@ -288,6 +314,11 @@ class ContactSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
     def to_representation(self, instance):
         response = super().to_representation(instance)
         response['contact_type'] = instance.contact_type if instance.contact_type else None
+
+        response['country_code_legal'] = CountrySerializer(
+            instance.country_code_legal).data if instance.country_code_legal else None
+        response['country_code_post'] = CountrySerializer(
+            instance.country_code_post).data if instance.country_code_post else None
 
         return response
 
@@ -343,7 +374,43 @@ class ContactSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
                   'country_code_legal', 'zip_code_legal', 'city_legal', 'address_legal', 'county_legal', 'sect_legal',
                   'country_code_post', 'zip_code_post', 'city_post', 'address_post', 'comment1', 'comment2',
                   'lat', 'lon',
-                  'contact_persons', 'contact_vehicle_units', 'contact_bank_accounts')
+                  'contact_persons', 'contact_vehicle_units', 'contact_bank_accounts', 'contact_sites',
+                  )
+
+###### Start Contact Site Serializers ######
+
+
+class ContactSiteBasicReadSerializer(WritableNestedModelSerializer):
+
+    country_code_site = CountrySerializer(allow_null=True)
+
+    class Meta:
+        model = ContactSite
+        fields = ('name_site', 'address_site', 'city_site', 'zip_code_site', 'country_code_site', 'lat', 'lon', 'uf',
+                  'country_code_site',
+                  )
+
+
+class ContactSiteListSerializer(WritableNestedModelSerializer):
+
+    class Meta:
+        model = ContactSite
+        lookup_field = 'uf'
+        fields = ('name_site', 'address_site', 'city_site', 'zip_code_site', 'country_code_site', 'lat', 'lon', 'uf',
+
+                  )
+
+
+class ContactSiteSerializer(WritableNestedModelSerializer):
+
+    class Meta:
+        model = ContactSite
+        lookup_field = 'uf'
+        fields = ('name_site', 'address_site', 'city_site', 'zip_code_site', 'country_code_site', 'lat', 'lon', 'uf',
+
+                  )
+
+###### End Contact Site Serializers ######
 
 
 class TargetGroupSerializer(WritableNestedModelSerializer):

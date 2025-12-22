@@ -14,6 +14,7 @@ from app.serializers import UserBasicSerializer, UserSerializer
 from att.models import Contact, PaymentTerm, Person, VehicleUnit
 from att.serializers import BodyTypeSerializer, IncotermSerializer, ModeTypeSerializer, StatusTypeSerializer
 from axx.models import Ctr, Exp, Inv, Load, Tor
+from ayy.models import CMR
 from dff.serializers.serializers_ctr import CtrSerializer
 from dff.serializers.serializers_entry_detail import EntryBasicReadListSerializer, EntrySerializer
 from dff.serializers.serializers_exp import ExpSerializer
@@ -191,6 +192,7 @@ class LoadSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
     load_imageuploads = ImageSerializer(many=True, read_only=True)
 
     def to_internal_value(self, data):
+        # print('6080', data)
 
         for idx, item in enumerate(data['entry_loads']):
             data['entry_loads'][idx]['order'] = idx

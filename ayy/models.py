@@ -9,7 +9,7 @@ from abb.utils import assign_new_num, hex_uuid, default_notification_status_3, u
 
 from app.models import CategoryGeneral, Company, TypeGeneral
 from axx.models import Ctr, Exp, Inv, Load, Tor, Trip
-from att.models import Contact, Person, VehicleCompany
+from att.models import Contact, ContactSite, Person, VehicleCompany
 
 from .utils import dynamic_upload_path, user_photo_upload_path
 
@@ -285,7 +285,7 @@ class Entry(models.Model):
     action = models.CharField(
         choices=ACTION_CHOICES, max_length=20, null=True, blank=True)
     shipper = models.ForeignKey(
-        Contact, on_delete=models.SET_NULL, blank=True, null=True, related_name='shipper_entries')
+        ContactSite, on_delete=models.SET_NULL, blank=True, null=True, related_name='shipper_entries')
     date_load = models.DateTimeField(null=True, blank=True)
 
     time_load_min = models.DateTimeField(null=True, blank=True)

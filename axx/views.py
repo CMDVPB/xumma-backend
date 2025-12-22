@@ -78,15 +78,16 @@ class ContactListCreate(ListCreateAPIView):
             user = self.request.user
             user_company = get_user_company(user)
             serializer.save(company=user_company)
-        except:
-            print('E269')
+        except Exception as e:
+            print('E269', e)
             serializer.save()
 
 
 class ContactDetail(RetrieveUpdateDestroyAPIView):
     serializer_class = ContactSerializer
-    permission_classes = [IsAuthenticated, IsSubscriptionActiveOrReadOnly]
-    http_method_names = ['head', 'get', 'put', 'patch', 'delete']
+    permission_classes = [IsAuthenticated,
+                          #    IsSubscriptionActiveOrReadOnly
+                          ]
     lookup_field = 'uf'
 
     def get_queryset(self):
@@ -94,9 +95,9 @@ class ContactDetail(RetrieveUpdateDestroyAPIView):
             user = self.request.user
             user_company = get_user_company(user)
             return Contact.objects.filter(company__id=user_company.id).distinct()
-        except:
-            print('E435')
-            return []
+        except Exception as e:
+            print('E435', e)
+            return Contact.objects.none()
 
     def put(self, request, *args, **kwargs):
         # print('3637', )

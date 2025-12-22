@@ -19,8 +19,9 @@ from rest_framework.permissions import IsAuthenticated  # used for FBV
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.exceptions import ValidationError
 
+from abb.mixins_serializer import ReadWriteSerializerMixin
 from abb.pagination import LimitResultsSetPagination
-from abb.permissions import HasGroupPermission
+from abb.permissions import AssignedUserManagerOrReadOnlyIfLocked, AssignedUserOrManagerOrReadOnly, HasGroupPermission
 from abb.utils import check_not_unique_num, check_not_unique_num_inv, get_user_company, is_valid_queryparam
 from axx.models import Inv
 from ayy.models import Comment, Entry, ItemInv
@@ -55,7 +56,7 @@ class QuoteListView(ListAPIView):
                 'item_for_item_inv').all()
 
             entries = Entry.objects.select_related(
-                'shipper', 'shipper__country_code_post',).prefetch_related('entry_details').all()
+                'shipper', 'shipper__country_code_site',).prefetch_related('entry_details').all()
 
             queryset = queryset.prefetch_related(
                 Prefetch('inv_comments', queryset=comments)).prefetch_related(
@@ -321,3 +322,75 @@ class QuoteCreateView(CreateAPIView):
         except Exception as e:
             print('EV581', e)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class QuoteDetailView(ReadWriteSerializerMixin, RetrieveUpdateDestroyAPIView):
+    read_serializer_class = InvSerializer
+    write_serializer_class = InvSerializer
+    lookup_field = 'uf'
+    permission_classes = [IsAuthenticated, HasGroupPermission, AssignedUserOrManagerOrReadOnly,
+                          AssignedUserManagerOrReadOnlyIfLocked,
+                          # IsSubscriptionActiveOrReadOnly
+                          ]
+    required_groups = {
+        'HEAD': ['type_forwarder'],
+        'GET': ['type_forwarder'],
+        'PATCH': ['type_forwarder'],
+        'DELETE': ['type_forwarder'],
+    }
+
+    def get_queryset(self):
+        user_company = get_user_company(self.request.user)
+        queryset = Inv.objects.filter(company__id=user_company.id)
+
+        # print('7799', )
+        return queryset
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+
+        num = 'qn' if self.request.data.get('qn', None) else 'vn'
+        # print('5673', num)
+
+        queryset = self.get_queryset().exclude(uf=instance.uf)
+        new_item_num = self.request.data.get(num, None)
+        series = self.request.data.get('series')
+
+        if (num == 'vn' and check_not_unique_num_inv(queryset=queryset, new_item_num=new_item_num, num=num, series=series)) or \
+                (num == 'qn' and check_not_unique_num(instance, queryset, new_item_num, num)):
+            return Response(status=status.HTTP_409_CONFLICT)
+
+        assigned_user_id = instance.assigned_user.id if instance.assigned_user else None
+        if not is_user_member_group(request.user, 'level_manager') and assigned_user_id != self.request.user.id:
+            request.data.pop('is_locked', None)
+
+        serializer = self.get_serializer(
+            instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        if getattr(instance, '_prefetched_objects_cache', None):
+            # If 'prefetch_related' has been applied to a queryset, we need to
+            # forcibly invalidate the prefetch cache on the instance.
+            instance._prefetched_objects_cache = {}
+
+        return Response(serializer.data)
+
+    def perform_update(self, serializer):
+        assigned_user = None
+
+        try:
+            assigned_user_uf = self.request.data.get('assigned_user', None)
+
+            if assigned_user_uf is not None:
+                assigned_user = User.objects.get(uf=assigned_user_uf)
+            else:
+                assigned_user = User.objects.get(uf=self.request.user.uf)
+
+        except Exception as e:
+            logger.error(
+                f'ERRORLOG403 QuoteDetailView. perform_update. Error: {e}')
+
+        serializer.save(changed_by=self.request.user,
+                        assigned_user=assigned_user)

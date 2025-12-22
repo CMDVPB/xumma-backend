@@ -1,7 +1,8 @@
-
+import logging
 from datetime import datetime, timedelta
 from smtplib import SMTPException
 from django.utils import timezone
+from django.conf import settings
 from django.forms.models import model_to_dict
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError
@@ -12,6 +13,7 @@ from django.http import HttpResponse
 from rest_framework.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
 from rest_framework import status, exceptions
+from rest_framework.views import APIView
 from rest_framework.generics import CreateAPIView, ListAPIView, ListCreateAPIView, CreateAPIView, \
     RetrieveUpdateDestroyAPIView, DestroyAPIView
 from rest_framework.response import Response
@@ -26,8 +28,20 @@ from att.models import TargetGroup
 from dff.serializers.serializers_company import CompanySerializer
 from dff.serializers.serializers_other import TargetGroupSerializer  # used for FBV
 
-import logging
+import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+from urllib.parse import quote
+request_session = requests.Session()
+retries = Retry(total=3, backoff_factor=5)
+adapter = HTTPAdapter(max_retries=retries)
+request_session.mount("http://", adapter)
+
 logger = logging.getLogger(__name__)
+
+GOOGLE_API_KEY = settings.GOOGLE_MAPS_API_KEY
+HERE_ID = settings.HERE_ID
+HERE_API_KEY = settings.HERE_API_KEY
 
 
 class TargetGroupListCreate(ListCreateAPIView):
@@ -121,3 +135,135 @@ class CompanyDetail(RetrieveUpdateDestroyAPIView):
         company = self.get_object(pk)
         company.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class ContactSuggestionAPIView(APIView):
+    def get(self, request):
+        query = request.GET.get("query", "")
+
+        # print('6870', query)
+
+        if not query:
+            return Response({"error": "missing_query"}, status=status.HTTP_400_BAD_REQUEST)
+
+        suggestions = []
+        google_failed = False
+        here_failed = False
+
+        ### Google ###
+        try:
+            payload = {
+                "textQuery": query
+            }
+
+            headers = {
+                "Content-Type": "application/json",
+                "X-Goog-Api-Key": GOOGLE_API_KEY,
+                "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.location"
+            }
+
+            r = request_session.post(
+                "https://places.googleapis.com/v1/places:searchText",
+                json=payload,
+                headers=headers,
+                timeout=3
+            )
+
+            r.raise_for_status()
+            data = r.json()
+
+            print('6876', data)
+
+            for item in data.get("places", []):
+                formatted = item.get("formattedAddress", "") or ""
+                location = item.get("location", {}) or {}
+
+                # Split: "Air Cargo Center, 1300 Wien, Austria"
+                parts = [p.strip() for p in formatted.split(",")]
+
+                street = parts[0] if len(parts) > 0 else None
+                zip_city = parts[1] if len(parts) > 1 else None
+                country = parts[2] if len(parts) > 2 else None
+
+                # Further split zip and city
+                zip_code, city = None, None
+                if zip_city:
+                    zc = zip_city.split(" ", 1)
+                    if len(zc) == 2:
+                        zip_code, city = zc[0], zc[1]
+                    else:
+                        city = zip_city
+
+                suggestions.append({
+                    "id": item.get("id"),
+                    "display_name": item.get("displayName", {}).get("text"),
+                    "company_name": item.get("displayName", {}).get("text"),
+                    "address": {
+                        "country_code": country,
+                        "city": city,
+                        "zip": zip_code,
+                        "address": street,      # no house number available from Search
+                        "county": None          # Search data does not include county
+                    },
+                    "lat": float(location.get("latitude")) if location.get("latitude") else None,
+                    "lon": float(location.get("longitude")) if location.get("longitude") else None
+                })
+
+        except requests.RequestException as e:
+            # Log Google failure, but continue to HERE
+            print("Google Places API failed:", str(e))
+            google_failed = True
+
+        ### HERE ###
+        if not suggestions or google_failed:
+            try:
+
+                headers = {
+                    "Content-Type": "application/json",
+                }
+
+                r = request_session.get(
+                    f"https://geocode.search.hereapi.com/v1/geocode?q={query}&apiKey={HERE_API_KEY}",
+                    headers=headers,
+                    timeout=3
+                )
+
+                r.raise_for_status()
+                data = r.json()
+
+                # print('7560', data)
+
+                for item in data.get("items", []):
+                    addr = item.get("address", {})
+                    pos = item.get("position", {})
+
+                    suggestions.append({
+                        "id": item.get("id"),
+                        "display_name": item.get("title") or query,
+                        "company_name": item.get("title") or query,
+                        "address": {
+                            "country_code": (addr.get("countryCode") or "").upper(),
+                            "city": addr.get("city"),
+                            "zip": addr.get("postalCode"),
+                            "address": " ".join(filter(None, [
+                                addr.get("street"),
+                                addr.get("houseNumber")
+                            ])).strip(),
+                            "county": addr.get("county"),
+                        },
+                        "lat": float(pos.get("lat")) if pos.get("lat") else None,
+                        "lon": float(pos.get("lng")) if pos.get("lng") else None
+                    })
+
+            except requests.RequestException as e:
+                print("HERE Geocode API failed:", str(e))
+                here_failed = True
+
+        ### Return result or error if both failed ###
+        if not suggestions and (google_failed and here_failed):
+            return Response({
+                "error": "both_apis_failed",
+                "details": "both_apis_failed"
+            }, status=status.HTTP_502_BAD_GATEWAY)
+
+        return Response(suggestions)
