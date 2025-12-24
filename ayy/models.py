@@ -6,7 +6,6 @@ from phonenumber_field.modelfields import PhoneNumberField
 from abb.constants import ACTION_CHOICES, UNIT_MEASUREMENT_CHOICES, VAT_CHOICES, VAT_EXEMPTION_REASON, VAT_TYPE_CHOICES
 from abb.models import Country, Currency
 from abb.utils import assign_new_num, hex_uuid, default_notification_status_3, upload_to
-
 from app.models import CategoryGeneral, Company, TypeGeneral
 from axx.models import Ctr, Exp, Inv, Load, Tor, Trip
 from att.models import Contact, ContactSite, Person, VehicleCompany
@@ -552,35 +551,6 @@ class History(models.Model):
     def __str__(self):
         return str(self.id) or ''
 
-### Base Model ###
-
-
-# class TransportDocument(models.Model):
-
-#     company = models.ForeignKey(
-#         Company,
-#         on_delete=models.CASCADE,
-#         related_name="%(class)ss"
-#     )
-
-#     series = models.CharField(max_length=20)
-#     number = models.CharField(max_length=50)
-
-#     issued_at = models.DateField()
-#     valid_from = models.DateField(null=True, blank=True)
-#     valid_until = models.DateField(null=True, blank=True)
-
-#     notes = models.TextField(blank=True)
-
-#     created_at = models.DateTimeField(auto_now_add=True)
-
-#     class Meta:
-#         abstract = True
-#         ordering = ["-issued_at"]
-
-#     def __str__(self):
-#         return f"{self.series} {self.number}"
-
 
 class CMRStockBatch(models.Model):
     uf = models.CharField(max_length=36, default=hex_uuid, db_index=True)
@@ -665,3 +635,151 @@ class CTIRStockBatch(models.Model):
 
     class Meta:
         unique_together = ("company", "number")
+
+
+###### Start Damages Models ######
+
+class DamageReport(models.Model):
+    uf = models.CharField(max_length=36, default=hex_uuid, db_index=True)
+    company = models.ForeignKey(
+        Company, on_delete=models.CASCADE, related_name="company_damage_reports")
+
+    vehicle = models.ForeignKey(
+        VehicleCompany, on_delete=models.CASCADE, related_name="vehicle_damage_reports")
+
+    reported_at = models.DateTimeField(auto_now_add=True)
+    reported_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True)
+
+    location = models.CharField(max_length=255, blank=True)
+    notes = models.TextField(blank=True)
+
+    def __str__(self):
+        return f"Damage report #{self.id} for {self.vehicle}"
+
+
+class VehicleDamage(models.Model):
+    DAMAGE_TYPE_CHOICES = (
+        ('scratch', 'Scratch'),
+        ('dent', 'Dent'),
+        ('crack', 'Crack'),
+        ('broken', 'Broken'),
+        ('missing', 'Missing'),
+        ('other', 'Other'),
+    )
+
+    SEVERITY_CHOICES = (
+        ('minor', 'Minor'),
+        ('medium', 'Medium'),
+        ('severe', 'Severe'),
+    )
+
+    uf = models.CharField(max_length=36, default=hex_uuid, db_index=True)
+    company = models.ForeignKey(
+        Company, on_delete=models.CASCADE, related_name="company_vehicle_damages")
+
+    report = models.ForeignKey(
+        DamageReport,
+        on_delete=models.CASCADE,
+        related_name="report_vehicle_damages"
+    )
+
+    damage_type = models.CharField(
+        max_length=20, choices=DAMAGE_TYPE_CHOICES, blank=True)
+    severity = models.CharField(
+        max_length=20, choices=SEVERITY_CHOICES, blank=True)
+
+    part = models.CharField(
+        max_length=100,
+        help_text="e.g. Front bumper, Left door, Trailer side panel"
+    )
+
+    amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2, blank=True, null=True
+    )
+
+    description = models.TextField(blank=True)
+
+    is_repaired = models.BooleanField(default=False)
+    repaired_at = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.damage_type} ({self.severity}) - {self.part}"
+
+
+class DamageLiability(models.Model):
+    uf = models.CharField(max_length=36, default=hex_uuid, db_index=True)
+
+    company = models.ForeignKey(
+        Company,
+        on_delete=models.CASCADE,
+        related_name="company_damage_liabilities"
+    )
+
+    report = models.ForeignKey(
+        DamageReport,
+        on_delete=models.CASCADE,
+        related_name="report_damage_liabilities", null=True, blank=True
+    )
+
+    driver = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="driver_damage_liabilities", null=True, blank=True
+    )
+
+    total_amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2
+    )
+
+    currency = models.ForeignKey(
+        Currency,
+        on_delete=models.CASCADE,
+        related_name="currency_damage_liabilities"
+    )
+
+    reason = models.TextField(blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    is_settled = models.BooleanField(default=False)
+
+    def __str__(self):
+        return (
+            f"{self.driver} owes {self.total_amount} "
+            f"for report #{self.report.id}"
+        )
+
+
+class DamagePayment(models.Model):
+    liability = models.ForeignKey(
+        DamageLiability,
+        on_delete=models.CASCADE,
+        related_name="liability_damage_payments"
+    )
+
+    amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2
+    )
+
+    paid_at = models.DateField()
+
+    method = models.CharField(
+        max_length=30,
+        choices=(
+            ('cash', 'Cash'),
+            ('salary_deduction', 'Salary deduction'),
+            ('bank_transfer', 'Bank transfer'),
+        )
+    )
+
+    note = models.TextField(blank=True)
+
+    def __str__(self):
+        return f"{self.amount} paid on {self.paid_at}"
+
+
+###### End Damages Models ######

@@ -25,6 +25,7 @@ from abb.permissions import IsSubscriptionActiveOrReadOnly
 from abb.utils import get_user_company
 from app.models import Company
 from att.models import TargetGroup
+from ayy.models import DamageReport
 from dff.serializers.serializers_company import CompanySerializer
 from dff.serializers.serializers_other import TargetGroupSerializer  # used for FBV
 
@@ -32,6 +33,8 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from urllib.parse import quote
+
+from dtt.serializers import DamageReportSerializer
 request_session = requests.Session()
 retries = Retry(total=3, backoff_factor=5)
 adapter = HTTPAdapter(max_retries=retries)
@@ -45,10 +48,9 @@ HERE_API_KEY = settings.HERE_API_KEY
 
 
 class TargetGroupListCreate(ListCreateAPIView):
+    permission_classes = [IsAuthenticated]
     serializer_class = TargetGroupSerializer
-    permission_classes = [IsAuthenticated, IsSubscriptionActiveOrReadOnly]
     lookup_field = 'uf'
-    http_method_names = ['head', 'get', 'post']
 
     def get_queryset(self):
         try:
@@ -267,3 +269,39 @@ class ContactSuggestionAPIView(APIView):
             }, status=status.HTTP_502_BAD_GATEWAY)
 
         return Response(suggestions)
+
+
+class DamageReportListView(ListAPIView):
+    serializer_class = DamageReportSerializer
+    permission_classes = [IsAuthenticated]
+    lookup_field = 'uf'
+
+    def get_queryset(self):
+        try:
+            user = self.request.user
+            user_company = get_user_company(user)
+            queryset = DamageReport.objects.filter(company__id=user_company.id)
+
+            return queryset.distinct().order_by('-reported_at')
+        except Exception as e:
+            print('E511', e)
+            return DamageReport.objects.none()
+
+
+class DamageReportCreateView(CreateAPIView):
+    serializer_class = DamageReportSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        try:
+            user_company = get_user_company(self.request.user)
+
+            queryset = DamageReport.objects.filter(
+                company__id=user_company.id)
+
+            return queryset.distinct()
+
+        except Exception as e:
+            logger.error(
+                f'ERRORLOG691 DamageReportCreateView. get_queryset. Error: {e}')
+            return DamageReport.objects.none()
