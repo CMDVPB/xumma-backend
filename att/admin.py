@@ -18,7 +18,7 @@ class ContactAdmin(admin.ModelAdmin):
 
 @admin.register(ContactSite)
 class ContactSiteAdmin(admin.ModelAdmin):
-    list_display = ('id', 'contact', 'name_site')
+    list_display = ('id', 'company', 'name_site', 'contact')
 
     search_fields = ('contact__company_name', 'contact__fiscal_code',
                      'contact__compoany__uf', 'contact__company__company_name')

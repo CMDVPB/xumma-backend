@@ -1,6 +1,7 @@
 
 from django.contrib.auth.models import Group
 from django.contrib.auth import get_user_model
+from django.db import transaction
 from rest_framework import serializers
 from drf_writable_nested.serializers import WritableNestedModelSerializer
 from drf_writable_nested.mixins import NestedCreateMixin, NestedUpdateMixin, UniqueFieldsMixin
@@ -10,6 +11,7 @@ import logging
 from abb.serializers import CountrySerializer
 from abb.utils import company_latest_exp_date_subscription, get_company_manager, get_company_users, get_user_company
 from app.models import Company, UserSettings
+
 logger = logging.getLogger(__name__)
 
 User = get_user_model()
@@ -36,6 +38,12 @@ class UserBasicSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
 
 
 class UserBasicPlusSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
+    from ayy.serializers import PhoneNumberSerializer, DocumentSerializer
+
+    user_documents = DocumentSerializer(
+        many=True, context={'request': 'request'})
+    user_phone_numbers = PhoneNumberSerializer(
+        many=True, context={'request': 'request'})
 
     def to_representation(self, instance):
         response = super().to_representation(instance)
@@ -52,12 +60,22 @@ class UserBasicPlusSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
 
     class Meta:
         model = User
-        fields = ('email', 'first_name', 'last_name',
-                  'image', 'phone', 'messanger', 'uf')
+        fields = ('email', 'first_name', 'last_name', 'personal_id', 'uf',
+                  'comment', 'date_registered', 'date_of_birth', 'date_termination', 'is_archived',
+                  'image', 'phone', 'messanger',
+                  'user_documents', 'user_phone_numbers',
+                  )
 
 
 class UserSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
+    from ayy.serializers import PhoneNumberSerializer, DocumentSerializer
+
     company = CompanyUserSerializer(read_only=True)
+
+    user_documents = DocumentSerializer(
+        many=True, context={'request': 'request'})
+    user_phone_numbers = PhoneNumberSerializer(
+        many=True, context={'request': 'request'})
 
     def to_representation(self, instance):
         response = super().to_representation(instance)
@@ -107,8 +125,10 @@ class UserSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
 
     class Meta:
         model = User
-        fields = ('email', 'first_name', 'last_name', 'phone', 'messanger', 'image', 'lang', 'uf',
+        fields = ('email', 'first_name', 'last_name', 'personal_id', 'phone', 'messanger', 'comment', 'image', 'lang', 'uf',
+                  'date_registered', 'date_of_birth', 'date_termination', 'is_archived',
                   'company',
+                  'user_documents', 'user_phone_numbers',
                   )
 
 

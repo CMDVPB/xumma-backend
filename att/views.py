@@ -1,6 +1,7 @@
 import math
 from django.conf import settings
 from datetime import datetime
+from django.db.models import QuerySet, Prefetch, Q, F
 from django.views.decorators.cache import cache_page
 from django.utils.decorators import method_decorator
 from django.http import HttpResponse
@@ -14,7 +15,7 @@ from rest_framework.permissions import IsAuthenticated
 
 from abb.models import BodyType, Incoterm, ModeType, StatusType
 from abb.pagination import LimitResultsSetPagination
-from abb.utils import get_user_company
+from abb.utils import get_user_company, is_valid_queryparam
 from app.models import CategoryGeneral, TypeGeneral
 from att.models import EmissionClass, VehicleBrand, VehicleCompany
 from att.serializers import BodyTypeSerializer, CategoryGeneralSerializer, EmissionClassdSerializer, IncotermSerializer, ModeTypeSerializer, StatusTypeSerializer, TypeGeneralSerializer, \
@@ -173,6 +174,7 @@ class VehicleCompanyCreateView(CreateAPIView):
 class VehicleCompanyListView(ListAPIView):
     serializer_class = VehicleCompanySerializer
     permission_classes = [IsAuthenticated]
+    ordering = ['-date_registered']
 
     def get_queryset(self):
         try:
@@ -181,17 +183,40 @@ class VehicleCompanyListView(ListAPIView):
             queryset = VehicleCompany.objects.filter(
                 company__id=user_company.id)
 
-            return queryset.distinct().order_by('-id')
+            return queryset
         except Exception as e:
             logger.error(
                 f'ERRORLOG735 VehicleCompanyListView. get_queryset. Error: {e}')
             return VehicleCompany.objects.none()
 
+    def filter_queryset(self, queryset: QuerySet, **kwargs):
+        # print('4960',)
+
+        queryset = super().filter_queryset(queryset=queryset, **kwargs)
+
+        try:
+            vehicle_type = self.request.query_params.get('vehicleType', None)
+
+            if is_valid_queryparam(vehicle_type):
+                if vehicle_type == 'tractor':
+                    queryset = queryset.filter(Q(vehicle_type='tractor') |
+                                               Q(vehicle_type='truck'))
+                elif vehicle_type == 'trailer':
+                    queryset = queryset.filter(vehicle_type='trailer')
+
+            print('4968', queryset.count())
+
+            return queryset.distinct()
+
+        except Exception as e:
+            logger.error(
+                f'ERRORLOG7535 VehicleCompanyListView. filter_queryset. Error: {e}')
+            return queryset
+
 
 class VehicleCompanyDetailView(RetrieveUpdateDestroyAPIView):
-    serializer_class = VehicleCompanySerializer
     permission_classes = [IsAuthenticated]
-    http_method_names = ['get', 'patch', 'delete']
+    serializer_class = VehicleCompanySerializer
     lookup_field = 'uf'
 
     def get_queryset(self):

@@ -8,10 +8,12 @@ from rest_framework import serializers
 from abb.models import Country
 from abb.serializers import CountrySerializer, CurrencySerializer
 from abb.serializers_drf_writable import CustomWritableNestedModelSerializer, CustomsUniqueFieldsMixin
+from abb.utils import get_user_company
 from app.serializers import UserBasicSerializer
-from att.models import Contact, BankAccount, ContactSite, PaymentTerm, Person, TargetGroup, Term, VehicleCompany, VehicleUnit
+from att.models import Contact, ContactSite, PaymentTerm, Person, TargetGroup, Term, VehicleCompany, VehicleUnit
 from axx.models import Load
 from ayy.models import CMR, Comment, Document, History, ImageUpload
+from dff.serializers.serializers_bce import BankAccountSerializer
 
 
 class DocumentSerializer(WritableNestedModelSerializer):
@@ -31,57 +33,6 @@ class DocumentSerializer(WritableNestedModelSerializer):
         model = Document
         fields = ('doc_num', 'date_doc', 'date_exp',
                   'doc_det', 'doc_type', 'uf')
-
-
-class BankAccountSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
-    currency_code = CurrencySerializer(allow_null=True)
-
-    def create(self, validated_data):
-        # print('0604', validated_data)
-        relations, reverse_relations = self._extract_relations(validated_data)
-
-        # Create or update direct relations (foreign key, one-to-one)
-        self.update_or_create_direct_relations(
-            validated_data,
-            relations,
-        )
-
-        # Create instance with atomic
-        with transaction.atomic():
-            instance = super(NestedCreateMixin,
-                             self).create(validated_data)
-            self.update_or_create_reverse_relations(
-                instance, reverse_relations)
-
-        return instance
-
-    def update(self, instance, validated_data):
-        # print('3190', validated_data, instance)
-        relations, reverse_relations = self._extract_relations(validated_data)
-
-        # Create or update direct relations (foreign key, one-to-one)
-        self.update_or_create_direct_relations(
-            validated_data,
-            relations,
-        )
-
-        # Update instance with atomic
-        with transaction.atomic():
-            instance = super(NestedUpdateMixin, self).update(
-                instance,
-                validated_data,
-            )
-            self.update_or_create_reverse_relations(
-                instance, reverse_relations)
-            self.delete_reverse_relations_if_need(instance, reverse_relations)
-            instance.refresh_from_db()
-            return instance
-
-    class Meta:
-        model = BankAccount
-        fields = ('currency_code', 'iban_number', 'bank_name', 'bank_address', 'bank_code', 'add_instructions', 'include_in_inv', 'uf',
-                  'contact',
-                  )
 
 
 class VehicleCompanyBasicReadSerializer(WritableNestedModelSerializer):
@@ -269,6 +220,9 @@ class ContactSiteForContactSerializer(CustomsUniqueFieldsMixin, CustomWritableNe
     To be used as child serializer for ContactSerializer
     '''
 
+    country_code_site = serializers.SlugRelatedField(
+        allow_null=True, slug_field='uf', queryset=Country.objects.all(), required=False)
+
     class Meta:
         model = ContactSite
         lookup_field = 'uf'
@@ -381,33 +335,64 @@ class ContactSerializer(WritableNestedModelSerializer):
 
 
 class ContactSiteBasicReadSerializer(WritableNestedModelSerializer):
-
     country_code_site = CountrySerializer(allow_null=True)
 
     class Meta:
         model = ContactSite
-        fields = ('name_site', 'address_site', 'city_site', 'zip_code_site', 'country_code_site', 'lat', 'lon', 'uf',
+        fields = ('name_site', 'address_site', 'city_site', 'zip_code_site', 'lat', 'lon', 'uf',
+                  'phone', 'email', 'comment1', 'comment2',
                   'country_code_site',
                   )
 
 
 class ContactSiteListSerializer(WritableNestedModelSerializer):
+    country_code_site = serializers.SlugRelatedField(
+        allow_null=True, slug_field='uf', queryset=Country.objects.all(), required=False)
 
     class Meta:
         model = ContactSite
         lookup_field = 'uf'
-        fields = ('name_site', 'address_site', 'city_site', 'zip_code_site', 'country_code_site', 'lat', 'lon', 'uf',
-
+        fields = ('name_site', 'address_site', 'city_site', 'zip_code_site', 'lat', 'lon', 'uf',
+                  'phone', 'email', 'comment1', 'comment2',
+                  'country_code_site',
                   )
 
 
 class ContactSiteSerializer(WritableNestedModelSerializer):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        request = self.context.get('request')
+        user = getattr(request, "user", None)
+
+        if user and user.is_authenticated:
+            user_company = get_user_company(user)
+        else:
+            user_company = None
+
+        if user_company:
+            self.fields['contact'].queryset = Contact.objects.filter(
+                company=user_company)
+
+    country_code_site = serializers.SlugRelatedField(
+        allow_null=True, slug_field='uf', queryset=Country.objects.all(), required=False)
+    contact = serializers.SlugRelatedField(
+        allow_null=True, slug_field='uf', queryset=Contact.objects.none(), write_only=True)
+
+    def to_representation(self, instance):
+        response = super().to_representation(instance)
+
+        response['contact'] = ContactSerializer(
+            instance.contact).data if instance.contact else None
+
+        return response
 
     class Meta:
         model = ContactSite
         lookup_field = 'uf'
-        fields = ('name_site', 'address_site', 'city_site', 'zip_code_site', 'country_code_site', 'lat', 'lon', 'uf',
-
+        fields = ('name_site', 'address_site', 'city_site', 'zip_code_site', 'lat', 'lon', 'uf',
+                  'phone', 'email', 'comment1', 'comment2',
+                  'country_code_site', 'contact',
                   )
 
 ###### End Contact Site Serializers ######

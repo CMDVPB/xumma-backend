@@ -85,16 +85,14 @@ class ContactListCreate(ListCreateAPIView):
 
 class ContactDetail(RetrieveUpdateDestroyAPIView):
     serializer_class = ContactSerializer
-    permission_classes = [IsAuthenticated,
-                          #    IsSubscriptionActiveOrReadOnly
-                          ]
+    permission_classes = [IsAuthenticated]
     lookup_field = 'uf'
 
     def get_queryset(self):
         try:
             user = self.request.user
             user_company = get_user_company(user)
-            return Contact.objects.filter(company__id=user_company.id).distinct()
+            return Contact.objects.filter(company__id=user_company.id).distinct().order_by('-created_at')
         except Exception as e:
             print('E435', e)
             return Contact.objects.none()

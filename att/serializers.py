@@ -92,7 +92,32 @@ class VehicleCompanySerializer(WritableNestedModelSerializer):
     emission_class = serializers.SlugRelatedField(
         allow_null=True, slug_field='uf', queryset=EmissionClass.objects.all())
 
+    def _empty_strings_to_none(self, data, fields):
+        for field in fields:
+            if data.get(field) == '':
+                data[field] = None
+        return data
+
     # vehicle_gendocs = GenDocSerializer(many=True)
+    def to_internal_value(self, data):
+        data = data.copy()  # IMPORTANT
+
+        data = self._empty_strings_to_none(data, [
+            'buy_price',
+            'change_oil_interval',
+            'consumption_summer',
+            'consumption_winter',
+            'height',
+            'interval_taho',
+            'length',
+            'sell_price',
+            'tank_volume',
+            'volume_capacity',
+            'weight_capacity',
+            'width',
+        ])
+
+        return super().to_internal_value(data)
 
     def create(self, validated_data):
         # print('1614:', validated_data)
@@ -138,5 +163,8 @@ class VehicleCompanySerializer(WritableNestedModelSerializer):
     class Meta:
         model = VehicleCompany
         fields = ('reg_number', 'vin', 'vehicle_type', 'is_available', 'is_archived', 'uf',
+                  'length', 'width', 'height', 'weight_capacity', 'volume_capacity',
+                  'tank_volume', 'change_oil_interval', 'consumption_summer', 'consumption_winter', 'buy_price', 'sell_price',
+                  'interval_taho', 'last_date_unload_taho', 'comment',
                   'brand', 'vehicle_body', 'emission_class',
                   )

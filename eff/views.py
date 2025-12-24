@@ -172,7 +172,7 @@ class ContactSuggestionAPIView(APIView):
             r.raise_for_status()
             data = r.json()
 
-            print('6876', data)
+            # print('6876', data)
 
             for item in data.get("places", []):
                 formatted = item.get("formattedAddress", "") or ""

@@ -23,8 +23,8 @@ class PhoneNumber(models.Model):
     ''' Phone number '''
     uf = models.CharField(max_length=36, default=hex_uuid, unique=True)
     number = PhoneNumberField(region=None)  # stores in E.164 format
-    is_primary = models.BooleanField(default=False)
     notes = models.CharField(max_length=255, blank=True)
+    is_primary = models.BooleanField(default=False)
 
     # Linked to either a User OR Contact OR Person
     user = models.ForeignKey(User, on_delete=models.CASCADE,
@@ -48,7 +48,7 @@ class PhoneNumber(models.Model):
         else:
             owner = "Unassigned"
 
-        return f"{self.number} ({self.type}) – {owner}"
+        return f"{self.number} – {owner}"
 
 
 class DocumentType(models.Model):
@@ -591,7 +591,7 @@ class CMRStockBatch(models.Model):
         related_name="company_cmr_stock"
     )
 
-    series = models.CharField(max_length=20)
+    series = models.CharField(max_length=20, blank=True, null=True)
 
     number_from = models.PositiveIntegerField()
     number_to = models.PositiveIntegerField()

@@ -78,6 +78,7 @@ class User(AbstractUser):
     phone = models.CharField(max_length=100, null=True, blank=True)
     personal_id = models.CharField(max_length=50, null=True, blank=True)
     messanger = models.CharField(max_length=100, null=True, blank=True)
+    comment = models.CharField(max_length=500, null=True, blank=True)
     image = models.CharField(max_length=1000, blank=True, null=True)
 
     lang = models.CharField(max_length=2, blank=True, null=True)
@@ -86,6 +87,8 @@ class User(AbstractUser):
 
     is_staff = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
+
+    is_archived = models.BooleanField(default=False)
 
     last_login_ip = models.GenericIPAddressField(null=True, blank=True)
     last_activity = models.DateTimeField(default=timezone.now)

@@ -2,6 +2,7 @@ import logging
 import smtplib
 from datetime import datetime, timedelta
 from django.db import IntegrityError
+from django.db.models.deletion import RestrictedError
 from django.utils import timezone
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -17,10 +18,13 @@ from rest_framework.permissions import IsAuthenticated
 from abb.utils import get_user_company
 from app.models import SMTPSettings, UserSettings
 from app.serializers import UserSettingsSerializer
-from att.models import ContactSite
-from ayy.models import AuthorizationStockBatch, CMRStockBatch, CTIRStockBatch
+from att.models import BankAccount, ContactSite, Note, PaymentTerm, Term
+from ayy.models import AuthorizationStockBatch, CMRStockBatch, CTIRStockBatch, ItemForItemCost, ItemForItemInv
+from ayy.serializers import ItemForItemCostSerializer
+from dff.serializers.serializers_bce import BankAccountSerializer, NoteSerializer
 from dff.serializers.serializers_document import AuthorizationStockBatchSerializer, CMRStockBatchSerializer, CTIRStockBatchSerializer
-from dff.serializers.serializers_other import ContactSiteListSerializer
+from dff.serializers.serializers_item_inv import ItemForItemInvSerializer
+from dff.serializers.serializers_other import ContactSiteListSerializer, ContactSiteSerializer, PaymentTermSerializer, TermSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -160,11 +164,9 @@ class CTIRStockBatchDetailsView(RetrieveUpdateDestroyAPIView):
             return CTIRStockBatch.objects.none()
 
 
-class ContactSiteListView(ListCreateAPIView):
+class ContactSiteListView(ListAPIView):
     serializer_class = ContactSiteListSerializer
-    permission_classes = [IsAuthenticated,
-                          #   IsSubscriptionActiveOrReadOnly
-                          ]
+    permission_classes = [IsAuthenticated]
     lookup_field = 'uf'
 
     def get_queryset(self):
@@ -172,13 +174,405 @@ class ContactSiteListView(ListCreateAPIView):
             user = self.request.user
             user_company = get_user_company(user)
             queryset = ContactSite.objects.select_related(
-                'contact').filter(contact__company__id=user_company.id)
+                'contact', 'company').filter(contact__company__id=user_company.id).order_by('-date_modified')
 
             return queryset.distinct().order_by('name_site')
 
         except Exception as e:
             print('E587', e)
             return ContactSite.objects.none()
+
+
+class ContactSiteCreateView(CreateAPIView):
+    serializer_class = ContactSiteListSerializer
+    permission_classes = [IsAuthenticated]
+    lookup_field = 'uf'
+
+    def get_queryset(self):
+        try:
+            user = self.request.user
+            user_company = get_user_company(user)
+            return ContactSite.objects.filter(company__id=user_company.id).distinct()
+        except Exception as e:
+            logger.error(
+                f'ERRORLOG329 ContactSiteCreate. get_queryset. Error: {e}')
+            return ContactSite.objects.none()
+
+    def perform_create(self, serializer):
+        try:
+            user = self.request.user
+            user_company = get_user_company(user)
+            serializer.save(company=user_company)
+        except Exception as e:
+            logger.error(
+                f'ERRORLOG331 ContactSiteCreate. perform_create. Error: {e}')
+            serializer.save()
+
+
+class ContactSiteDetailView(RetrieveUpdateDestroyAPIView):
+    serializer_class = ContactSiteSerializer
+    permission_classes = [IsAuthenticated]
+    lookup_field = 'uf'
+
+    def get_queryset(self):
+        try:
+            user = self.request.user
+            user_company = get_user_company(user)
+            return ContactSite.objects.filter(company__id=user_company.id).distinct()
+        except Exception as e:
+            print('E435', e)
+            return ContactSite.objects.none()
+
+    def perform_update(self, serializer):
+        try:
+            serializer.save()
+        except RestrictedError as e:
+            raise ValidationError(
+                {"detail": "entry_not_deleted_used_in_related_documents"}, code=400)
+
+    def destroy(self, request, *args, **kwargs):
+        try:
+            return super().destroy(request, *args, **kwargs)
+        except IntegrityError:
+            return Response(
+                {'error': 'restricted'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+
+class BankAccountListCreateView(ListCreateAPIView):
+    serializer_class = BankAccountSerializer
+    permission_classes = [IsAuthenticated]
+    lookup_field = 'uf'
+
+    def get_queryset(self):
+        try:
+            user = self.request.user
+            user_company = get_user_company(user)
+            return BankAccount.objects.filter(company__id=user_company.id).distinct().order_by('currency_code')
+        except Exception as e:
+            print('E557', e)
+            return BankAccount.objects.none()
+
+    def get(self, request, *args, **kwargs):
+        # Without bank accounts related to contacts
+        filtered_bank_accounts = self.get_queryset().filter(contact=None)
+        serializer = BankAccountSerializer(filtered_bank_accounts, many=True)
+        return Response(serializer.data)
+
+    def perform_create(self, serializer):
+        try:
+            user_company = get_user_company(self.request.user)
+            serializer.save(company=user_company)
+
+        except Exception as e:
+            print('EV381', e)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class BankAccountDetailView(RetrieveUpdateDestroyAPIView):
+    serializer_class = BankAccountSerializer
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['get', 'put', 'delete']
+    lookup_field = 'uf'
+
+    def get_queryset(self):
+        try:
+            user = self.request.user
+            user_company = get_user_company(user)
+
+            queryset = BankAccount.objects.filter(Q(
+                contact__company__id=user_company.id) | Q(company__id=user_company.id))
+
+            queryset = queryset.select_related(
+                'contact').select_related('contact__company')
+
+            return queryset.distinct()
+        except Exception as e:
+            print('EV451', e)
+            return BankAccount.objects.none()
+
+
+class ItemForItemInvListCreateView(ListCreateAPIView):
+    serializer_class = ItemForItemInvSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        try:
+            user = self.request.user
+            user_company = get_user_company(user)
+            queryset = ItemForItemInv.objects.filter(
+                company__id=user_company.id)
+
+            return queryset.distinct().order_by('description')
+        except Exception as e:
+            logger.error(f'EV735 ItemForItemInvListCreate: {e}')
+            return ItemForItemInv.objects.none()
+
+    def create(self, request, *args, **kwargs):
+        user = request.user
+        user_company = get_user_company(user)
+
+        description = request.data.get('description', '').strip()
+        # default True if not provided
+        is_sale = request.data.get('is_sale', True)
+
+        # Check for duplicates only within the same is_sale type
+        if self.get_queryset().filter(description__iexact=description, is_sale=is_sale).exists():
+            return Response(status=status.HTTP_409_CONFLICT)
+
+        # Save company association automatically if needed
+        request.data['company'] = user_company.id
+
+        return super().create(request, *args, **kwargs)
+
+
+class ItemForItemInvDetailView(RetrieveUpdateDestroyAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = ItemForItemInvSerializer
+    lookup_field = 'uf'
+
+    def get_queryset(self):
+        try:
+            user = self.request.user
+            user_company = get_user_company(user)
+            queryset = ItemForItemInv.objects.filter(
+                company__id=user_company.id)
+
+            return queryset.order_by('description')
+        except Exception as e:
+            print('E735', e)
+            return ItemForItemInv.objects.none()
+
+    def put(self, request, *args, **kwargs):
+        instance = self.get_object()
+        request_obj = request.data.get('description', None).lower()
+        is_sale = request.data.get('is_sale', True)
+
+        # print('332211', is_sale)
+
+        if (instance.description.lower() == request_obj) or \
+                not self.get_queryset().filter(description__iexact=request_obj, is_sale=is_sale).exists():
+            return self.update(request, *args, **kwargs)
+        else:
+            return Response(status=status.HTTP_409_CONFLICT)
+
+    def delete(self, request, uf):
+        obj = self.get_object()  # this triggers DRF permission checks
+        try:
+            obj.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except IntegrityError:
+            return Response(
+                {'error': 'restricted'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except ItemForItemInv.DoesNotExist:
+            return Response(
+                {'error': 'Object not found.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+
+class ItemForItemCostListCreateView(ListCreateAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = ItemForItemCostSerializer
+    lookup_field = 'uf'
+
+    def get_queryset(self):
+        try:
+            user_company = get_user_company(self.request.user)
+            queryset = ItemForItemCost.objects.filter(
+                company__id=user_company.id)
+
+            queryset = queryset.select_related(
+                'company').distinct().order_by('serial_number', 'description')
+
+            return queryset
+        except Exception as e:
+            print('E341', e)
+            return ItemForItemCost.objects.none()
+
+    def post(self, request, *args, **kwargs):
+        request_obj = request.data.get('description', None).lower()
+
+        if not self.get_queryset().filter(description__iexact=request_obj).exists():
+            return self.create(request, *args, **kwargs)
+        else:
+            return Response(status=status.HTTP_409_CONFLICT)
+
+    def perform_create(self, serializer):
+        try:
+            user = self.request.user
+            user_company = get_user_company(user)
+            serializer.save(company=user_company)
+        except Exception as e:
+            print('E269', e)
+            serializer.save()
+
+
+class ItemForItemCostDetailView(RetrieveUpdateDestroyAPIView):
+    serializer_class = ItemForItemCostSerializer
+    lookup_field = 'uf'
+
+    def get_queryset(self):
+        try:
+            user = self.request.user
+            user_company = get_user_company(user)
+            queryset = ItemForItemCost.objects.select_related(
+                'company').filter(company__id=user_company.id)
+            return queryset
+        except Exception as e:
+            logger.error(
+                f'EV575 ItemForItemCostDetailView. get_queryset. Error: {e}')
+            return ItemForItemCost.objects.none()
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+
+        request_obj = request.data.get('description', None).lower()
+        if instance is not None and ((instance.description.lower() != request_obj) and
+                                     self.get_queryset().filter(description__iexact=request_obj).exists()):
+            return Response(status=status.HTTP_409_CONFLICT)
+
+        serializer = self.get_serializer(
+            instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        if getattr(instance, '_prefetched_objects_cache', None):
+            # If 'prefetch_related' has been applied to a queryset, we need to
+            # forcibly invalidate the prefetch cache on the instance.
+            instance._prefetched_objects_cache = {}
+
+        return Response(serializer.data)
+
+
+class NoteListCreateView(ListCreateAPIView):
+    permission_classes = [IsAuthenticated,]
+    serializer_class = NoteSerializer
+    lookup_field = 'uf'
+
+    def get_queryset(self):
+        try:
+            user_company = get_user_company(self.request.user)
+            return Note.objects.filter(company__id=user_company.id).distinct().order_by('-note_short')
+        except Exception as e:
+            print('E245', e)
+            return Note.objects.none()
+
+    def perform_create(self, serializer):
+        user_company = get_user_company(self.request.user)
+        serializer.save(company=user_company)
+
+
+class NoteDetailView(RetrieveUpdateDestroyAPIView):
+    serializer_class = NoteSerializer
+    http_method_names = ['get', 'patch', 'delete']
+    lookup_field = 'uf'
+
+    def get_queryset(self):
+        try:
+            user = self.request.user
+            user_company = get_user_company(user)
+            queryset = Note.objects.filter(
+                company__id=user_company.id).distinct()
+            return queryset
+        except Exception as e:
+            print('E247', e)
+            return Note.objects.none()
+
+
+class PaymentTermListCreateView(ListCreateAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = PaymentTermSerializer
+    lookup_field = 'uf'
+
+    def get_queryset(self):
+        try:
+            user_company = get_user_company(self.request.user)
+            return PaymentTerm.objects.filter(company__id=user_company.id).distinct().order_by('-payment_term_short')
+        except Exception as e:
+            return PaymentTerm.objects.none()
+
+    def perform_create(self, serializer):
+        user_company = get_user_company(self.request.user)
+        serializer.save(company=user_company)
+
+
+class PaymentTermsDetailView(RetrieveUpdateDestroyAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = PaymentTermSerializer
+    lookup_field = 'uf'
+
+    def get_queryset(self):
+        try:
+            user = self.request.user
+            user_company = get_user_company(user)
+            queryset = PaymentTerm.objects.filter(
+                company__id=user_company.id).distinct()
+            return queryset
+        except Exception as e:
+            print('E247', e)
+            return PaymentTerm.objects.none()
+
+
+class TermListCreateView(ListCreateAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = TermSerializer
+
+    def get_queryset(self):
+        try:
+            user = self.request.user
+            user_company = get_user_company(user)
+            return Term.objects.filter(company__id=user_company.id).distinct()
+
+        except Exception as e:
+            print('E533', e)
+            return Term.objects.none()
+
+    def post(self, request, *args, **kwargs):
+        if not self.get_queryset().filter(term_short__iexact=request.data.get('term_short', None)).exists():
+            return self.create(request, *args, **kwargs)
+        else:
+            raise exceptions.ValidationError(
+                detail='not_unique', )
+
+    def perform_create(self, serializer):
+        try:
+            user = self.request.user
+            user_company = get_user_company(user)
+            serializer.save(company=user_company)
+        except:
+            print('E297')
+            serializer.save()
+
+
+class TermDetailView(RetrieveUpdateDestroyAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = TermSerializer
+    lookup_field = 'uf'
+
+    def get_queryset(self):
+        try:
+            user = self.request.user
+            user_company = get_user_company(user)
+            return Term.objects.filter(company__id=user_company.id).distinct()
+        except Exception as e:
+            print('E293', e)
+            return Term.objects.none()
+
+    def put(self, request, *args, **kwargs):
+        # print('9870', request.data)
+        instance = self.get_object()
+        if not self.get_queryset().filter(term_short__iexact=request.data.get('term_short', None)).exists() \
+                or instance.term_short.lower() == request.data.get('term_short', None).lower():
+            return self.update(request, *args, **kwargs)
+
+        else:
+            raise exceptions.ValidationError(
+                detail='not_unique', )
 
 
 ### Start SMTP Settings ###

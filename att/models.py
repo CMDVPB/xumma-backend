@@ -160,6 +160,8 @@ class Contact(models.Model):
     company = models.ForeignKey(
         Company, on_delete=models.CASCADE, related_name='company_contacts')
 
+    created_at = models.DateTimeField(auto_now_add=True)
+
     company_name = models.CharField(
         max_length=150, null=True, verbose_name=('company_name'))
     alias_company_name = models.CharField(
@@ -231,22 +233,31 @@ class Contact(models.Model):
 class ContactSite(models.Model):
     uf = models.CharField(max_length=36, default=hex_uuid,
                           db_index=True, unique=True)
+    company = models.ForeignKey(
+        Company, on_delete=models.CASCADE, null=True, blank=True, related_name='company_contact_sites')
 
-    contact = models.ForeignKey(
-        Contact, on_delete=models.CASCADE, related_name="contact_sites")
+    date_modified = models.DateTimeField(auto_now=True)
 
-    name_site = models.CharField(max_length=255, blank=True, null=True)
+    name_site = models.CharField(max_length=255)
     address_site = models.CharField(max_length=255, blank=True, null=True)
     city_site = models.CharField(max_length=100, blank=True, null=True)
     zip_code_site = models.CharField(max_length=20, blank=True, null=True)
     country_code_site = models.ForeignKey(
         Country, on_delete=models.PROTECT, related_name='country_code_sites', blank=True, null=True)
 
+    phone = models.CharField(max_length=100, null=True, blank=True)
+    email = models.EmailField(max_length=255, null=True, blank=True)
+    comment1 = models.CharField(max_length=500, null=True, blank=True)
+    comment2 = models.CharField(max_length=500, null=True, blank=True)
+
     lat = models.FloatField(null=True, blank=True)
     lon = models.FloatField(null=True, blank=True)
 
+    contact = models.ForeignKey(
+        Contact, on_delete=models.CASCADE, related_name="contact_sites", blank=True, null=True)
+
     def __str__(self):
-        return f"{self.name_site} – {self.contact.company_name}"
+        return f"{self.name_site} – {self.company}"
 
 
 class Person(ProtectedDeleteMixin, models.Model):
@@ -345,6 +356,24 @@ class BankAccount(models.Model):
 
     def __str__(self):
         return self.iban_number or ''
+
+
+class Note(models.Model):
+    uf = models.CharField(max_length=36, default=hex_uuid, db_index=True)
+    company = models.ForeignKey(
+        Company, on_delete=models.CASCADE, null=True, blank=True, related_name='company_notes')
+
+    note_short = models.CharField(
+        max_length=100, blank=True, null=True)
+    note_description = models.CharField(
+        max_length=1000, blank=True, null=True)
+
+    class Meta:
+        verbose_name = "Note"
+        verbose_name_plural = "Notes"
+
+    def __str__(self) -> str:
+        return str(self.id) or ''
 
 
 class PaymentTerm(models.Model):

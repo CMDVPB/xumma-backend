@@ -83,6 +83,7 @@ class UserBaseCreateSerializer(UserCreateSerializer):
     class Meta:
         model = User
         fields = ('email', 'password', 'first_name', 'last_name', 'date_registered', 'date_of_birth', 'personal_id', 'uf',
+                  'phone', 'comment',
                   'lang', 'base_country',
                   'level',
                   )
