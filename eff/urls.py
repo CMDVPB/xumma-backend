@@ -1,7 +1,7 @@
 from django.urls import path
 from rest_framework.urlpatterns import format_suffix_patterns
 
-from eff.views import CompanyDetail, ContactSuggestionAPIView, DamageReportCreateView, DamageReportListView, TargetGroupDetail, TargetGroupListCreate
+from eff.views import CompanyDetail, ContactSuggestionAPIView, DamageReportCreateView, DamageReportDetailView, DamageReportListView, TargetGroupDetail, TargetGroupListCreate
 
 urlpatterns = [
     path('companies/me/', CompanyDetail.as_view(), name='company_detail'),
@@ -17,6 +17,9 @@ urlpatterns = [
          name='damage_reports'),
     path('damage-reports/create/', DamageReportCreateView.as_view(),
          name='damage_report_create'),
+
+    path('damage-reports/<str:uf>/', DamageReportDetailView.as_view(),
+         name='damage_report_detail'),
 
 
 ]

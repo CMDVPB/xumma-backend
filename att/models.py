@@ -276,8 +276,8 @@ class Person(ProtectedDeleteMixin, models.Model):
     mobile = models.CharField(max_length=30, blank=True, null=True)
     comment = models.CharField(max_length=250, blank=True, null=True)
 
-    is_driver = models.BooleanField(default=False, null=True, blank=True)
-    archived = models.BooleanField(default=False)
+    is_driver = models.BooleanField(default=False)
+    is_private = models.BooleanField(default=False)
 
     contact = models.ForeignKey(Contact, on_delete=models.CASCADE,
                                 blank=True, null=True, related_name='contact_persons')

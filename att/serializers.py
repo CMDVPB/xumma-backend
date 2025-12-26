@@ -162,7 +162,7 @@ class VehicleCompanySerializer(WritableNestedModelSerializer):
 
     class Meta:
         model = VehicleCompany
-        fields = ('reg_number', 'vin', 'vehicle_type', 'is_available', 'is_archived', 'uf',
+        fields = ('reg_number', 'vin', 'vehicle_type', 'date_registered', 'is_available', 'is_archived', 'uf',
                   'length', 'width', 'height', 'weight_capacity', 'volume_capacity',
                   'tank_volume', 'change_oil_interval', 'consumption_summer', 'consumption_winter', 'buy_price', 'sell_price',
                   'interval_taho', 'last_date_unload_taho', 'comment',

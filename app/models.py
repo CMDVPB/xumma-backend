@@ -110,6 +110,26 @@ class User(AbstractUser):
         return self.email
 
 
+class UserProfile(models.Model):
+    uf = models.CharField(max_length=36, default=hex_uuid,
+                          db_index=True, unique=True)
+    user = models.OneToOneField(
+        User, on_delete=models.CASCADE, related_name='user_profile')
+
+    position = models.CharField(max_length=100, blank=True,
+                                )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'User Profile'
+        verbose_name_plural = 'User Profiles'
+
+    def __str__(self):
+        return f'{self.user} profile'
+
+
 class UserSettings(models.Model):
     uf = models.CharField(max_length=36, default=hex_uuid, db_index=True)
     user = models.OneToOneField(

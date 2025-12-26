@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from ayy.models import AuthorizationStockBatch, CMRStockBatch, PhoneNumber
+from ayy.models import AuthorizationStockBatch, CMRStockBatch, DamageReport, PhoneNumber
 
 
 @admin.register(CMRStockBatch)
@@ -24,4 +24,13 @@ class PhoneNumberAdmin(admin.ModelAdmin):
     list_display = ('id', )
 
     search_fields = ('number',
+                     )
+
+
+@admin.register(DamageReport)
+class DamageReportAdmin(admin.ModelAdmin):
+
+    list_display = ('id', 'company', 'vehicle', 'driver')
+
+    search_fields = ('company__company_name', 'vehicle__reg_number', 'driver__email', 'driver__first_name', 'driver__last_name',
                      )

@@ -305,3 +305,23 @@ class DamageReportCreateView(CreateAPIView):
             logger.error(
                 f'ERRORLOG691 DamageReportCreateView. get_queryset. Error: {e}')
             return DamageReport.objects.none()
+
+
+class DamageReportDetailView(RetrieveUpdateDestroyAPIView):
+    serializer_class = DamageReportSerializer
+    permission_classes = [IsAuthenticated]
+    lookup_field = 'uf'
+
+    def get_queryset(self):
+        try:
+            user_company = get_user_company(self.request.user)
+
+            queryset = DamageReport.objects.filter(
+                company__id=user_company.id)
+
+            return queryset.distinct()
+
+        except Exception as e:
+            logger.error(
+                f'ERRORLOG673 DamageReportDetailView. get_queryset. Error: {e}')
+            return DamageReport.objects.none()

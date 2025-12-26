@@ -113,7 +113,7 @@ class VehicleUnitSerializer(WritableNestedModelSerializer):
 class PersonBasicReadSerializer(WritableNestedModelSerializer):
     class Meta:
         model = Person
-        fields = ('last_name', 'first_name', 'is_driver', 'uf')
+        fields = ('last_name', 'first_name', 'is_driver', 'is_private', 'uf')
 
 
 class PersonSerializer(WritableNestedModelSerializer):
@@ -212,7 +212,7 @@ class PersonSerializer(WritableNestedModelSerializer):
     class Meta:
         model = Person
         fields = ('last_name', 'first_name', 'email',
-                  'phone', 'comment', 'is_driver', "archived", 'uf')
+                  'phone', 'comment', 'is_driver', "is_private", 'uf')
 
 
 class ContactSiteForContactSerializer(CustomsUniqueFieldsMixin, CustomWritableNestedModelSerializer):

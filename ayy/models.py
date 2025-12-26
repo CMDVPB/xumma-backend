@@ -640,16 +640,30 @@ class CTIRStockBatch(models.Model):
 ###### Start Damages Models ######
 
 class DamageReport(models.Model):
+    DAMAGE_REPORT_TYPE_CHOICES = (
+        ('vehicle_damage', 'Vehicle'),
+        ('goods_damage', 'Goods'),
+    )
     uf = models.CharField(max_length=36, default=hex_uuid, db_index=True)
     company = models.ForeignKey(
         Company, on_delete=models.CASCADE, related_name="company_damage_reports")
 
     vehicle = models.ForeignKey(
-        VehicleCompany, on_delete=models.CASCADE, related_name="vehicle_damage_reports")
+        VehicleCompany, on_delete=models.CASCADE, related_name="vehicle_damage_reports", null=True, blank=True)
 
-    reported_at = models.DateTimeField(auto_now_add=True)
+    damage_report_type = models.CharField(
+        max_length=20, choices=DAMAGE_REPORT_TYPE_CHOICES, blank=True)
+
     reported_by = models.ForeignKey(
         User, on_delete=models.SET_NULL, null=True, blank=True)
+
+    driver = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        related_name="driver_damage_reports", null=True, blank=True
+    )
+
+    reported_at = models.DateTimeField(auto_now_add=True)
 
     location = models.CharField(max_length=255, blank=True)
     notes = models.TextField(blank=True)
@@ -690,8 +704,8 @@ class VehicleDamage(models.Model):
         max_length=20, choices=SEVERITY_CHOICES, blank=True)
 
     part = models.CharField(
-        max_length=100,
-        help_text="e.g. Front bumper, Left door, Trailer side panel"
+        max_length=100, blank=True, null=True
+
     )
 
     amount = models.DecimalField(
