@@ -116,51 +116,7 @@ class PersonBasicReadSerializer(WritableNestedModelSerializer):
         fields = ('last_name', 'first_name', 'is_driver', 'is_private', 'uf')
 
 
-class PersonSerializer(WritableNestedModelSerializer):
-
-    def save(self, **kwargs):
-        ### Initialize _save_kwargs to store additional data ###
-        self._save_kwargs = defaultdict(dict, kwargs)
-
-        # List of possible parent keys that may be passed in kwargs
-        possible_parents = ['contact']
-
-        # print('4450', kwargs)
-
-        parent_instance = None
-        parent_field_name = None
-
-        # Find which parent instance is passed in kwargs
-        for parent_key in possible_parents:
-            if parent_key in kwargs:
-                parent_instance = kwargs.get(parent_key)
-                parent_field_name = parent_key
-                break  # Exit loop once we find the first match
-
-        if parent_instance and parent_field_name:
-            # Attach the found parent instance to the validated data
-            self.validated_data[parent_field_name] = parent_instance
-        else:
-            raise serializers.ValidationError(
-                "E681 A valid parent instance is required.")
-
-        # print('4850', kwargs)
-
-        uf_value = self.validated_data.get('uf')
-        if uf_value:  # Fetch instance by 'uf' if exists
-            instance = self.Meta.model.objects.filter(uf=uf_value).first()
-            if instance:
-                return self.update(instance, self.validated_data)
-            else:
-                return self.create(self.validated_data)
-        else:
-            return self.create(self.validated_data)
-
-    def to_internal_value(self, data):
-        if 'uf' in data and data['uf'] == '':
-            data['uf'] = None
-
-        return super(PersonSerializer, self).to_internal_value(data)
+class PersonSerializer(CustomsUniqueFieldsMixin, CustomWritableNestedModelSerializer):
 
     def to_representation(self, instance):
         response = super().to_representation(instance)
@@ -168,51 +124,11 @@ class PersonSerializer(WritableNestedModelSerializer):
 
         return response
 
-    def create(self, validated_data):
-        # print('1614:', validated_data)
-        relations, reverse_relations = self._extract_relations(validated_data)
-
-        # Create or update direct relations (foreign key, one-to-one)
-        self.update_or_create_direct_relations(
-            validated_data,
-            relations,
-        )
-
-        # Create instance with atomic
-        with transaction.atomic():
-            instance = super(NestedCreateMixin,
-                             self).create(validated_data)
-            self.update_or_create_reverse_relations(
-                instance, reverse_relations)
-
-        return instance
-
-    def update(self, instance, validated_data):
-        # print('3347', validated_data, instance)
-        relations, reverse_relations = self._extract_relations(validated_data)
-
-        # Create or update direct relations (foreign key, one-to-one)
-        self.update_or_create_direct_relations(
-            validated_data,
-            relations,
-        )
-
-        # Update instance with atomic
-        with transaction.atomic():
-            instance = super(NestedUpdateMixin, self).update(
-                instance,
-                validated_data,
-            )
-            self.update_or_create_reverse_relations(
-                instance, reverse_relations)
-            self.delete_reverse_relations_if_need(instance, reverse_relations)
-            instance.refresh_from_db()
-            return instance
-
     class Meta:
         model = Person
-        fields = ('last_name', 'first_name', 'email',
-                  'phone', 'comment', 'is_driver', "is_private", 'uf')
+        lookup_field = 'uf'
+        fields = ('last_name', 'first_name', 'email', 'phone',
+                  'comment', 'is_driver', "is_private", 'uf')
 
 
 class ContactSiteForContactSerializer(CustomsUniqueFieldsMixin, CustomWritableNestedModelSerializer):

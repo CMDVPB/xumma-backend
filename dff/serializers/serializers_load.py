@@ -10,10 +10,11 @@ from rest_framework import serializers
 from abb.custom_serializers import SlugRelatedGetOrCreateField
 from abb.models import Currency, StatusType
 from abb.serializers import CurrencySerializer
+from abb.utils import get_user_company
 from app.serializers import UserBasicSerializer, UserSerializer
 from att.models import Contact, PaymentTerm, Person, VehicleUnit
 from att.serializers import BodyTypeSerializer, IncotermSerializer, ModeTypeSerializer, StatusTypeSerializer
-from axx.models import Ctr, Exp, Inv, Load, Tor
+from axx.models import Ctr, Exp, Inv, Load, Tor, Trip
 from ayy.models import CMR
 from dff.serializers.serializers_ctr import CtrSerializer
 from dff.serializers.serializers_entry_detail import EntryBasicReadListSerializer, EntrySerializer
@@ -120,7 +121,6 @@ class LoadListSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
     load_iteminvs = ItemInvSerializer(many=True)
     load_comments = CommentSerializer(many=True)
     load_tors = TorLoadListSerializer(many=True)
-    load_imageuploads = ImageSerializer(many=True, read_only=True)
 
     def to_representation(self, instance):
         response = super().to_representation(instance)
@@ -139,12 +139,25 @@ class LoadListSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
                   'load_address', 'unload_address', 'hb', 'mb', 'booking_number', 'comment1',
                   'assigned_user', 'bill_to', 'mode', 'bt', 'currency', 'status', 'incoterm', 'carrier', 'vehicle_tractor', 'vehicle_trailer',
                   'load_comments', 'load_tors', 'entry_loads', 'load_iteminvs',
-                  'load_imageuploads'
                   )
-        read_only_fields = ['load_board_data']
 
 
 class LoadSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        request = self.context.get('request')
+        user = getattr(request, "user", None)
+
+        if user and user.is_authenticated:
+            user_company = get_user_company(user)
+        else:
+            user_company = None
+
+        if user_company:
+            self.fields['trip'].queryset = Trip.objects.filter(
+                company=user_company)
 
     assigned_user = serializers.SlugRelatedField(
         allow_null=True, slug_field='uf', queryset=User.objects.all(), write_only=True)
@@ -170,6 +183,8 @@ class LoadSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
         allow_null=True, slug_field='uf', queryset=VehicleUnit.objects.all(), write_only=True)
     vehicle_trailer = SlugRelatedGetOrCreateField(
         allow_null=True, slug_field='uf', queryset=VehicleUnit.objects.all(), write_only=True)
+    trip = serializers.SlugRelatedField(
+        allow_null=True, slug_field='uf', queryset=VehicleUnit.objects.none(), write_only=True)
 
     load_tors = serializers.SlugRelatedField(
         many=True, slug_field='uf', queryset=Tor.objects.all(), write_only=True)
@@ -314,6 +329,8 @@ class LoadSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
         return super(LoadSerializer, self).to_internal_value(data)
 
     def to_representation(self, instance):
+        from dff.serializers.serializers_trip import TripTruckSerializer
+
         response = super().to_representation(instance)
 
         # print('8787', instance)
@@ -347,6 +364,8 @@ class LoadSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
             instance.load_invs, many=True).data if instance.load_invs else None
         response['load_exps'] = ExpSerializer(
             instance.load_exps, many=True).data if instance.load_exps else None
+        response['trip'] = TripTruckSerializer(
+            instance.trip).data if instance.trip else None
 
         return response
 
@@ -420,9 +439,8 @@ class LoadSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
                   'hb', 'mb', 'booking_number', 'comment1', 'bill_to', 'person', 'currency', 'mode', 'bt', 'status', 'incoterm', 'cmr',
                   'load_comments', 'payment_term', 'entry_loads', 'load_iteminvs', 'load_tors', 'load_ctrs', 'load_imageuploads', 'load_invs',
                   'load_histories', 'load_exps',
-                  'carrier', 'person_carrier', 'driver', 'vehicle_tractor', 'vehicle_trailer',
+                  'trip', 'carrier', 'person_carrier', 'driver', 'vehicle_tractor', 'vehicle_trailer',
                   )
-        read_only_fields = ['load_board_data', 'load_board_comments']
 
 
 class LoadPatchSerializer(WritableNestedModelSerializer):
@@ -475,3 +493,28 @@ class LoadBasicSerializer(WritableNestedModelSerializer):
         fields = ('sn', 'bill_to', 'currency', 'load_iteminvs', 'uf')
 
         depth = 2
+
+
+###### Load list for Trip ######
+class LoadListForTripSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
+    ''' Get only the loads for a particular 1 trip '''
+
+    # assigned_user = UserBasicSerializer(allow_null=True)
+    bill_to = ContactBasicReadSerializer(allow_null=True)
+    mode = ModeTypeSerializer(allow_null=True)
+    bt = BodyTypeSerializer(allow_null=True)
+    currency = CurrencySerializer(allow_null=True)
+    status = StatusTypeSerializer(allow_null=True)
+
+    entry_loads = EntryBasicReadListSerializer(many=True)
+    load_iteminvs = ItemInvSerializer(many=True)
+    load_comments = CommentSerializer(many=True)
+
+    class Meta:
+        model = Load
+        fields = ('sn', 'date_order', 'customer_ref', 'customer_notes', 'load_detail', 'load_size', 'load_add_ons', 'uf',
+                  'is_loaded', 'is_cleared', 'is_unloaded', 'is_invoiced',
+                  'load_address', 'unload_address', 'hb', 'mb', 'booking_number', 'comment1',
+                  'bill_to', 'mode', 'bt', 'currency', 'status',
+                  'load_comments', 'entry_loads', 'load_iteminvs',
+                  )

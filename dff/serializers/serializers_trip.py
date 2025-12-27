@@ -587,3 +587,22 @@ class TripSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
                   'trip_details', 'l_departure', 'l_arrival', 'trip_add_info', 'trip_loads', 'trip_comments', 'trip_histories', 'uf',
                   'trip_route_sheets', 'drivers',
                   )
+
+
+class TripTruckSerializer(serializers.ModelSerializer):
+    tractor = serializers.CharField(
+        source='vehicle_tractor.reg_number', read_only=True)
+    trailer = serializers.CharField(
+        source='vehicle_trailer.reg_number', read_only=True)
+
+    class Meta:
+        model = Trip
+        fields = (
+            'rn',
+
+
+            'tractor',
+
+            'trailer',
+            'uf',
+        )

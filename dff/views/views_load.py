@@ -1,5 +1,7 @@
 import time
 from datetime import datetime
+from django.utils.dateparse import parse_datetime
+from django.utils import timezone
 from django.utils import timezone
 from django.forms.models import model_to_dict
 from django.contrib.auth import get_user_model
@@ -29,7 +31,7 @@ from ayy.models import CMR, Comment, Entry, ImageUpload, ItemInv
 
 import logging
 
-from dff.serializers.serializers_load import LoadListSerializer, LoadPatchSerializer, LoadSerializer
+from dff.serializers.serializers_load import LoadListForTripSerializer, LoadListSerializer, LoadPatchSerializer, LoadSerializer
 logger = logging.getLogger(__name__)
 
 
@@ -314,14 +316,18 @@ class LoadListView(ListAPIView):
                                                )
 
                 if is_valid_queryparam(startDate):
-                    dts = datetime.strptime(startDate, "%Y-%m-%d")
-                    dts = timezone.make_aware(dts)
-                    queryset = queryset.filter(date_order__gte=dts)
+                    dts = parse_datetime(startDate)
+                    if dts:
+                        if timezone.is_naive(dts):
+                            dts = timezone.make_aware(dts)
+                        queryset = queryset.filter(date_order__gte=dts)
 
                 if is_valid_queryparam(endDate):
-                    dte = datetime.strptime(endDate, "%Y-%m-%d")
-                    dte = timezone.make_aware(dte)
-                    queryset = queryset.filter(date_order__lte=dte)
+                    dte = parse_datetime(endDate)
+                    if dte:
+                        if timezone.is_naive(dte):
+                            dte = timezone.make_aware(dte)
+                        queryset = queryset.filter(date_order__lte=dte)
 
                 print('2260', queryset.count())
 
@@ -550,3 +556,72 @@ class LoadDetailView(RetrieveUpdateDestroyAPIView):
         except Exception as e:
             logger.error(f'EV137 LoadDetail perform_update {e}')
             raise ValidationError({"detail": "failed_to_update_load"})
+
+
+###### Load list for Trip ######
+class LoadListForTripView(ListAPIView):
+    ''' Get list of loads for a particular 1 trip'''
+    serializer_class = LoadListForTripSerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = None
+    lookup_field = 'uf'
+
+    def get_queryset(self):
+        # print('3240', self.request.user)
+
+        try:
+            user_company = get_user_company(self.request.user)
+            queryset = Load.objects.filter(company__id=user_company.id)
+
+            queryset = queryset.select_related(
+                'bill_to',
+                'bill_to__country_code_post',
+                'mode',
+                'bt',
+                'currency',
+                'status',
+            )
+
+            entries_qs = (Entry.objects
+                          .select_related(
+                              'shipper',
+                              'shipper__country_code_site',
+                          )
+                          .prefetch_related('entry_details')
+                          .all())
+
+            itemInvs_qs = ItemInv.objects.select_related(
+                'item_for_item_inv', 'item_for_item_cost').all()
+
+            comments_qs = Comment.objects.all()
+
+            queryset = queryset.prefetch_related(
+                Prefetch('entry_loads', queryset=entries_qs),
+                Prefetch('load_iteminvs', queryset=itemInvs_qs),
+                Prefetch('load_comments', queryset=comments_qs),
+
+            )
+
+            return queryset.distinct()
+
+        except Exception as e:
+            logger.error(f'EV235 LoadListView. get_queryset. Error: {e}')
+            return Load.objects.none()
+
+    def filter_queryset(self, queryset: QuerySet, **kwargs):
+        # print('3260',)
+
+        queryset = super().filter_queryset(queryset=queryset, **kwargs)
+
+        try:
+            trip_uf = self.request.query_params.get('tripUf', None)
+
+            if is_valid_queryparam(trip_uf):
+                queryset = queryset.filter(trip__uf=trip_uf)
+
+            return queryset.order_by('-date_created')
+
+        except Exception as e:
+            logger.error(
+                f'ERRORLOG3935 LoadListView. filter_queryset. Error: {e}')
+            return queryset

@@ -1,6 +1,8 @@
 import time
 import logging
 from datetime import datetime
+from django.utils.dateparse import parse_datetime
+from django.utils import timezone
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 from django.db.models import QuerySet, Prefetch, Q, F
@@ -8,6 +10,7 @@ from rest_framework import status
 from rest_framework.generics import CreateAPIView, ListAPIView, RetrieveUpdateDestroyAPIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.decorators import authentication_classes, api_view, permission_classes
 
 from abb.pagination import LimitResultsSetPagination
 from abb.permissions import AssignedUserManagerOrReadOnlyIfLocked, HasGroupPermission
@@ -15,7 +18,7 @@ from abb.utils import check_not_unique_num, get_user_company, is_valid_querypara
 from app.utils import is_user_member_group
 from axx.models import Exp, Load, Tor, Trip
 from ayy.models import Comment, Entry, ItemInv, RouteSheet
-from dff.serializers.serializers_trip import TripCreateUpdateSerializer, TripListSerializer, TripSerializer
+from dff.serializers.serializers_trip import TripCreateUpdateSerializer, TripListSerializer, TripSerializer, TripTruckSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -205,21 +208,24 @@ class TripListView(ListAPIView):
                                                )
 
                 if is_valid_queryparam(startDate):
-                    dts = datetime.strptime(startDate, "%Y-%m-%d")
-                    dts = timezone.make_aware(dts)
-                    queryset = queryset.filter(date_order__gte=dts)
+                    dts = parse_datetime(startDate)
+                    if dts:
+                        if timezone.is_naive(dts):
+                            dts = timezone.make_aware(dts)
+                        queryset = queryset.filter(date_order__gte=dts)
 
                 if is_valid_queryparam(endDate):
-                    dte = datetime.strptime(endDate, "%Y-%m-%d")
-                    dte = timezone.make_aware(dte)
-                    queryset = queryset.filter(date_order__lte=dte)
+                    dte = parse_datetime(endDate)
+                    if dte:
+                        if timezone.is_naive(dte):
+                            dte = timezone.make_aware(dte)
+                        queryset = queryset.filter(date_order__lte=dte)
 
-            return queryset.order_by(F(order_by).desc(nulls_first=True), '-date_order')
+                return queryset.order_by(F(order_by).desc(nulls_first=True), '-date_order')
 
         except Exception as e:
             logger.error(
                 f'ERRORLOG2017 TripListView. filter_queryset. Error: {e}')
-
             return queryset
 
 
@@ -413,3 +419,45 @@ class TripDetailView(RetrieveUpdateDestroyAPIView):
                         assigned_user=assigned_user)
 
         print("SERIALIZER TIME:", time.time() - start)
+
+
+### Start SMTP Settings ###
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_trips_trucks_view(request):
+    """
+    Get the truck numbers for which there are opened route sheets
+    """
+
+    # print('6570', request)
+
+    try:
+        user_company = get_user_company(request.user)
+
+        status_serial = request.query_params.get('serial_number', 1000)
+
+        queryset = (
+            Trip.objects
+            .filter(
+                company_id=user_company.id,
+                status__serial_number=status_serial
+            )
+            .select_related(
+                'vehicle_tractor',
+                'vehicle_trailer'
+            )
+            .only(
+                'rn',
+                'vehicle_tractor__reg_number',
+                'vehicle_trailer__reg_number',
+                'uf',
+            )
+        )
+
+        serializer = TripTruckSerializer(queryset, many=True)
+
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        logger.error(f'ERRORLOG631 get_trips_trucks_view. ERROR: {e}')
+        return Response({'error': 'get trips trucks failed'}, status=status.HTTP_400_BAD_REQUEST)

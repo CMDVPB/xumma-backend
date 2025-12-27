@@ -2,9 +2,9 @@ from django.urls import path
 from rest_framework.urlpatterns import format_suffix_patterns
 
 from dff.views.views_inv import InvCreateView, InvDetailView, InvListView
-from dff.views.views_load import LoadCreateView, LoadDetailView, LoadListView
+from dff.views.views_load import LoadCreateView, LoadDetailView, LoadListForTripView, LoadListView
 from dff.views.views_quote import QuoteCreateView, QuoteDetailView, QuoteListView
-from dff.views.views_trip import TripCreateView, TripDetailView, TripListView
+from dff.views.views_trip import TripCreateView, TripDetailView, TripListView, get_trips_trucks_view
 from dff.views.views_user import UserCreate, UserDetailSelfOrByManagerView, UserDetailSelfView, UserManagerCreate
 
 urlpatterns = [
@@ -19,10 +19,14 @@ urlpatterns = [
     path('loads/', LoadListView.as_view(), name='loads'),
     path('loads/create/', LoadCreateView.as_view(), name='load_create'),
     path('loads/<str:uf>/', LoadDetailView.as_view(), name='load_detail'),
+    path('trip-loads/', LoadListForTripView.as_view(),
+         name='load_list_for_trip'),
 
     path('trips/', TripListView.as_view(), name='trips'),
     path('trips/create/', TripCreateView.as_view(), name='trip_create'),
     path('trips/<str:uf>/', TripDetailView.as_view(), name='trip_detail'),
+    path('trips-trucks/', get_trips_trucks_view, name='trips_trucks'),
+
 
     path('invs/', InvListView.as_view(), name='invs'),
     path('invs/create/', InvCreateView.as_view(), name='inv_create'),

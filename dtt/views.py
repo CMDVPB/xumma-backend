@@ -688,5 +688,5 @@ def get_post_delete_user_smtp_settings(request):
     # Catch any other unexpected exceptions
     except Exception as e:
         print('EV579', e)
-        return Response({'error': 'Something went wrong', 'details': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({'error': 'Something went wrong'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 ### End SMTP Settings ###
