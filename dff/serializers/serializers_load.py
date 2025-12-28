@@ -6,11 +6,13 @@ from django.contrib.auth import get_user_model
 from drf_writable_nested.serializers import WritableNestedModelSerializer
 from drf_writable_nested.mixins import UniqueFieldsMixin, NestedCreateMixin, NestedUpdateMixin
 from rest_framework import serializers
+from rest_framework.serializers import SlugRelatedField
 
 from abb.custom_serializers import SlugRelatedGetOrCreateField
-from abb.models import Currency, StatusType
+from abb.models import BodyType, Currency, Incoterm, ModeType, StatusType
 from abb.serializers import CurrencySerializer
 from abb.utils import get_user_company
+from app.models import CategoryGeneral
 from app.serializers import UserBasicSerializer, UserSerializer
 from att.models import Contact, PaymentTerm, Person, VehicleUnit
 from att.serializers import BodyTypeSerializer, IncotermSerializer, ModeTypeSerializer, StatusTypeSerializer
@@ -134,7 +136,7 @@ class LoadListSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
 
     class Meta:
         model = Load
-        fields = ('sn', 'date_order', 'customer_ref', 'customer_notes', 'load_detail', 'load_size', 'load_add_ons', 'uf',
+        fields = ('sn', 'date_order', 'customer_ref', 'customer_notes', 'load_detail', 'load_size', 'load_type', 'load_add_ons', 'uf',
                   'date_due', 'is_loaded', 'is_cleared', 'is_unloaded', 'is_invoiced',
                   'load_address', 'unload_address', 'hb', 'mb', 'booking_number', 'comment1',
                   'assigned_user', 'bill_to', 'mode', 'bt', 'currency', 'status', 'incoterm', 'carrier', 'vehicle_tractor', 'vehicle_trailer',
@@ -158,21 +160,33 @@ class LoadSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
         if user_company:
             self.fields['trip'].queryset = Trip.objects.filter(
                 company=user_company)
+            self.fields['category'].queryset = CategoryGeneral.objects.filter(
+                company=user_company)
+            self.fields['payment_term'].queryset = PaymentTerm.objects.filter(
+                company=user_company)
 
     assigned_user = serializers.SlugRelatedField(
-        allow_null=True, slug_field='uf', queryset=User.objects.all(), write_only=True)
+        allow_null=True, slug_field='uf', queryset=User.objects.all())
     bill_to = serializers.SlugRelatedField(
         allow_null=True, slug_field='uf', queryset=Contact.objects.all(), write_only=True)
     person = SlugRelatedGetOrCreateField(
         allow_null=True, slug_field='uf', queryset=Person.objects.all(), write_only=True)
-    payment_term = SlugRelatedGetOrCreateField(
-        allow_null=True, slug_field='uf', queryset=PaymentTerm.objects.all(), write_only=True)
+    payment_term = SlugRelatedField(
+        allow_null=True, slug_field='uf', queryset=PaymentTerm.objects.none(), write_only=True)
 
     currency = serializers.SlugRelatedField(
         allow_null=True, slug_field='uf', queryset=Currency.objects.all())
     status = serializers.SlugRelatedField(
         allow_null=True, slug_field='uf', queryset=StatusType.objects.all())
+    mode = serializers.SlugRelatedField(
+        allow_null=True, slug_field='uf', queryset=ModeType.objects.all())
+    bt = serializers.SlugRelatedField(
+        allow_null=True, slug_field='uf', queryset=BodyType.objects.all())
+    incoterm = serializers.SlugRelatedField(
+        allow_null=True, slug_field='uf', queryset=Incoterm.objects.all())
 
+    category = serializers.SlugRelatedField(
+        allow_null=True, slug_field='uf', queryset=CategoryGeneral.objects.none())
     carrier = serializers.SlugRelatedField(
         allow_null=True, slug_field='uf', queryset=Contact.objects.all(), write_only=True)
     person_carrier = SlugRelatedGetOrCreateField(
@@ -195,9 +209,6 @@ class LoadSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
     load_exps = serializers.SlugRelatedField(
         many=True, slug_field='uf', queryset=Exp.objects.all(), write_only=True)
 
-    mode = ModeTypeSerializer(allow_null=True)
-    incoterm = IncotermSerializer(allow_null=True)
-    bt = BodyTypeSerializer(allow_null=True)
     cmr = CMRSerializer(allow_null=True)
 
     entry_loads = EntrySerializer(many=True)
@@ -334,8 +345,8 @@ class LoadSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
         response = super().to_representation(instance)
 
         # print('8787', instance)
-        response['assigned_user'] = UserSerializer(
-            instance.assigned_user).data if instance.assigned_user else None
+        # response['assigned_user'] = UserSerializer(
+        #     instance.assigned_user).data if instance.assigned_user else None
         response['bill_to'] = ContactSerializer(
             instance.bill_to).data if instance.bill_to else None
         response['person'] = PersonSerializer(
@@ -434,9 +445,11 @@ class LoadSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
     class Meta:
         model = Load
         fields = ('assigned_user', 'sn', 'date_order', 'customer_ref', 'customer_notes', 'is_locked', 'uf',
-                  'load_detail', 'load_size', 'load_add_ons', 'date_due', 'doc_lang', 'load_address', 'unload_address',
+                  'load_detail', 'load_size', 'load_type', 'load_add_ons', 'ins_details', 'dgg_details', 'tmc_details',
+                  'date_due', 'doc_lang', 'load_address', 'unload_address',
                   'is_loaded', 'is_cleared', 'is_unloaded', 'is_invoiced',
-                  'hb', 'mb', 'booking_number', 'comment1', 'bill_to', 'person', 'currency', 'mode', 'bt', 'status', 'incoterm', 'cmr',
+                  'hb', 'mb', 'booking_number', 'comment1',
+                  'category', 'bill_to', 'person', 'currency', 'mode', 'bt', 'status', 'incoterm', 'cmr',
                   'load_comments', 'payment_term', 'entry_loads', 'load_iteminvs', 'load_tors', 'load_ctrs', 'load_imageuploads', 'load_invs',
                   'load_histories', 'load_exps',
                   'trip', 'carrier', 'person_carrier', 'driver', 'vehicle_tractor', 'vehicle_trailer',

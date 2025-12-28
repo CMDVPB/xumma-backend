@@ -395,6 +395,11 @@ class PaymentTermSerializer(WritableNestedModelSerializer):
             relations,
         )
 
+        ###### Assign the company here ######
+        request = self.context["request"]
+        user = request.user
+        validated_data["company"] = get_user_company(user)
+
         # Create instance with atomic
         with transaction.atomic():
             instance = super(NestedCreateMixin,
@@ -404,31 +409,32 @@ class PaymentTermSerializer(WritableNestedModelSerializer):
 
         return instance
 
-    def update(self, instance, validated_data):
-        # print('3347', validated_data, instance)
-        relations, reverse_relations = self._extract_relations(validated_data)
+    # def update(self, instance, validated_data):
+    #     # print('3347', validated_data, instance)
+    #     relations, reverse_relations = self._extract_relations(validated_data)
 
-        # Create or update direct relations (foreign key, one-to-one)
-        self.update_or_create_direct_relations(
-            validated_data,
-            relations,
-        )
+    #     # Create or update direct relations (foreign key, one-to-one)
+    #     self.update_or_create_direct_relations(
+    #         validated_data,
+    #         relations,
+    #     )
 
-        # Update instance with atomic
-        with transaction.atomic():
-            instance = super(NestedUpdateMixin, self).update(
-                instance,
-                validated_data,
-            )
-            self.update_or_create_reverse_relations(
-                instance, reverse_relations)
-            self.delete_reverse_relations_if_need(instance, reverse_relations)
-            instance.refresh_from_db()
-            return instance
+    #     # Update instance with atomic
+    #     with transaction.atomic():
+    #         instance = super(NestedUpdateMixin, self).update(
+    #             instance,
+    #             validated_data,
+    #         )
+    #         self.update_or_create_reverse_relations(
+    #             instance, reverse_relations)
+    #         self.delete_reverse_relations_if_need(instance, reverse_relations)
+    #         instance.refresh_from_db()
+    #         return instance
 
     class Meta:
         model = PaymentTerm
-        fields = ('note_short', 'note_description', 'uf')
+        fields = ('payment_term_short', 'payment_term_description',
+                  'payment_term_days', 'uf')
 
 
 class TermSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):

@@ -381,8 +381,9 @@ class PaymentTerm(models.Model):
                           db_index=True, unique=True)
     company = models.ForeignKey(
         Company, on_delete=models.CASCADE, null=True, blank=True, related_name='company_payment_terms')
+
     payment_term_short = models.CharField(
-        max_length=100, blank=True, null=True)
+        max_length=100)
     payment_term_description = models.CharField(
         max_length=1000, blank=True, null=True)
     payment_term_days = models.SmallIntegerField(blank=True, null=True)

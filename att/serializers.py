@@ -28,7 +28,7 @@ class IncotermSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
 
     class Meta:
         model = Incoterm
-        fields = ('it',  'description', 'serial_number', 'uf')
+        fields = ('serial_number',  'code', 'label', 'uf')
 
 
 class ModeTypeSerializer(WritableNestedModelSerializer):
@@ -36,7 +36,7 @@ class ModeTypeSerializer(WritableNestedModelSerializer):
 
     class Meta:
         model = ModeType
-        fields = ('mt',  'description', 'serial_number', 'uf')
+        fields = ('serial_number', 'code', 'label', 'uf')
 
 
 class BodyTypeSerializer(serializers.ModelSerializer):
@@ -44,7 +44,7 @@ class BodyTypeSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = BodyType
-        fields = ('bt', 'description', 'serial_number', 'uf')
+        fields = ('serial_number', 'code', 'label', 'uf')
 
 
 class EmissionClassdSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):

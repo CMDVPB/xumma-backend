@@ -4,11 +4,11 @@ from django.contrib.postgres.fields import ArrayField
 from django.db import IntegrityError
 from django.core.exceptions import ValidationError
 
-from abb.constants import DOCUMENT_TYPES, LOAD_SIZE, DOC_LANG_CHOICES
+from abb.constants import DOCUMENT_TYPES, LOAD_SIZE, DOC_LANG_CHOICES, LOAD_TYPES
 from abb.custom_exceptions import YourCustomApiExceptionName
 from abb.models import Currency, BodyType, ModeType, StatusType, Incoterm
 from abb.utils import assign_new_num_inv, hex_uuid, assign_new_num, tripLoadsTotals
-from app.models import Company
+from app.models import CategoryGeneral, Company
 from att.models import Contact, Person, Term, VehicleCompany, VehicleUnit, PaymentTerm
 
 import logging
@@ -214,8 +214,13 @@ class Load(models.Model):
     customer_notes = models.CharField(max_length=200, blank=True, null=True)
     load_add_ons = ArrayField(models.CharField(
         max_length=20, null=True, blank=True), blank=True, null=True, size=3)
+    ins_details = models.CharField(max_length=150, blank=True, null=True)
+    dgg_details = models.CharField(max_length=150, blank=True, null=True)
+    tmc_details = models.CharField(max_length=150, blank=True, null=True)
     load_stages = ArrayField(models.CharField(
         max_length=20), blank=True, null=True, size=3)
+    load_type = models.CharField(
+        choices=LOAD_TYPES, max_length=20, null=True, blank=True)
     doc_lang = models.CharField(choices=DOC_LANG_CHOICES,
                                 max_length=2, blank=True, null=True, default='ro')
     is_locked = models.BooleanField(default=False)
@@ -244,6 +249,8 @@ class Load(models.Model):
     is_unloaded = models.BooleanField(default=False)
     is_invoiced = models.BooleanField(default=False)
 
+    category = models.ForeignKey(CategoryGeneral, on_delete=models.SET_NULL,
+                                 null=True, blank=True, related_name='category_loads')
     mode = models.ForeignKey(ModeType, on_delete=models.SET_NULL,
                              null=True, blank=True, related_name='modetype_loads')
     bt = models.ForeignKey(BodyType, on_delete=models.SET_NULL,

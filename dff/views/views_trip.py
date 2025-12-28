@@ -1,6 +1,7 @@
 import time
 import logging
 from datetime import datetime
+from datetime import timedelta
 from django.utils.dateparse import parse_datetime
 from django.utils import timezone
 from django.utils import timezone
@@ -212,14 +213,17 @@ class TripListView(ListAPIView):
                     if dts:
                         if timezone.is_naive(dts):
                             dts = timezone.make_aware(dts)
-                        queryset = queryset.filter(date_order__gte=dts)
+                        queryset = queryset.filter(
+                            date_order__lt=dts + timedelta(days=1))
 
                 if is_valid_queryparam(endDate):
                     dte = parse_datetime(endDate)
                     if dte:
                         if timezone.is_naive(dte):
                             dte = timezone.make_aware(dte)
-                        queryset = queryset.filter(date_order__lte=dte)
+
+                        queryset = queryset.filter(
+                            date_order__lt=dte + timedelta(days=1))
 
                 return queryset.order_by(F(order_by).desc(nulls_first=True), '-date_order')
 

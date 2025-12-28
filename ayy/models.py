@@ -18,6 +18,29 @@ logger = logging.getLogger(__name__)
 User = get_user_model()
 
 
+class ColliType(models.Model):
+    ''' Type of collies: loose collies, euro pallets, industrial pallets, etc '''
+    uf = models.CharField(max_length=36, default=hex_uuid, unique=True)
+    company = models.ForeignKey(
+        Company, on_delete=models.CASCADE, related_name='company_colli_types')
+
+    code = models.CharField(max_length=10, blank=True)
+    label = models.CharField(max_length=20, blank=True)
+
+    ldm = models.PositiveSmallIntegerField(blank=True, null=True)
+
+    is_system = models.BooleanField(default=False)
+
+    class Meta:
+        verbose_name = "Colli Type"
+        verbose_name_plural = "Colli Types"
+        unique_together = ('code', 'company')
+        ordering = ['code']
+
+    def __str__(self):
+        return self.code
+
+
 class PhoneNumber(models.Model):
     ''' Phone number '''
     uf = models.CharField(max_length=36, default=hex_uuid, unique=True)

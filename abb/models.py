@@ -1,3 +1,4 @@
+
 from django.db import models
 
 from .utils import hex_uuid
@@ -61,55 +62,52 @@ class ExchangeRate(models.Model):
 class Incoterm(models.Model):
     ''' All incoterms to be pre-defined '''
     uf = models.CharField(max_length=36, default=hex_uuid, unique=True)
+
     serial_number = models.PositiveSmallIntegerField(unique=True)
-    it = models.CharField(max_length=3)
-    description = models.CharField(max_length=255, blank=True, null=True)
+    code = models.CharField(max_length=3)
+    label = models.CharField(max_length=255, blank=True, null=True)
 
     class Meta:
         verbose_name = "Incoterm"
         verbose_name_plural = "Incoterms"
-
-    def save(self, *args, **kwargs):
-        self.lt = self.it.upper()
-        return super(Incoterm, self).save(*args, **kwargs)
+        ordering = ['serial_number']
 
     def __str__(self):
-        return self.it or ''
+        return self.label or ''
 
 
 class BodyType(models.Model):
     ''' Vehicle body type '''
     uf = models.CharField(max_length=36, default=hex_uuid, unique=True)
+
     serial_number = models.PositiveSmallIntegerField(unique=True)
-    bt = models.CharField(max_length=25, blank=True, null=True)
-    description = models.CharField(max_length=60, blank=True, null=True)
+    code = models.CharField(max_length=15, blank=True)
+    label = models.CharField(max_length=15, blank=True)
 
     class Meta:
         verbose_name = "Body type"
         verbose_name_plural = "Body types"
+        ordering = ['serial_number']
 
     def __str__(self):
-        return self.description or ''
+        return self.label or ''
 
 
 class ModeType(models.Model):
     ''' Mode transport type '''
-    uf = models.CharField(max_length=36, default=hex_uuid,
-                          db_index=True, unique=True)
+    uf = models.CharField(max_length=36, default=hex_uuid, unique=True)
+
     serial_number = models.PositiveSmallIntegerField(unique=True)
-    mt = models.CharField(max_length=15)
-    description = models.CharField(max_length=255, blank=True, null=True)
+    code = models.CharField(max_length=15, blank=True)
+    label = models.CharField(max_length=15, blank=True)
 
     class Meta:
         verbose_name = "Mode transport type"
         verbose_name_plural = "Mode transport types"
-
-    def save(self, *args, **kwargs):
-        self.lt = self.mt.upper()
-        return super(ModeType, self).save(*args, **kwargs)
+        ordering = ['serial_number']
 
     def __str__(self):
-        return self.mt or ''
+        return self.label or ''
 
 
 class StatusType(models.Model):

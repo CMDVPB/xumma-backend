@@ -22,6 +22,8 @@ VEHICLE_TYPES = (('truck', 'Truck'), ('tractor', 'Tractor'),
 
 LOAD_SIZE = (('ltl', 'LTL'), ('ftl', 'FTL'), ('xpr', 'XPR'))
 
+LOAD_TYPES = (('own', 'Own'), ('external', 'External'))
+
 DOC_LANG_CHOICES = (('ro', 'Romanian'), ('en', 'English'),
                     ('ru', 'Russian'), ('rr', 'Romanian/Russian'))
 

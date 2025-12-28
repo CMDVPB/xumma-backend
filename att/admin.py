@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Contact, ContactSite, EmissionClass, VehicleBrand, VehicleCompany, VehicleUnit, Person, BankAccount
+from .models import Contact, ContactSite, EmissionClass, PaymentTerm, VehicleBrand, VehicleCompany, VehicleUnit, Person, BankAccount
 
 
 @admin.register(BankAccount)
@@ -27,6 +27,12 @@ class ContactSiteAdmin(admin.ModelAdmin):
 @admin.register(EmissionClass)
 class EmissionClassAdmin(admin.ModelAdmin):
     list_display = ('id', 'company', 'code', 'name', 'description')
+
+
+@admin.register(PaymentTerm)
+class PaymentTermAdmin(admin.ModelAdmin):
+    list_display = ('id', 'company', 'payment_term_short',
+                    'payment_term_description', 'payment_term_days')
 
 
 @admin.register(Person)
