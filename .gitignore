@@ -30,4 +30,4 @@ static/
 
 # Other
 .tar
-
+*.tar

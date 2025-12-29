@@ -117,7 +117,7 @@ class LoadListView(ListAPIView):
             return Load.objects.none()
 
     def filter_queryset(self, queryset: QuerySet, **kwargs):
-        # print('2260',)
+        # print('2234',)
 
         queryset = super().filter_queryset(queryset=queryset, **kwargs)
 
@@ -333,7 +333,7 @@ class LoadListView(ListAPIView):
                         queryset = queryset.filter(
                             date_order__lt=dte + timedelta(days=1))
 
-                print('2260', queryset.count())
+                # print('2260', queryset.count())
 
             return queryset.distinct().order_by(F(order_by).desc(nulls_first=True),
                                                 '-date_created')

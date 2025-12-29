@@ -3,6 +3,7 @@ import smtplib
 from datetime import datetime, timedelta
 from django.db import IntegrityError
 from django.db.models.deletion import RestrictedError
+from django.db.models import QuerySet, Prefetch, Q, F
 from django.utils import timezone
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -19,10 +20,11 @@ from abb.utils import get_user_company
 from app.models import SMTPSettings, UserSettings
 from app.serializers import UserSettingsSerializer
 from att.models import BankAccount, ContactSite, Note, PaymentTerm, Term
-from ayy.models import AuthorizationStockBatch, CMRStockBatch, CTIRStockBatch, ItemForItemCost, ItemForItemInv
+from ayy.models import AuthorizationStockBatch, CMRStockBatch, CTIRStockBatch, ColliType, ItemForItemCost, ItemForItemInv
 from ayy.serializers import ItemForItemCostSerializer
 from dff.serializers.serializers_bce import BankAccountSerializer, NoteSerializer
 from dff.serializers.serializers_document import AuthorizationStockBatchSerializer, CMRStockBatchSerializer, CTIRStockBatchSerializer
+from dff.serializers.serializers_entry_detail import ColliTypeSerializer
 from dff.serializers.serializers_item_inv import ItemForItemInvSerializer
 from dff.serializers.serializers_other import ContactSiteListSerializer, ContactSiteSerializer, PaymentTermSerializer, TermSerializer
 
@@ -573,6 +575,32 @@ class TermDetailView(RetrieveUpdateDestroyAPIView):
         else:
             raise exceptions.ValidationError(
                 detail='not_unique', )
+
+
+class ColliTypeListView(ListCreateAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = ColliTypeSerializer
+    lookup_field = 'uf'
+
+    def get_queryset(self):
+        try:
+            user_company = get_user_company(self.request.user)
+
+            return (
+                ColliType.objects
+                .filter(
+                    Q(company_id=user_company.id) | Q(is_system=True)
+                )
+                .distinct()
+                .order_by('-serial_number')
+            )
+
+        except Exception:
+            return ColliType.objects.none()
+
+    def perform_create(self, serializer):
+        user_company = get_user_company(self.request.user)
+        serializer.save(company=user_company)
 
 
 ### Start SMTP Settings ###

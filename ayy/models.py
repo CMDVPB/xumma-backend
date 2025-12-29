@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth import get_user_model
 from django.contrib.postgres.fields import ArrayField
+from django.db.models import QuerySet, Prefetch, Q, F
 from phonenumber_field.modelfields import PhoneNumberField
 
 from abb.constants import ACTION_CHOICES, UNIT_MEASUREMENT_CHOICES, VAT_CHOICES, VAT_EXEMPTION_REASON, VAT_TYPE_CHOICES
@@ -22,12 +23,15 @@ class ColliType(models.Model):
     ''' Type of collies: loose collies, euro pallets, industrial pallets, etc '''
     uf = models.CharField(max_length=36, default=hex_uuid, unique=True)
     company = models.ForeignKey(
-        Company, on_delete=models.CASCADE, related_name='company_colli_types')
+        Company, on_delete=models.CASCADE, related_name='company_colli_types', blank=True, null=True)
 
+    serial_number = models.PositiveSmallIntegerField(
+        null=True, blank=True, unique=True)
     code = models.CharField(max_length=10, blank=True)
     label = models.CharField(max_length=20, blank=True)
 
-    ldm = models.PositiveSmallIntegerField(blank=True, null=True)
+    ldm = models.DecimalField(
+        max_digits=6, decimal_places=2, null=True, blank=True)
 
     is_system = models.BooleanField(default=False)
 
@@ -322,6 +326,7 @@ class Entry(models.Model):
     shipperinstructions2 = models.CharField(
         max_length=250, blank=True, null=True)
 
+    is_stackable = models.BooleanField(default=False)
     palletexchange = models.BooleanField(blank=True, null=True, default=False)
     tail_lift = models.BooleanField(blank=True, null=True, default=False)
     dangerousgoods = models.BooleanField(blank=True, null=True, default=False)
@@ -358,8 +363,11 @@ class Detail(models.Model):
     ldm = models.CharField(max_length=10, null=True, blank=True)
     volume = models.CharField(max_length=10, null=True, blank=True)
     dims = models.CharField(max_length=150, blank=True, null=True)
+
     entry = models.ForeignKey(Entry, on_delete=models.CASCADE,
                               blank=True, null=True, related_name='entry_details')
+    colli_type = models.ForeignKey(
+        ColliType, on_delete=models.PROTECT, related_name='colli_type_details', blank=True, null=True)
 
     def __str__(self):
         return str(self.entry) or ''

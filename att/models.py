@@ -295,8 +295,8 @@ class Person(ProtectedDeleteMixin, models.Model):
 class VehicleUnit(ProtectedDeleteMixin, models.Model):
     ''' Used for vehicle units of contacts '''
 
-    protected_related = ["vehicle_tractor_route_sheets",
-                         "vehicle_tractor_route_sheets"]
+    # protected_related = ["vehicle_tractor_route_sheets",
+    #                      "vehicle_tractor_route_sheets"]
 
     uf = models.CharField(max_length=36, default=hex_uuid,
                           db_index=True, unique=True)
@@ -304,10 +304,10 @@ class VehicleUnit(ProtectedDeleteMixin, models.Model):
     reg_number = models.CharField(max_length=20)
     vehicle_type = models.CharField(
         choices=VEHICLE_TYPES, max_length=10, null=True, blank=True)
-    comment = models.CharField(
-        max_length=500, blank=True, null=True)
     payload = models.PositiveIntegerField(null=True, blank=True)
     volume = models.PositiveIntegerField(null=True, blank=True)
+    comment = models.CharField(
+        max_length=500, blank=True, null=True)
 
     contact = models.ForeignKey(
         Contact, on_delete=models.CASCADE, blank=True, null=True, related_name='contact_vehicle_units')

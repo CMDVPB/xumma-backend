@@ -19,7 +19,7 @@ from abb.utils import check_not_unique_num, get_user_company, is_valid_querypara
 from app.utils import is_user_member_group
 from axx.models import Exp, Load, Tor, Trip
 from ayy.models import Comment, Entry, ItemInv, RouteSheet
-from dff.serializers.serializers_trip import TripCreateUpdateSerializer, TripListSerializer, TripSerializer, TripTruckSerializer
+from dff.serializers.serializers_trip import TripListSerializer, TripSerializer, TripTruckSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -28,16 +28,10 @@ User = get_user_model()
 
 
 class TripListView(ListAPIView):
-    ''' get list of trips '''
+    ''' Get list of trips '''
     pagination_class = LimitResultsSetPagination
     serializer_class = TripListSerializer
     permission_classes = [IsAuthenticated, HasGroupPermission]
-    required_groups = {
-        'OPTIONS': ['type_carrier'],
-        'HEAD': ['type_carrier'],
-        'GET': ['type_carrier'],
-        'POST': ['type_carrier'],
-    }
 
     def get_queryset(self):
         try:
@@ -214,7 +208,7 @@ class TripListView(ListAPIView):
                         if timezone.is_naive(dts):
                             dts = timezone.make_aware(dts)
                         queryset = queryset.filter(
-                            date_order__lt=dts + timedelta(days=1))
+                            date_order__gt=dts)
 
                 if is_valid_queryparam(endDate):
                     dte = parse_datetime(endDate)
@@ -234,18 +228,9 @@ class TripListView(ListAPIView):
 
 
 class TripCreateView(CreateAPIView):
-    pagination_class = LimitResultsSetPagination
-    serializer_class = TripCreateUpdateSerializer
-    http_method_names = ['head', 'post']
-    permission_classes = [IsAuthenticated,
-                          HasGroupPermission
-                          # IsSubscriptionActiveOrReadOnly
-                          ]
-    required_groups = {
-        'HEAD': ['type_carrier'],
-        'GET': ['type_carrier'],
-        'POST': ['type_carrier'],
-    }
+    # serializer_class = TripCreateUpdateSerializer
+    serializer_class = TripSerializer
+    permission_classes = [IsAuthenticated, HasGroupPermission]
 
     def get_queryset(self):
 
@@ -288,22 +273,14 @@ class TripCreateView(CreateAPIView):
 
 
 class TripDetailView(RetrieveUpdateDestroyAPIView):
-    lookup_field = 'uf'
     permission_classes = [IsAuthenticated, HasGroupPermission,
                           AssignedUserManagerOrReadOnlyIfLocked
-                          # IsSubscriptionActiveOrReadOnly
                           ]
-    http_method_names = ['head', 'get', 'patch', 'delete']
-    required_groups = {
-        'HEAD': ['type_carrier'],
-        'GET': ['type_carrier',],
-        'PUT': ['type_carrier',],
-        'DELETE': ['type_carrier'],
-    }
+    lookup_field = 'uf'
 
     def get_serializer_class(self):
-        if self.request.method in ['PATCH', 'PUT']:
-            return TripCreateUpdateSerializer
+        # if self.request.method in ['PATCH', 'PUT']:
+        #     return TripCreateUpdateSerializer
         return TripSerializer
 
     def get_queryset(self):

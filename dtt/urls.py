@@ -2,11 +2,14 @@ from django.urls import path
 from rest_framework.urlpatterns import format_suffix_patterns
 
 from dtt.views import AuthorizationStockBatchDetailsView, AuthorizationStockBatchListCreateView, BankAccountDetailView, BankAccountListCreateView, \
-    CMRStockBatchDetailsView, CMRStockBatchListCreateView, CTIRStockBatchDetailsView, CTIRStockBatchListCreateView, ContactSiteCreateView, ContactSiteDetailView, \
+    CMRStockBatchDetailsView, CMRStockBatchListCreateView, CTIRStockBatchDetailsView, CTIRStockBatchListCreateView, ColliTypeListView, ContactSiteCreateView, ContactSiteDetailView, \
     ContactSiteListView, ItemForItemCostDetailView, ItemForItemCostListCreateView, ItemForItemInvDetailView, ItemForItemInvListCreateView, NoteDetailView, NoteListCreateView, PaymentTermListCreateView, PaymentTermsDetailView, TermDetailView, TermListCreateView, UserSettingsView, \
     get_post_delete_user_smtp_settings, test_smtp_connection_view
 
 urlpatterns = [
+
+    path('colli-types/', ColliTypeListView.as_view(),
+         name='colli_types'),
 
     path('bank-accounts/', BankAccountListCreateView.as_view(), name='bank_accounts'),
     path('bank-accounts/<str:uf>/', BankAccountDetailView.as_view(),

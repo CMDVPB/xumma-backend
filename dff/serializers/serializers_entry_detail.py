@@ -1,20 +1,34 @@
 from collections import defaultdict
 from django.db import transaction
 from django.contrib.auth import get_user_model
+from django.db.models import QuerySet, Prefetch, Q, F
 from drf_writable_nested.serializers import WritableNestedModelSerializer
 from drf_writable_nested.mixins import UniqueFieldsMixin, NestedCreateMixin, NestedUpdateMixin
 from rest_framework import serializers
 
 from abb.serializers import CountrySerializer
+from abb.utils import get_user_company
 from att.models import ContactSite
-from ayy.models import Detail, Entry
+from ayy.models import ColliType, Detail, Entry
 from dff.serializers.serializers_other import ContactBasicReadSerializer, ContactSerializer, ContactSiteBasicReadSerializer, ContactSiteSerializer
 
 
+class ColliTypeSerializer(WritableNestedModelSerializer):
+    class Meta:
+        model = ColliType
+        fields = ('serial_number', 'code', 'label', 'ldm', 'is_system', 'uf')
+
+
 class DetailSerializer(WritableNestedModelSerializer):
+
+    colli_type = serializers.SlugRelatedField(
+        allow_null=True, slug_field='uf', queryset=ColliType.objects.all())
+
     class Meta:
         model = Detail
-        fields = ('pieces', 'weight', 'ldm', 'volume', 'dims', 'uf')
+        fields = ('pieces', 'weight', 'ldm', 'volume', 'dims', 'uf',
+                  'colli_type',
+                  )
 
 
 class EntryBasicReadListSerializer(WritableNestedModelSerializer):
@@ -113,7 +127,7 @@ class EntrySerializer(WritableNestedModelSerializer):
 
     class Meta:
         model = Entry
-        fields = ('action', 'shipper', 'date_load', 'time_load_min', 'time_load_max',
+        fields = ('action', 'shipper', 'date_load', 'time_load_min', 'time_load_max', 'is_stackable',
                   'shipperinstructions1', 'shipperinstructions2', 'tail_lift', 'palletexchange',
                   'dangerousgoods', 'dangerousgoods_class', 'temp_control', 'temp_control_details', 'order',
                   'country_load', 'zip_load', 'city_load', 'entry_details', 'uf')

@@ -49,65 +49,69 @@ class VehicleUnitBasicReadSerializer(WritableNestedModelSerializer):
         fields = ('reg_number', 'uf')
 
 
-class VehicleUnitSerializer(WritableNestedModelSerializer):
+class VehicleUnitSerializer(CustomsUniqueFieldsMixin, CustomWritableNestedModelSerializer):
 
-    vehicle_gendocs = DocumentSerializer(many=True)
+    # vehicle_gendocs = DocumentSerializer(many=True)
 
-    def to_internal_value(self, data):
-        if 'uf' in data and data['uf'] == '':
-            data['uf'] = None
-        if 'payload' in data and data['payload'] == '':
-            data['payload'] = None
-        if 'volume' in data and data['volume'] == '':
-            data['volume'] = None
+    # def to_internal_value(self, data):
+    #     if 'uf' in data and data['uf'] == '':
+    #         data['uf'] = None
+    #     if 'payload' in data and data['payload'] == '':
+    #         data['payload'] = None
+    #     if 'volume' in data and data['volume'] == '':
+    #         data['volume'] = None
 
-        return super(VehicleUnitSerializer, self).to_internal_value(data)
+    #     return super(VehicleUnitSerializer, self).to_internal_value(data)
 
-    def create(self, validated_data):
-        # print('1614:', validated_data)
-        relations, reverse_relations = self._extract_relations(validated_data)
+    # def create(self, validated_data):
+    #     # print('1614:', validated_data)
+    #     relations, reverse_relations = self._extract_relations(validated_data)
 
-        # Create or update direct relations (foreign key, one-to-one)
-        self.update_or_create_direct_relations(
-            validated_data,
-            relations,
-        )
+    #     # Create or update direct relations (foreign key, one-to-one)
+    #     self.update_or_create_direct_relations(
+    #         validated_data,
+    #         relations,
+    #     )
 
-        # Create instance with atomic
-        with transaction.atomic():
-            instance = super(NestedCreateMixin,
-                             self).create(validated_data)
-            self.update_or_create_reverse_relations(
-                instance, reverse_relations)
+    #     # Create instance with atomic
+    #     with transaction.atomic():
+    #         instance = super(NestedCreateMixin,
+    #                          self).create(validated_data)
+    #         self.update_or_create_reverse_relations(
+    #             instance, reverse_relations)
 
-        return instance
+    #     return instance
 
-    def update(self, instance, validated_data):
-        # print('3347', validated_data, instance)
-        relations, reverse_relations = self._extract_relations(validated_data)
+    # def update(self, instance, validated_data):
+    #     # print('3347', validated_data, instance)
+    #     relations, reverse_relations = self._extract_relations(validated_data)
 
-        # Create or update direct relations (foreign key, one-to-one)
-        self.update_or_create_direct_relations(
-            validated_data,
-            relations,
-        )
+    #     # Create or update direct relations (foreign key, one-to-one)
+    #     self.update_or_create_direct_relations(
+    #         validated_data,
+    #         relations,
+    #     )
 
-        # Update instance with atomic
-        with transaction.atomic():
-            instance = super(NestedUpdateMixin, self).update(
-                instance,
-                validated_data,
-            )
-            self.update_or_create_reverse_relations(
-                instance, reverse_relations)
-            self.delete_reverse_relations_if_need(instance, reverse_relations)
-            instance.refresh_from_db()
-            return instance
+    #     # Update instance with atomic
+    #     with transaction.atomic():
+    #         instance = super(NestedUpdateMixin, self).update(
+    #             instance,
+    #             validated_data,
+    #         )
+    #         self.update_or_create_reverse_relations(
+    #             instance, reverse_relations)
+    #         self.delete_reverse_relations_if_need(instance, reverse_relations)
+    #         instance.refresh_from_db()
+    #         return instance
 
     class Meta:
         model = VehicleUnit
-        fields = ('id', 'reg_number', 'vehicle_type', 'payload',
-                  'volume', 'comment', 'contact', 'vehicle_gendocs', 'uf')
+        lookup_field = 'uf'
+        fields = ('reg_number', 'vehicle_type', 'payload', 'uf',
+                  'volume', 'comment',
+                  'contact',
+                  # 'vehicle_gendocs',
+                  )
 
 
 class PersonBasicReadSerializer(WritableNestedModelSerializer):
@@ -173,8 +177,8 @@ class ContactSerializer(WritableNestedModelSerializer):
 
     country_code_legal = serializers.SlugRelatedField(
         slug_field='uf', queryset=Country.objects.all(), write_only=True, required=True)
-    country_code_post = serializers.SlugRelatedField(
-        allow_null=True, slug_field='uf', queryset=Country.objects.all(), write_only=True, required=False)
+    # country_code_post = serializers.SlugRelatedField(
+    #     allow_null=True, slug_field='uf', queryset=Country.objects.all(), write_only=True, required=False)
 
     contact_sites = ContactSiteForContactSerializer(many=True)
 
@@ -242,7 +246,7 @@ class ContactSerializer(WritableNestedModelSerializer):
                   'fiscal_code', 'vat_code', 'reg_com', 'subscribed_capital',
                   'is_vat_payer', 'is_vat_on_receipt', 'email', 'phone', 'messanger',
                   'country_code_legal', 'zip_code_legal', 'city_legal', 'address_legal', 'county_legal', 'sect_legal',
-                  'country_code_post', 'zip_code_post', 'city_post', 'address_post', 'comment1', 'comment2',
+                  'comment1', 'comment2',
                   'lat', 'lon',
                   'contact_persons', 'contact_vehicle_units', 'contact_bank_accounts', 'contact_sites',
                   )

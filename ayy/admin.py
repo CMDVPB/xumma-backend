@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from ayy.models import AuthorizationStockBatch, CMRStockBatch, DamageReport, PhoneNumber
+from ayy.models import AuthorizationStockBatch, CMRStockBatch, ColliType, DamageReport, PhoneNumber
 
 
 @admin.register(CMRStockBatch)
@@ -9,6 +9,11 @@ class CMRStockBatchAdmin(admin.ModelAdmin):
 
     search_fields = ('series', 'company__company_name',
                      'number_from', 'number_to')
+
+
+@admin.register(ColliType)
+class ColliTypeAdmin(admin.ModelAdmin):
+    list_display = ('id', 'company', 'code', 'label', 'ldm', 'is_system')
 
 
 @admin.register(AuthorizationStockBatch)

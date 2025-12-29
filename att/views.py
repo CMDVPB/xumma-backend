@@ -204,7 +204,7 @@ class VehicleCompanyListView(ListAPIView):
                 elif vehicle_type == 'trailer':
                     queryset = queryset.filter(vehicle_type='trailer')
 
-            print('4968', queryset.count())
+            # print('4968', queryset.count())
 
             return queryset.distinct()
 
