@@ -8,7 +8,7 @@ from drf_writable_nested.serializers import WritableNestedModelSerializer
 from drf_writable_nested.mixins import UniqueFieldsMixin, NestedCreateMixin, NestedUpdateMixin
 
 from abb.serializers import CurrencySerializer
-from abb.serializers_drf_writable import CustomWritableNestedModelSerializer, CustomsUniqueFieldsMixin
+from abb.serializers_drf_writable import CustomWritableNestedModelSerializer, CustomUniqueFieldsMixin
 from abb.utils import get_user_company
 from ayy.models import Document, ItemCost, ItemForItemCost, PhoneNumber
 
@@ -149,7 +149,7 @@ class ItemCostSerializer(WritableNestedModelSerializer):
                   )
 
 
-class PhoneNumberSerializer(CustomsUniqueFieldsMixin, CustomWritableNestedModelSerializer):
+class PhoneNumberSerializer(CustomUniqueFieldsMixin, CustomWritableNestedModelSerializer):
 
     class Meta:
         model = PhoneNumber
@@ -158,7 +158,7 @@ class PhoneNumberSerializer(CustomsUniqueFieldsMixin, CustomWritableNestedModelS
                   )
 
 
-class DocumentSerializer(CustomsUniqueFieldsMixin, CustomWritableNestedModelSerializer):
+class DocumentSerializer(CustomUniqueFieldsMixin, CustomWritableNestedModelSerializer):
 
     class Meta:
         model = Document

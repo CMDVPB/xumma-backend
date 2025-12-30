@@ -26,7 +26,7 @@ class ContactSiteAdmin(admin.ModelAdmin):
 
 @admin.register(EmissionClass)
 class EmissionClassAdmin(admin.ModelAdmin):
-    list_display = ('id', 'company', 'code', 'name', 'description')
+    list_display = ('id', 'company', 'code', 'label', 'description')
 
 
 @admin.register(PaymentTerm)
@@ -37,7 +37,7 @@ class PaymentTermAdmin(admin.ModelAdmin):
 
 @admin.register(Person)
 class PersonAdmin(admin.ModelAdmin):
-    list_display = ('id', 'first_name', 'last_name')
+    list_display = ('id', 'first_name', 'last_name', 'contact', 'site')
 
 
 @admin.register(VehicleBrand)

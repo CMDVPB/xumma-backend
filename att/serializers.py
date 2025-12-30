@@ -47,11 +47,12 @@ class BodyTypeSerializer(serializers.ModelSerializer):
         fields = ('serial_number', 'code', 'label', 'uf')
 
 
-class EmissionClassdSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
+class EmissionClassSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
 
     class Meta:
         model = EmissionClass
-        fields = ('code', 'name', 'description', 'is_active', 'uf')
+        fields = ('code', 'label', 'description',
+                  'is_active', 'is_system', 'uf')
 
 
 class VehicleBrandSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
@@ -87,10 +88,16 @@ class StatusTypeSerializer(WritableNestedModelSerializer):
 class VehicleCompanySerializer(WritableNestedModelSerializer):
     brand = serializers.SlugRelatedField(
         allow_null=True, slug_field='uf', queryset=VehicleBrand.objects.all())
+    vehicle_category = serializers.SlugRelatedField(
+        allow_null=True, slug_field='code', queryset=CategoryGeneral.objects.all())
+    vehicle_category_type = serializers.SlugRelatedField(
+        allow_null=True, slug_field='code', queryset=TypeGeneral.objects.all())
     vehicle_body = serializers.SlugRelatedField(
         allow_null=True, slug_field='uf', queryset=BodyType.objects.all())
     emission_class = serializers.SlugRelatedField(
-        allow_null=True, slug_field='uf', queryset=EmissionClass.objects.all())
+        allow_null=True, slug_field='code', queryset=EmissionClass.objects.all())
+
+    # vehicle_gendocs = GenDocSerializer(many=True)
 
     def _empty_strings_to_none(self, data, fields):
         for field in fields:
@@ -98,7 +105,6 @@ class VehicleCompanySerializer(WritableNestedModelSerializer):
                 data[field] = None
         return data
 
-    # vehicle_gendocs = GenDocSerializer(many=True)
     def to_internal_value(self, data):
         data = data.copy()  # IMPORTANT
 
@@ -164,7 +170,7 @@ class VehicleCompanySerializer(WritableNestedModelSerializer):
         model = VehicleCompany
         fields = ('reg_number', 'vin', 'vehicle_type', 'date_registered', 'is_available', 'is_archived', 'uf',
                   'length', 'width', 'height', 'weight_capacity', 'volume_capacity',
-                  'tank_volume', 'change_oil_interval', 'consumption_summer', 'consumption_winter', 'buy_price', 'sell_price',
+                  'tank_volume', 'change_oil_interval', 'consumption_summer', 'consumption_winter', 'buy_price', 'sell_price', 'km_initial',
                   'interval_taho', 'last_date_unload_taho', 'comment',
-                  'brand', 'vehicle_body', 'emission_class',
+                  'brand', 'vehicle_category', 'vehicle_category_type', 'vehicle_body', 'emission_class',
                   )

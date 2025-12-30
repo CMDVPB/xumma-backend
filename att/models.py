@@ -5,11 +5,11 @@ from django.db import IntegrityError
 from django.core.exceptions import ValidationError
 
 from abb.models import Currency, Country, BodyType
-from abb.custom_exceptions import YourCustomApiExceptionName
+from abb.custom_exceptions import CustomApiException
 from abb.utils import hex_uuid, get_contact_type_default
 from abb.mixins import ProtectedDeleteMixin
 from abb.constants import VEHICLE_TYPES
-from app.models import Company
+from app.models import CategoryGeneral, Company, TypeGeneral
 
 import logging
 logger = logging.getLogger(__name__)
@@ -25,10 +25,12 @@ class EmissionClass(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
     code = models.CharField(max_length=20, unique=True)
-    name = models.CharField(max_length=50)
+    label = models.CharField(max_length=50)
     description = models.TextField(blank=True, null=True)
 
     is_active = models.BooleanField(default=True)
+
+    is_system = models.BooleanField(default=False)
 
     class Meta:
         verbose_name = "Emission Class"
@@ -36,7 +38,7 @@ class EmissionClass(models.Model):
         ordering = ["code"]
 
     def __str__(self):
-        return self.name
+        return f'{self.code} - {self.label}'
 
 
 class VehicleBrand(models.Model):
@@ -79,6 +81,10 @@ class VehicleCompany(ProtectedDeleteMixin, models.Model):
     vin = models.CharField(max_length=50, null=True, blank=True)
     vehicle_type = models.CharField(
         choices=VEHICLE_TYPES, max_length=10, null=True, blank=True)
+    vehicle_category = models.ForeignKey(
+        CategoryGeneral, on_delete=models.CASCADE, null=True, blank=True, related_name='vehicle_category_company_vehicles')
+    vehicle_category_type = models.ForeignKey(
+        TypeGeneral, on_delete=models.CASCADE, null=True, blank=True, related_name='vehicle_category_type_company_vehicles')
     vehicle_body = models.ForeignKey(
         BodyType, on_delete=models.CASCADE, null=True, blank=True, related_name='vehicle_body_company_vehicles')
     emission_class = models.ForeignKey(
@@ -93,6 +99,7 @@ class VehicleCompany(ProtectedDeleteMixin, models.Model):
     change_oil_interval = models.PositiveIntegerField(null=True, blank=True)
     buy_price = models.PositiveIntegerField(null=True, blank=True)
     sell_price = models.PositiveIntegerField(null=True, blank=True)
+    km_initial = models.PositiveIntegerField(null=True, blank=True)
 
     length = models.PositiveIntegerField(null=True, blank=True)
     width = models.PositiveIntegerField(null=True, blank=True)
@@ -130,7 +137,7 @@ class VehicleCompany(ProtectedDeleteMixin, models.Model):
             super(VehicleCompany, self).save(*args, **kwargs)
         except IntegrityError as e:
             logger.error(f'ERRORLOG951 class CompanyVehicle. save. Error: {e}')
-            raise YourCustomApiExceptionName(409, 'unique_together')
+            raise CustomApiException(409, 'unique_together')
 
     def __str__(self):
         return self.reg_number or ''
@@ -221,7 +228,7 @@ class Contact(models.Model):
             super(Contact, self).save(*args, **kwargs)
         except IntegrityError as e:
             logger.error(f'ERRORLOG647 class Contact. save. Error: {e}')
-            raise YourCustomApiExceptionName(409, 'unique_together')
+            raise CustomApiException(409, 'unique_together')
 
     def natural_key(self):
         return (self.company_name)
@@ -326,7 +333,7 @@ class VehicleUnit(ProtectedDeleteMixin, models.Model):
             super(VehicleUnit, self).save(*args, **kwargs)
         except IntegrityError as e:
             logger.error(f'ERRORLOG951 class VehicleUnit. save. Error: {e}')
-            raise YourCustomApiExceptionName(409, 'unique_together')
+            raise CustomApiException(409, 'unique_together')
 
     def __str__(self):
         return self.reg_number or ''
@@ -341,7 +348,7 @@ class BankAccount(models.Model):
     currency_code = models.ForeignKey(
         Currency, on_delete=models.SET_NULL, null=True, blank=True, related_name='bankaccountscurrency')
     iban_number = models.CharField(max_length=50)
-    bank_name = models.CharField(max_length=150)
+    bank_name = models.CharField(max_length=150, null=True, blank=True)
     bank_code = models.CharField(max_length=30)
     bank_address = models.CharField(max_length=250, null=True, blank=True)
     add_instructions = models.TextField(max_length=700, null=True, blank=True)
@@ -487,7 +494,7 @@ class AuthorizationCEMT(models.Model):
         except IntegrityError as e:
             logger.error(
                 f'ERRORLOG351 class AuthorizationCEMT. save. Error: {e}')
-            raise YourCustomApiExceptionName(409, 'unique_together')
+            raise CustomApiException(409, 'unique_together')
 
     def __str__(self):
         return f"{self.company.company_name} - {self.series or 'N/A'} {self.number}"

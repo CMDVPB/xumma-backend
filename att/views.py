@@ -18,7 +18,7 @@ from abb.pagination import LimitResultsSetPagination
 from abb.utils import get_user_company, is_valid_queryparam
 from app.models import CategoryGeneral, TypeGeneral
 from att.models import EmissionClass, VehicleBrand, VehicleCompany
-from att.serializers import BodyTypeSerializer, CategoryGeneralSerializer, EmissionClassdSerializer, IncotermSerializer, ModeTypeSerializer, StatusTypeSerializer, TypeGeneralSerializer, \
+from att.serializers import BodyTypeSerializer, CategoryGeneralSerializer, EmissionClassSerializer, IncotermSerializer, ModeTypeSerializer, StatusTypeSerializer, TypeGeneralSerializer, \
     VehicleBrandSerializer, VehicleCompanySerializer
 
 
@@ -99,7 +99,7 @@ class BodyTypeListView(ListAPIView):
 
 
 class EmissionClassListView(ListAPIView):
-    serializer_class = EmissionClassdSerializer
+    serializer_class = EmissionClassSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):

@@ -16,11 +16,12 @@ from rest_framework import permissions, status, exceptions
 from rest_framework.decorators import authentication_classes, api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 
-from abb.utils import get_user_company
+from abb.utils import assign_new_num, get_user_company
 from app.models import SMTPSettings, UserSettings
 from app.serializers import UserSettingsSerializer
 from att.models import BankAccount, ContactSite, Note, PaymentTerm, Term
-from ayy.models import AuthorizationStockBatch, CMRStockBatch, CTIRStockBatch, ColliType, ItemForItemCost, ItemForItemInv
+from axx.models import Load
+from ayy.models import CMR, AuthorizationStockBatch, CMRStockBatch, CTIRStockBatch, ColliType, ItemForItemCost, ItemForItemInv
 from ayy.serializers import ItemForItemCostSerializer
 from dff.serializers.serializers_bce import BankAccountSerializer, NoteSerializer
 from dff.serializers.serializers_document import AuthorizationStockBatchSerializer, CMRStockBatchSerializer, CTIRStockBatchSerializer
@@ -222,7 +223,8 @@ class ContactSiteDetailView(RetrieveUpdateDestroyAPIView):
             user_company = get_user_company(user)
             return ContactSite.objects.filter(company__id=user_company.id).distinct()
         except Exception as e:
-            print('E435', e)
+            logger.error(
+                f'ERRORLOG5097 ContactSiteDetailView get_queryset. ERROR: {e}')
             return ContactSite.objects.none()
 
     def perform_update(self, serializer):
@@ -718,3 +720,55 @@ def get_post_delete_user_smtp_settings(request):
         print('EV579', e)
         return Response({'error': 'Something went wrong'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 ### End SMTP Settings ###
+
+
+@api_view(["POST"])
+def validate_or_generate_cmr(request, uf):
+    """
+    POST accepts:
+      - cmr_number (optional)
+    If provided: checks uniqueness.
+    If empty: generates next sequential cmr_number per company.
+    """
+
+    # print('V8440', request.data, uf)
+
+    cmr_number = request.data.get("cmr_number", "").strip()
+
+    # Get the load
+    try:
+        load = Load.objects.get(uf=uf)
+    except Load.DoesNotExist:
+        return Response({"error": "Load not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    company = load.company
+
+    # Get or create CMR object for this load
+    cmr, created = CMR.objects.get_or_create(
+        load=load, defaults={"company": company})
+
+    # Case 1: user entered number → validate uniqueness per company
+    if cmr_number:
+        exists = CMR.objects.filter(
+            company=company,
+            number=cmr_number
+        ).exclude(id=cmr.id).exists()
+
+        if exists:
+            return Response(
+                {"error": "cmr_number_already_exists"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        cmr.number = cmr_number
+        cmr.save(update_fields=["number"])
+        return Response({"cmr_number": cmr_number}, status=status.HTTP_200_OK)
+
+    # Case 2: no number provided → generate next sequential number per company
+    cmr_qs = CMR.objects.filter(company=company)
+    num_new = assign_new_num(cmr_qs, "number")
+
+    cmr.number = num_new
+    cmr.save(update_fields=["number"])
+
+    return Response({"cmr_number": num_new}, status=status.HTTP_200_OK)

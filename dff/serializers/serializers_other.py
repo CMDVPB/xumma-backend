@@ -4,10 +4,13 @@ from django.contrib.auth import get_user_model
 from drf_writable_nested.serializers import WritableNestedModelSerializer
 from drf_writable_nested.mixins import UniqueFieldsMixin, NestedCreateMixin, NestedUpdateMixin
 from rest_framework import serializers
+from django.core.exceptions import ValidationError
+from rest_framework.validators import UniqueTogetherValidator
 
+from abb.custom_exceptions import CustomApiException
 from abb.models import Country
 from abb.serializers import CountrySerializer, CurrencySerializer
-from abb.serializers_drf_writable import CustomWritableNestedModelSerializer, CustomsUniqueFieldsMixin
+from abb.serializers_drf_writable import CustomWritableNestedModelSerializer, CustomUniqueFieldsMixin
 from abb.utils import get_user_company
 from app.serializers import UserBasicSerializer
 from att.models import Contact, ContactSite, PaymentTerm, Person, TargetGroup, Term, VehicleCompany, VehicleUnit
@@ -49,69 +52,48 @@ class VehicleUnitBasicReadSerializer(WritableNestedModelSerializer):
         fields = ('reg_number', 'uf')
 
 
-class VehicleUnitSerializer(CustomsUniqueFieldsMixin, CustomWritableNestedModelSerializer):
+class VehicleUnitSerializer(CustomUniqueFieldsMixin, CustomWritableNestedModelSerializer):
 
     # vehicle_gendocs = DocumentSerializer(many=True)
 
-    # def to_internal_value(self, data):
-    #     if 'uf' in data and data['uf'] == '':
-    #         data['uf'] = None
-    #     if 'payload' in data and data['payload'] == '':
-    #         data['payload'] = None
-    #     if 'volume' in data and data['volume'] == '':
-    #         data['volume'] = None
-
-    #     return super(VehicleUnitSerializer, self).to_internal_value(data)
-
-    # def create(self, validated_data):
-    #     # print('1614:', validated_data)
-    #     relations, reverse_relations = self._extract_relations(validated_data)
-
-    #     # Create or update direct relations (foreign key, one-to-one)
-    #     self.update_or_create_direct_relations(
-    #         validated_data,
-    #         relations,
-    #     )
-
-    #     # Create instance with atomic
-    #     with transaction.atomic():
-    #         instance = super(NestedCreateMixin,
-    #                          self).create(validated_data)
-    #         self.update_or_create_reverse_relations(
-    #             instance, reverse_relations)
-
-    #     return instance
-
-    # def update(self, instance, validated_data):
-    #     # print('3347', validated_data, instance)
-    #     relations, reverse_relations = self._extract_relations(validated_data)
-
-    #     # Create or update direct relations (foreign key, one-to-one)
-    #     self.update_or_create_direct_relations(
-    #         validated_data,
-    #         relations,
-    #     )
-
-    #     # Update instance with atomic
-    #     with transaction.atomic():
-    #         instance = super(NestedUpdateMixin, self).update(
-    #             instance,
-    #             validated_data,
-    #         )
-    #         self.update_or_create_reverse_relations(
-    #             instance, reverse_relations)
-    #         self.delete_reverse_relations_if_need(instance, reverse_relations)
-    #         instance.refresh_from_db()
-    #         return instance
-
     class Meta:
         model = VehicleUnit
-        lookup_field = 'uf'
         fields = ('reg_number', 'vehicle_type', 'payload', 'uf',
                   'volume', 'comment',
                   'contact',
                   # 'vehicle_gendocs',
                   )
+        lookup_field = 'uf'
+
+    def get_validators(self):
+        validators = super().get_validators()
+        # remove DRF auto validator that produces:
+        # "The fields contact, reg_number must make a unique set."
+        return [v for v in validators if not isinstance(v, UniqueTogetherValidator)]
+
+    def validate(self, attrs):
+        instance = self.instance
+
+        contact = attrs.get("contact") if "contact" in attrs else (
+            instance.contact if instance else None)
+        reg_number = attrs.get("reg_number") or (
+            instance.reg_number if instance else None)
+
+        if contact and reg_number:
+            qs = VehicleUnit.objects.filter(
+                contact=contact, reg_number=reg_number)
+
+            if instance:
+                qs = qs.exclude(pk=instance.pk)
+
+            # Fallback: nested update without instance
+            elif 'uf' in attrs:
+                qs = qs.exclude(uf=attrs['uf'])
+
+            if qs.exists():
+                raise CustomApiException(409, 'unique_together')
+
+        return attrs
 
 
 class PersonBasicReadSerializer(WritableNestedModelSerializer):
@@ -120,7 +102,7 @@ class PersonBasicReadSerializer(WritableNestedModelSerializer):
         fields = ('last_name', 'first_name', 'is_driver', 'is_private', 'uf')
 
 
-class PersonSerializer(CustomsUniqueFieldsMixin, CustomWritableNestedModelSerializer):
+class PersonSerializer(CustomUniqueFieldsMixin, CustomWritableNestedModelSerializer):
 
     def to_representation(self, instance):
         response = super().to_representation(instance)
@@ -135,7 +117,7 @@ class PersonSerializer(CustomsUniqueFieldsMixin, CustomWritableNestedModelSerial
                   'comment', 'is_driver', "is_private", 'uf')
 
 
-class ContactSiteForContactSerializer(CustomsUniqueFieldsMixin, CustomWritableNestedModelSerializer):
+class ContactSiteForContactSerializer(CustomUniqueFieldsMixin, CustomWritableNestedModelSerializer):
     '''
     To be used as child serializer for ContactSerializer
     '''
@@ -177,8 +159,6 @@ class ContactSerializer(WritableNestedModelSerializer):
 
     country_code_legal = serializers.SlugRelatedField(
         slug_field='uf', queryset=Country.objects.all(), write_only=True, required=True)
-    # country_code_post = serializers.SlugRelatedField(
-    #     allow_null=True, slug_field='uf', queryset=Country.objects.all(), write_only=True, required=False)
 
     contact_sites = ContactSiteForContactSerializer(many=True)
 
@@ -242,6 +222,7 @@ class ContactSerializer(WritableNestedModelSerializer):
 
     class Meta:
         model = Contact
+
         fields = ('company_name', 'alias_company_name', 'is_same_address', 'contact_type', 'uf',
                   'fiscal_code', 'vat_code', 'reg_com', 'subscribed_capital',
                   'is_vat_payer', 'is_vat_on_receipt', 'email', 'phone', 'messanger',
@@ -299,10 +280,12 @@ class ContactSiteSerializer(WritableNestedModelSerializer):
     contact = serializers.SlugRelatedField(
         allow_null=True, slug_field='uf', queryset=Contact.objects.none(), write_only=True)
 
+    site_persons = PersonSerializer(many=True)
+
     def to_representation(self, instance):
         response = super().to_representation(instance)
 
-        response['contact'] = ContactSerializer(
+        response['contact'] = ContactBasicReadSerializer(
             instance.contact).data if instance.contact else None
 
         return response
@@ -313,6 +296,7 @@ class ContactSiteSerializer(WritableNestedModelSerializer):
         fields = ('name_site', 'address_site', 'city_site', 'zip_code_site', 'lat', 'lon', 'uf',
                   'phone', 'email', 'comment1', 'comment2',
                   'country_code_site', 'contact',
+                  'site_persons',
                   )
 
 ###### End Contact Site Serializers ######

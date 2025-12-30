@@ -5,7 +5,7 @@ from django.db import IntegrityError
 from django.core.exceptions import ValidationError
 
 from abb.constants import DOCUMENT_TYPES, LOAD_SIZE, DOC_LANG_CHOICES, LOAD_TYPES
-from abb.custom_exceptions import YourCustomApiExceptionName
+from abb.custom_exceptions import CustomApiException
 from abb.models import Currency, BodyType, ModeType, StatusType, Incoterm
 from abb.utils import assign_new_num_inv, hex_uuid, assign_new_num, tripLoadsTotals
 from app.models import CategoryGeneral, Company
@@ -59,7 +59,7 @@ class Series(models.Model):
         try:
             super(Series, self).save(*args, **kwargs)
         except IntegrityError as e:
-            raise YourCustomApiExceptionName(409, 'unique_together')
+            raise CustomApiException(409, 'unique_together')
 
     def __str__(self):
         return f"{self.document_type}-{self.prefix}"
@@ -80,10 +80,12 @@ class Trip(models.Model):
     date_order = models.DateTimeField(blank=True, null=True)
     load_size = models.CharField(
         choices=LOAD_SIZE, max_length=20, null=True, blank=True)
-    is_locked = models.BooleanField(default=False)
+    trip_type = models.CharField(
+        choices=LOAD_TYPES, max_length=20, null=True, blank=True)
     incl_loads_costs = models.BooleanField(default=False)
     doc_lang = models.CharField(choices=DOC_LANG_CHOICES,
                                 max_length=2, blank=True, null=True, default='en')
+    is_locked = models.BooleanField(default=False)
 
     trip_number = models.CharField(max_length=20, blank=True, null=True)
     km_departure = models.CharField(max_length=20, blank=True, null=True)
@@ -103,7 +105,8 @@ class Trip(models.Model):
                                 related_name='carrier_trips')
     person = models.ForeignKey(Person, on_delete=models.SET_NULL,
                                blank=True, null=True, related_name='person_trips')
-
+    driver = models.ForeignKey(
+        Person, on_delete=models.SET_NULL, blank=True, null=True, related_name='driver_trips')
     vehicle_tractor = models.ForeignKey(
         VehicleCompany, on_delete=models.SET_NULL, blank=True, null=True, related_name='vehicle_tractor_trips')
     vehicle_trailer = models.ForeignKey(

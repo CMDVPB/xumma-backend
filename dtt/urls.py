@@ -4,7 +4,7 @@ from rest_framework.urlpatterns import format_suffix_patterns
 from dtt.views import AuthorizationStockBatchDetailsView, AuthorizationStockBatchListCreateView, BankAccountDetailView, BankAccountListCreateView, \
     CMRStockBatchDetailsView, CMRStockBatchListCreateView, CTIRStockBatchDetailsView, CTIRStockBatchListCreateView, ColliTypeListView, ContactSiteCreateView, ContactSiteDetailView, \
     ContactSiteListView, ItemForItemCostDetailView, ItemForItemCostListCreateView, ItemForItemInvDetailView, ItemForItemInvListCreateView, NoteDetailView, NoteListCreateView, PaymentTermListCreateView, PaymentTermsDetailView, TermDetailView, TermListCreateView, UserSettingsView, \
-    get_post_delete_user_smtp_settings, test_smtp_connection_view
+    get_post_delete_user_smtp_settings, test_smtp_connection_view, validate_or_generate_cmr
 
 urlpatterns = [
 
@@ -56,6 +56,9 @@ urlpatterns = [
          name='contact_site_create'),
     path('contact-sites/<str:uf>/', ContactSiteDetailView.as_view(),
          name='contact_site_detail'),
+
+    path('load/validate-cmr/<str:uf>/',
+         validate_or_generate_cmr, name='validate-cmr'),
 
 ]
 

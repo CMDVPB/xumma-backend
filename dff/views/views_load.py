@@ -22,6 +22,7 @@ from rest_framework.permissions import IsAuthenticated  # used for FBV
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.exceptions import ValidationError
 
+from abb.constants import LOAD_TYPES
 from abb.pagination import LimitResultsSetPagination
 from abb.permissions import AssignedUserManagerOrReadOnlyIfLocked, AssignedUserOrManagerOrReadOnly
 from abb.utils import get_user_company, is_valid_queryparam
@@ -211,15 +212,18 @@ class LoadListView(ListAPIView):
                     'startDate', None)
                 endDate = self.request.query_params.get(
                     'endDate', None)
-                # print('2040', order_pre_order_all_index)
 
                 if is_valid_queryparam(order_pre_order_all_index):
                     if order_pre_order_all_index == '0':
                         queryset = queryset.filter(trip__isnull=False)
                     elif order_pre_order_all_index == '1':
                         queryset = queryset.filter(trip__isnull=True)
+                    elif order_pre_order_all_index == '4':
+                        queryset = queryset.filter(load_type=LOAD_TYPES[1][0])
                     else:
                         pass
+
+                # print('2040',)
 
                 if is_valid_queryparam(sortByQuery):
                     if sortByQuery == '0':

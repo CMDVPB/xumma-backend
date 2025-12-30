@@ -3,7 +3,7 @@ import binascii
 from django.db import models, IntegrityError
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from abb.custom_exceptions import YourCustomApiExceptionName
+from abb.custom_exceptions import CustomApiException
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.contrib.postgres.fields import ArrayField
 from django.utils import timezone
@@ -437,7 +437,7 @@ class DocumentSeries(models.Model):
             super(DocumentSeries, self).save(*args, **kwargs)
         except IntegrityError as e:
             logger.error(f'ERRORLOG647 DocumentSeries. save. Error: {e}')
-            raise YourCustomApiExceptionName(409, 'unique_together')
+            raise CustomApiException(409, 'unique_together')
 
     def __str__(self):
         return f"{self.company.company_name} - {self.series} {self.number_from}-{self.number_to}"

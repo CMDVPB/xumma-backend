@@ -13,6 +13,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import authentication_classes, api_view, permission_classes
 
+from abb.constants import LOAD_TYPES
 from abb.pagination import LimitResultsSetPagination
 from abb.permissions import AssignedUserManagerOrReadOnlyIfLocked, HasGroupPermission
 from abb.utils import check_not_unique_num, get_user_company, is_valid_queryparam
@@ -98,6 +99,8 @@ class TripListView(ListAPIView):
                                            )
 
             else:
+                own_external_all_index = self.request.query_params.get(
+                    'buttonIndex', None)
                 sortByQuery = self.request.query_params.get(
                     'sortByQuery', None)
                 billtoQuery = self.request.query_params.get(
@@ -132,7 +135,17 @@ class TripListView(ListAPIView):
                 endDate = self.request.query_params.get(
                     'endDate', None)
 
-                print('3040', startDate)
+                print('3040', own_external_all_index)
+
+                if is_valid_queryparam(own_external_all_index):
+                    if own_external_all_index == '0':
+                        queryset = queryset.filter(trip_type=LOAD_TYPES[0][0])
+                    elif own_external_all_index == '1':
+                        queryset = queryset.filter(trip_type=LOAD_TYPES[1][0])
+                    else:
+                        pass
+
+                # print('2040',)
 
                 if is_valid_queryparam(sortByQuery):
                     if sortByQuery is not None:

@@ -5,10 +5,10 @@ from django.contrib.contenttypes.models import ContentType
 from django.db.models import ProtectedError, SET_NULL, SET_DEFAULT
 from django.db.models.fields.related import ForeignObjectRel, ManyToManyRel
 from rest_framework import serializers
-from rest_framework.exceptions import ValidationError
-from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 from rest_framework.exceptions import ValidationError
+from django.db import IntegrityError
+from django.db.models import UniqueConstraint
 
 
 shall_print = False
@@ -362,10 +362,34 @@ class CustomNestedUpdateMixin(CustomBaseNestedModelSerializer):
 
 class CustomWritableNestedModelSerializer(CustomNestedCreateMixin, CustomNestedUpdateMixin,
                                           serializers.ModelSerializer):
-    pass
+    def save(self, **kwargs):
+        try:
+            return super().save(**kwargs)
+        except IntegrityError as e:
+            if self._is_unique_constraint_error(e):
+                raise ValidationError(self._format_unique_error())
+            raise
+
+    def _is_unique_constraint_error(self, exc):
+        return 'unique' in str(exc).lower()
+
+    def _format_unique_error(self):
+        model = self.Meta.model
+        constraints = getattr(model._meta, 'constraints', [])
+
+        for c in constraints:
+            if isinstance(c, UniqueConstraint):
+                return {
+                    field: f'{field} must be unique.'
+                    for field in c.fields
+                }
+
+        return {
+            'non_field_errors': ['Unique constraint violation.']
+        }
 
 
-class CustomsUniqueFieldsMixin(serializers.ModelSerializer):
+class CustomUniqueFieldsMixin(serializers.ModelSerializer):
     """
     Fixes unique validation for nested updates when objects
     are matched by a custom lookup field (e.g. `uf`).

@@ -424,7 +424,7 @@ class TripListSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
 
     class Meta:
         model = Trip
-        fields = ('rn', 'num_loads', 'load_size', 'date_order', 'uf',
+        fields = ('rn', 'num_loads', 'load_size', 'trip_type', 'date_order', 'uf',
                   'carrier', 'status', 'bt', 'mode', 'vehicle_tractor', 'vehicle_trailer',
                   'trip_loads', 'trip_comments', 'totals_trip',
                   'drivers'
@@ -439,6 +439,8 @@ class TripSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
         allow_null=True, slug_field='uf', queryset=Contact.objects.all(), write_only=True)
     person = SlugRelatedGetOrCreateField(
         allow_null=True, slug_field='uf', queryset=Person.objects.all(), write_only=True)
+    driver = serializers.SlugRelatedField(
+        allow_null=True, slug_field='uf', queryset=Person.objects.filter(is_driver=True), write_only=True)
     vehicle_tractor = SlugRelatedGetOrCreateField(
         allow_null=True, slug_field='uf', queryset=VehicleCompany.objects.all(), write_only=True)
     vehicle_trailer = SlugRelatedGetOrCreateField(
@@ -581,8 +583,8 @@ class TripSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
 
     class Meta:
         model = Trip
-        fields = ('rn', 'assigned_user', 'date_order', 'person', 'vehicle_tractor', 'incl_loads_costs', 'doc_lang',
-                  'vehicle_trailer', 'carrier', 'load_size', 'load_order', 'mode', 'bt', 'currency', 'status', 'is_locked',
+        fields = ('rn', 'assigned_user', 'date_order', 'person', 'driver', 'vehicle_tractor', 'incl_loads_costs', 'doc_lang',
+                  'vehicle_trailer', 'carrier', 'load_size', 'trip_type', 'load_order', 'mode', 'bt', 'currency', 'status', 'is_locked',
                   'km_departure', 'km_arrival', 'km_exit', 'km_entry', 'trip_number', 'date_trip', 'date_departure', 'date_arrival',
                   'trip_details', 'l_departure', 'l_arrival', 'trip_add_info', 'trip_loads', 'trip_comments', 'trip_histories', 'uf',
                   'trip_route_sheets', 'drivers',
@@ -597,12 +599,5 @@ class TripTruckSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Trip
-        fields = (
-            'rn',
-
-
-            'tractor',
-
-            'trailer',
-            'uf',
-        )
+        fields = ('rn', 'tractor', 'trailer', 'uf',
+                  )
