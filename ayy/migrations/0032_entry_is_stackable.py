@@ -6,13 +6,8 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('ayy', '0031_collitype_serial_number'),
+        ('att', '0031_auto_last_existing'),
     ]
 
-    operations = [
-        migrations.AddField(
-            model_name='entry',
-            name='is_stackable',
-            field=models.BooleanField(default=False),
-        ),
-    ]
+
+operations = []

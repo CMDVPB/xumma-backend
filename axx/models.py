@@ -9,7 +9,7 @@ from abb.custom_exceptions import CustomApiException
 from abb.models import Currency, BodyType, ModeType, StatusType, Incoterm
 from abb.utils import assign_new_num_inv, hex_uuid, assign_new_num, tripLoadsTotals
 from app.models import CategoryGeneral, Company
-from att.models import Contact, Person, Term, VehicleCompany, VehicleUnit, PaymentTerm
+from att.models import Contact, Person, RouteSheetNumber, Term, Vehicle, VehicleUnit, PaymentTerm
 
 import logging
 logger = logging.getLogger(__name__)
@@ -74,6 +74,8 @@ class Trip(models.Model):
     assigned_user = models.ForeignKey(
         User, on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_user_trips')
 
+    rs_number = models.OneToOneField(
+        RouteSheetNumber, on_delete=models.PROTECT, related_name="number_route_sheet_number", null=True, blank=True)
     rn = models.CharField(max_length=12, null=True, blank=True)
     date_created = models.DateTimeField(
         auto_now_add=True, null=True, blank=True)
@@ -108,9 +110,9 @@ class Trip(models.Model):
     driver = models.ForeignKey(
         Person, on_delete=models.SET_NULL, blank=True, null=True, related_name='driver_trips')
     vehicle_tractor = models.ForeignKey(
-        VehicleCompany, on_delete=models.SET_NULL, blank=True, null=True, related_name='vehicle_tractor_trips')
+        Vehicle, on_delete=models.SET_NULL, blank=True, null=True, related_name='vehicle_tractor_trips')
     vehicle_trailer = models.ForeignKey(
-        VehicleCompany, on_delete=models.SET_NULL, blank=True, null=True, related_name='vehicle_trailer_trips')
+        Vehicle, on_delete=models.SET_NULL, blank=True, null=True, related_name='vehicle_trailer_trips')
     mode = models.ForeignKey(ModeType, on_delete=models.SET_NULL,
                              null=True, blank=True, related_name='modetype_trips')
     bt = models.ForeignKey(BodyType, on_delete=models.SET_NULL,
@@ -235,9 +237,9 @@ class Load(models.Model):
     driver = models.ForeignKey(
         Person, on_delete=models.SET_NULL, blank=True, null=True, related_name='driver_loads')
     vehicle_tractor = models.ForeignKey(
-        VehicleUnit, on_delete=models.SET_NULL, blank=True, null=True, related_name='vehicle_tractor_loads')
+        Vehicle, on_delete=models.SET_NULL, blank=True, null=True, related_name='vehicle_tractor_loads')
     vehicle_trailer = models.ForeignKey(
-        VehicleUnit, on_delete=models.SET_NULL, blank=True, null=True, related_name='vehicle_trailer_loads')
+        Vehicle, on_delete=models.SET_NULL, blank=True, null=True, related_name='vehicle_trailer_loads')
 
     hb = models.CharField(max_length=30, blank=True, null=True)
     mb = models.CharField(max_length=30, blank=True, null=True)
@@ -347,9 +349,9 @@ class Tor(models.Model):
     driver = models.ForeignKey(
         Person, on_delete=models.SET_NULL, blank=True, null=True, related_name='driver_tors',)
     vehicle_tractor = models.ForeignKey(
-        VehicleUnit, on_delete=models.SET_NULL, blank=True, null=True, related_name='vehicle_tractor_tors',)
+        Vehicle, on_delete=models.SET_NULL, blank=True, null=True, related_name='vehicle_tractor_tors')
     vehicle_trailer = models.ForeignKey(
-        VehicleUnit, on_delete=models.SET_NULL, blank=True, null=True, related_name='vehicle_trailer_tors',)
+        Vehicle, on_delete=models.SET_NULL, blank=True, null=True, related_name='vehicle_trailer_tors')
     load = models.ForeignKey(
         Load, on_delete=models.SET_NULL, blank=True, null=True, related_name='load_tors')
     payment_term = models.ForeignKey(PaymentTerm, on_delete=models.SET_NULL,

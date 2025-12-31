@@ -429,12 +429,15 @@ def get_trips_trucks_view(request):
         user_company = get_user_company(request.user)
 
         status_serial = request.query_params.get('serial_number', 1000)
+        trip_type = request.query_params.get('tripTypeToSelect', 'own')
+
+        # print('5274', status_serial, trip_type)
 
         queryset = (
             Trip.objects
             .filter(
                 company_id=user_company.id,
-                status__serial_number=status_serial
+                status__serial_number=status_serial,
             )
             .select_related(
                 'vehicle_tractor',
@@ -447,6 +450,18 @@ def get_trips_trucks_view(request):
                 'uf',
             )
         )
+
+        own = LOAD_TYPES[0][0]
+        external = LOAD_TYPES[1][0]
+
+        if trip_type == own:
+            queryset = queryset.filter(
+                Q(trip_type=own) | Q(trip_type__isnull=True)
+            )
+        elif trip_type == external:
+            queryset = queryset.filter(trip_type=external)
+
+        # print('5678', queryset.values())
 
         serializer = TripTruckSerializer(queryset, many=True)
 

@@ -8,139 +8,11 @@ from abb.models import Currency, Country, BodyType
 from abb.custom_exceptions import CustomApiException
 from abb.utils import hex_uuid, get_contact_type_default
 from abb.mixins import ProtectedDeleteMixin
-from abb.constants import VEHICLE_TYPES
+from abb.constants import DOCUMENT_STATUS_CHOICES, VEHICLE_TYPES
 from app.models import CategoryGeneral, Company, TypeGeneral
 
 import logging
 logger = logging.getLogger(__name__)
-
-
-class EmissionClass(models.Model):
-    """
-    Vehicle emission classes (Euro 0, Euro 1, Euro 2, Euro 3, Euro 4, Euro 5, Euro 6)
-    """
-    uf = models.CharField(max_length=36, default=hex_uuid, db_index=True)
-    company = models.ForeignKey(
-        Company, on_delete=models.CASCADE, related_name='company_emission_classes')
-
-    created_at = models.DateTimeField(auto_now_add=True)
-    code = models.CharField(max_length=20, unique=True)
-    label = models.CharField(max_length=50)
-    description = models.TextField(blank=True, null=True)
-
-    is_active = models.BooleanField(default=True)
-
-    is_system = models.BooleanField(default=False)
-
-    class Meta:
-        verbose_name = "Emission Class"
-        verbose_name_plural = "Emission Classes"
-        ordering = ["code"]
-
-    def __str__(self):
-        return f'{self.code} - {self.label}'
-
-
-class VehicleBrand(models.Model):
-    uf = models.CharField(max_length=36, default=hex_uuid,
-                          db_index=True, unique=True)
-    company = models.ForeignKey(
-        Company, on_delete=models.CASCADE, null=True, blank=True, related_name='company_vehicle_brands')
-
-    name = models.CharField(max_length=100, unique=True)
-    serial_number = models.PositiveSmallIntegerField(
-        unique=True, null=True, blank=True)
-
-    is_active = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        verbose_name = "Vehicle Brand"
-        verbose_name_plural = "Vehicle Brands"
-        ordering = ["name"]
-
-    def __str__(self):
-        return self.name
-
-
-class VehicleCompany(ProtectedDeleteMixin, models.Model):
-    # protected_related = ["vehicle_tractor_route_sheets",
-    #                      "vehicle_tractor_route_sheets"]
-
-    protected_related = []
-
-    uf = models.CharField(max_length=36, default=hex_uuid,
-                          db_index=True, unique=True)
-    company = models.ForeignKey(
-        Company, on_delete=models.CASCADE, null=True, blank=True, related_name='company_vehicle_units')
-
-    brand = models.ForeignKey(
-        VehicleBrand, on_delete=models.PROTECT, null=True, blank=True, related_name="brand_company_vehicles")
-
-    reg_number = models.CharField(max_length=50)
-    vin = models.CharField(max_length=50, null=True, blank=True)
-    vehicle_type = models.CharField(
-        choices=VEHICLE_TYPES, max_length=10, null=True, blank=True)
-    vehicle_category = models.ForeignKey(
-        CategoryGeneral, on_delete=models.CASCADE, null=True, blank=True, related_name='vehicle_category_company_vehicles')
-    vehicle_category_type = models.ForeignKey(
-        TypeGeneral, on_delete=models.CASCADE, null=True, blank=True, related_name='vehicle_category_type_company_vehicles')
-    vehicle_body = models.ForeignKey(
-        BodyType, on_delete=models.CASCADE, null=True, blank=True, related_name='vehicle_body_company_vehicles')
-    emission_class = models.ForeignKey(
-        EmissionClass, on_delete=models.CASCADE, null=True, blank=True, related_name='emission_class_company_vehicles')
-
-    date_registered = models.DateField(null=True, blank=True)
-    tank_volume = models.PositiveIntegerField(null=True, blank=True)
-    consumption_summer = models.PositiveIntegerField(null=True, blank=True)
-    consumption_winter = models.PositiveIntegerField(null=True, blank=True)
-    add_consumption_with_load = models.PositiveIntegerField(
-        null=True, blank=True)
-    change_oil_interval = models.PositiveIntegerField(null=True, blank=True)
-    buy_price = models.PositiveIntegerField(null=True, blank=True)
-    sell_price = models.PositiveIntegerField(null=True, blank=True)
-    km_initial = models.PositiveIntegerField(null=True, blank=True)
-
-    length = models.PositiveIntegerField(null=True, blank=True)
-    width = models.PositiveIntegerField(null=True, blank=True)
-    height = models.PositiveIntegerField(null=True, blank=True)
-    weight_capacity = models.PositiveIntegerField(null=True, blank=True)
-    volume_capacity = models.PositiveIntegerField(null=True, blank=True)
-
-    interval_taho = models.PositiveIntegerField(null=True, blank=True)
-    last_date_unload_taho = models.DateField(null=True, blank=True)
-
-    comment = models.CharField(
-        max_length=500, blank=True, null=True)
-
-    has_dgr = models.BooleanField(default=False)
-    has_sanitary_certificate = models.BooleanField(default=False)
-    has_l_paket = models.BooleanField(default=False)
-
-    is_rented = models.BooleanField(default=False)
-    is_service_vehicle = models.BooleanField(default=False)
-    is_available = models.BooleanField(default=True)
-    is_archived = models.BooleanField(default=False)
-
-    class Meta:
-        verbose_name = "Vehicle Company"
-        verbose_name_plural = "Vehicles Company"
-        ordering = ['reg_number']
-        constraints = [
-            models.UniqueConstraint(fields=[
-                                    'company', "reg_number"], name='unique_together company reg_number')
-        ]
-
-    def save(self, *args, **kwargs):
-
-        try:
-            super(VehicleCompany, self).save(*args, **kwargs)
-        except IntegrityError as e:
-            logger.error(f'ERRORLOG951 class CompanyVehicle. save. Error: {e}')
-            raise CustomApiException(409, 'unique_together')
-
-    def __str__(self):
-        return self.reg_number or ''
 
 
 class TargetGroup(models.Model):
@@ -208,7 +80,6 @@ class Contact(models.Model):
     other = models.CharField(max_length=200, null=True, blank=True)
 
     is_vat_payer = models.BooleanField(default=False)
-    is_vat_on_receipt = models.BooleanField(default=False)
 
     contact_type = ArrayField(models.CharField(
         max_length=20, null=True, blank=True), default=get_contact_type_default, size=5)
@@ -297,6 +168,136 @@ class Person(ProtectedDeleteMixin, models.Model):
 
     def __str__(self):
         return (self.first_name + ' ' + (self.last_name or '')) or ''
+
+
+class EmissionClass(models.Model):
+    """
+    Vehicle emission classes (Euro 0, Euro 1, Euro 2, Euro 3, Euro 4, Euro 5, Euro 6)
+    """
+    uf = models.CharField(max_length=36, default=hex_uuid, db_index=True)
+    company = models.ForeignKey(
+        Company, on_delete=models.CASCADE, related_name='company_emission_classes')
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    code = models.CharField(max_length=20, unique=True)
+    label = models.CharField(max_length=50)
+    description = models.TextField(blank=True, null=True)
+
+    is_active = models.BooleanField(default=True)
+
+    is_system = models.BooleanField(default=False)
+
+    class Meta:
+        verbose_name = "Emission Class"
+        verbose_name_plural = "Emission Classes"
+        ordering = ["code"]
+
+    def __str__(self):
+        return f'{self.code} - {self.label}'
+
+
+class VehicleBrand(models.Model):
+    uf = models.CharField(max_length=36, default=hex_uuid,
+                          db_index=True, unique=True)
+    company = models.ForeignKey(
+        Company, on_delete=models.CASCADE, null=True, blank=True, related_name='company_vehicle_brands')
+
+    name = models.CharField(max_length=100, unique=True)
+    serial_number = models.PositiveSmallIntegerField(
+        unique=True, null=True, blank=True)
+
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Vehicle Brand"
+        verbose_name_plural = "Vehicle Brands"
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+
+class Vehicle(ProtectedDeleteMixin, models.Model):
+    # protected_related = ["vehicle_tractor_route_sheets",
+    #                      "vehicle_tractor_route_sheets"]
+
+    protected_related = []
+
+    uf = models.CharField(max_length=36, default=hex_uuid,
+                          db_index=True, unique=True)
+    company = models.ForeignKey(
+        Company, on_delete=models.CASCADE, null=True, blank=True, related_name='company_vehicles')
+    contact = models.ForeignKey(
+        Contact, on_delete=models.CASCADE, null=True, blank=True, related_name='contact_vehicles')
+
+    reg_number = models.CharField(max_length=50)
+    vin = models.CharField(max_length=50, null=True, blank=True)
+    vehicle_type = models.CharField(
+        choices=VEHICLE_TYPES, max_length=10, null=True, blank=True)
+
+    brand = models.ForeignKey(
+        VehicleBrand, on_delete=models.PROTECT, null=True, blank=True, related_name="brand_vehicles")
+    vehicle_category = models.ForeignKey(
+        CategoryGeneral, on_delete=models.CASCADE, null=True, blank=True, related_name='vehicle_category_vehicles')
+    vehicle_category_type = models.ForeignKey(
+        TypeGeneral, on_delete=models.CASCADE, null=True, blank=True, related_name='vehicle_category_type_vehicles')
+    vehicle_body = models.ForeignKey(
+        BodyType, on_delete=models.CASCADE, null=True, blank=True, related_name='vehicle_body_vehicles')
+    emission_class = models.ForeignKey(
+        EmissionClass, on_delete=models.CASCADE, null=True, blank=True, related_name='emission_class_vehicles')
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    date_registered = models.DateField(null=True, blank=True)
+    tank_volume = models.PositiveIntegerField(null=True, blank=True)
+    consumption_summer = models.PositiveIntegerField(null=True, blank=True)
+    consumption_winter = models.PositiveIntegerField(null=True, blank=True)
+    add_consumption_with_load = models.PositiveIntegerField(
+        null=True, blank=True)
+    change_oil_interval = models.PositiveIntegerField(null=True, blank=True)
+    buy_price = models.PositiveIntegerField(null=True, blank=True)
+    sell_price = models.PositiveIntegerField(null=True, blank=True)
+    km_initial = models.PositiveIntegerField(null=True, blank=True)
+
+    length = models.PositiveIntegerField(null=True, blank=True)
+    width = models.PositiveIntegerField(null=True, blank=True)
+    height = models.PositiveIntegerField(null=True, blank=True)
+    weight_capacity = models.PositiveIntegerField(null=True, blank=True)
+    volume_capacity = models.PositiveIntegerField(null=True, blank=True)
+
+    interval_taho = models.PositiveIntegerField(null=True, blank=True)
+    last_date_unload_taho = models.DateField(null=True, blank=True)
+
+    comment = models.CharField(
+        max_length=500, blank=True, null=True)
+
+    has_dgr = models.BooleanField(default=False)
+    has_sanitary_certificate = models.BooleanField(default=False)
+    has_l_paket = models.BooleanField(default=False)
+
+    is_rented = models.BooleanField(default=False)
+    is_service_vehicle = models.BooleanField(default=False)
+    is_available = models.BooleanField(default=True)
+    is_archived = models.BooleanField(default=False)
+
+    class Meta:
+        verbose_name = "Vehicle"
+        verbose_name_plural = "Vehicles"
+        ordering = ['created_at']
+        constraints = [
+            models.UniqueConstraint(fields=[
+                                    'company', "reg_number"], name='unique_together company reg_number')
+        ]
+
+    def save(self, *args, **kwargs):
+        try:
+            super(Vehicle, self).save(*args, **kwargs)
+        except IntegrityError as e:
+            logger.error(f'ERRORLOG951 class CompanyVehicle. save. Error: {e}')
+            raise CustomApiException(409, 'unique_together')
+
+    def __str__(self):
+        return self.reg_number or ''
 
 
 class VehicleUnit(ProtectedDeleteMixin, models.Model):
@@ -464,7 +465,7 @@ class AuthorizationCEMT(models.Model):
         AuthorizationCEMTCategories, on_delete=models.CASCADE, null=True,
         blank=True, related_name="category_authorization_cemts")
     company_vehicle = models.ForeignKey(
-        VehicleCompany, on_delete=models.CASCADE, null=True,
+        Vehicle, on_delete=models.CASCADE, null=True,
         blank=True, related_name="company_vehicle_authorization_cemts")
 
     is_standard_authorization = models.BooleanField(default=False)
@@ -498,3 +499,56 @@ class AuthorizationCEMT(models.Model):
 
     def __str__(self):
         return f"{self.company.company_name} - {self.series or 'N/A'} {self.number}"
+
+
+class RouteSheetStockBatch(models.Model):
+    uf = models.CharField(max_length=36, default=hex_uuid, db_index=True)
+    company = models.ForeignKey(
+        Company, on_delete=models.CASCADE, related_name="company_route_sheet_stock")
+
+    series = models.CharField(max_length=20, blank=True, null=True)
+
+    number_from = models.PositiveIntegerField()
+    number_to = models.PositiveIntegerField()
+
+    received_at = models.DateField(null=True, blank=True)
+
+    total_count = models.PositiveIntegerField(editable=False)
+    used_count = models.PositiveIntegerField(default=0)
+
+    notes = models.TextField(max_length=1000, blank=True)
+
+    route_sheet_status = models.CharField(
+        max_length=10, choices=DOCUMENT_STATUS_CHOICES, default=DOCUMENT_STATUS_CHOICES[0][0])
+    reserved_at = models.DateTimeField(null=True, blank=True)
+    used_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        unique_together = ("company", "series", "number_from", "number_to")
+
+    def save(self, *args, **kwargs):
+        self.total_count = self.number_to - self.number_from + 1
+        super().save(*args, **kwargs)
+
+    @property
+    def available_count(self):
+        return self.total_count - self.used_count
+
+
+class RouteSheetNumber(models.Model):
+    uf = models.CharField(max_length=36, default=hex_uuid, db_index=True)
+    company = models.ForeignKey(
+        Company, on_delete=models.CASCADE, related_name="company_route_sheet_number")
+
+    batch = models.ForeignKey(
+        RouteSheetStockBatch, on_delete=models.PROTECT, related_name="batch_route_sheet_numbers")
+
+    number = models.CharField(max_length=30)
+    is_used = models.BooleanField(default=False)
+    used_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["number"]
+
+    def __str__(self):
+        return self.number

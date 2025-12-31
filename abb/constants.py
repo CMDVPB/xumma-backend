@@ -64,3 +64,7 @@ VAT_EXEMPTION_REASON = (('vatex-eu-g', 'VATEX-EU-G'),
 
 DOC_LANG_CHOICES = (('ro', 'Romanian'), ('en', 'English'),
                     ('ru', 'Russian'), ('rr', 'Romanian/Russian'))
+
+
+DOCUMENT_STATUS_CHOICES = (
+    ('free', 'Free'), ('reserved', 'Reserved'), ('used', 'Used'))

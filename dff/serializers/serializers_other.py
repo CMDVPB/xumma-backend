@@ -13,7 +13,8 @@ from abb.serializers import CountrySerializer, CurrencySerializer
 from abb.serializers_drf_writable import CustomWritableNestedModelSerializer, CustomUniqueFieldsMixin
 from abb.utils import get_user_company
 from app.serializers import UserBasicSerializer
-from att.models import Contact, ContactSite, PaymentTerm, Person, TargetGroup, Term, VehicleCompany, VehicleUnit
+from att.models import Contact, ContactSite, PaymentTerm, Person, TargetGroup, Term, Vehicle, VehicleUnit
+from att.serializers import VehicleContactSerializer, VehicleSerializer
 from axx.models import Load
 from ayy.models import CMR, Comment, Document, History, ImageUpload
 from dff.serializers.serializers_bce import BankAccountSerializer
@@ -38,10 +39,10 @@ class DocumentSerializer(WritableNestedModelSerializer):
                   'doc_det', 'doc_type', 'uf')
 
 
-class VehicleCompanyBasicReadSerializer(WritableNestedModelSerializer):
+class VehicleBasicReadSerializer(WritableNestedModelSerializer):
 
     class Meta:
-        model = VehicleCompany
+        model = Vehicle
         fields = ('reg_number', 'uf')
 
 
@@ -133,13 +134,12 @@ class ContactSiteForContactSerializer(CustomUniqueFieldsMixin, CustomWritableNes
 
 
 class ContactTripListSerializer(WritableNestedModelSerializer):
-    contact_vehicle_units = VehicleUnitBasicReadSerializer(many=True)
+    contact_vehicles = VehicleBasicReadSerializer(many=True)
 
     class Meta:
         model = Contact
-
         fields = ('company_name', 'uf',
-                  'contact_vehicle_units'
+                  'contact_vehicles'
                   )
 
 
@@ -155,15 +155,14 @@ class ContactBasicReadSerializer(WritableNestedModelSerializer):
 
 
 class ContactSerializer(WritableNestedModelSerializer):
-    contact_persons = PersonSerializer(many=True)
 
     country_code_legal = serializers.SlugRelatedField(
         slug_field='uf', queryset=Country.objects.all(), write_only=True, required=True)
 
     contact_sites = ContactSiteForContactSerializer(many=True)
-
-    contact_vehicle_units = VehicleUnitSerializer(many=True)
+    contact_persons = PersonSerializer(many=True)
     contact_bank_accounts = BankAccountSerializer(many=True)
+    contact_vehicles = VehicleContactSerializer(many=True)
 
     def to_representation(self, instance):
         response = super().to_representation(instance)
@@ -177,19 +176,10 @@ class ContactSerializer(WritableNestedModelSerializer):
         return response
 
     def create(self, validated_data):
-        # print('6543', self.fields)
         relations, reverse_relations = self._extract_relations(validated_data)
 
-        # print('3591', self.serializer_related_field,
-        #       self.serializer_related_to_field)
+        self.update_or_create_direct_relations(validated_data, relations)
 
-        # Create or update direct relations (foreign key, one-to-one)
-        self.update_or_create_direct_relations(
-            validated_data,
-            relations,
-        )
-
-        # Create instance with atomic
         with transaction.atomic():
             instance = super(NestedCreateMixin,
                              self).create(validated_data)
@@ -199,37 +189,29 @@ class ContactSerializer(WritableNestedModelSerializer):
         return instance
 
     def update(self, instance, validated_data):
-        # print('6827', validated_data, "\n", instance)
         relations, reverse_relations = self._extract_relations(validated_data)
 
-        # Create or update direct relations (foreign key, one-to-one)
-        self.update_or_create_direct_relations(
-            validated_data,
-            relations,
-        )
+        self.update_or_create_direct_relations(validated_data, relations)
 
-        # Update instance with atomic
         with transaction.atomic():
             instance = super(NestedUpdateMixin, self).update(
-                instance,
-                validated_data,
-            )
+                instance, validated_data)
             self.update_or_create_reverse_relations(
                 instance, reverse_relations)
             self.delete_reverse_relations_if_need(instance, reverse_relations)
             instance.refresh_from_db()
-            return instance
+
+        return instance
 
     class Meta:
         model = Contact
-
         fields = ('company_name', 'alias_company_name', 'is_same_address', 'contact_type', 'uf',
                   'fiscal_code', 'vat_code', 'reg_com', 'subscribed_capital',
-                  'is_vat_payer', 'is_vat_on_receipt', 'email', 'phone', 'messanger',
+                  'is_vat_payer', 'email', 'phone', 'messanger',
                   'country_code_legal', 'zip_code_legal', 'city_legal', 'address_legal', 'county_legal', 'sect_legal',
                   'comment1', 'comment2',
                   'lat', 'lon',
-                  'contact_persons', 'contact_vehicle_units', 'contact_bank_accounts', 'contact_sites',
+                  'contact_persons', 'contact_vehicles', 'contact_bank_accounts', 'contact_sites',
                   )
 
 ###### Start Contact Site Serializers ######

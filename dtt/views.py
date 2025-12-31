@@ -177,12 +177,13 @@ class ContactSiteListView(ListAPIView):
             user = self.request.user
             user_company = get_user_company(user)
             queryset = ContactSite.objects.select_related(
-                'contact', 'company').filter(contact__company__id=user_company.id).order_by('-date_modified')
+                'contact', 'company').filter(company__id=user_company.id).order_by('-date_modified')
 
-            return queryset.distinct().order_by('name_site')
+            return queryset.distinct()
 
         except Exception as e:
-            print('E587', e)
+            logger.error(
+                f'ERRORLOG573 ContactSiteListView get_queryset. ERROR: {e}')
             return ContactSite.objects.none()
 
 

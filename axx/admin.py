@@ -11,7 +11,7 @@ class LoadAdmin(admin.ModelAdmin):
 
 @admin.register(Trip)
 class TripAdmin(admin.ModelAdmin):
-    list_display = ('id', 'company', )
+    list_display = ('id', 'company', 'vehicle_tractor', 'vehicle_trailer')
 
 
 @admin.register(TripDriver)

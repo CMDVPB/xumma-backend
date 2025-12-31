@@ -9,7 +9,7 @@ from rest_framework import serializers
 from abb.models import Country
 from abb.utils import get_user_company
 from app.models import CategoryGeneral, TypeGeneral
-from att.models import VehicleCompany
+from att.models import Vehicle
 from ayy.models import AuthorizationStockBatch, CMRStockBatch, CTIRStockBatch
 
 logger = logging.getLogger(__name__)
@@ -44,7 +44,7 @@ class AuthorizationStockBatchSerializer(WritableNestedModelSerializer):
     category_authorization = serializers.SlugRelatedField(
         allow_null=True, slug_field='uf', queryset=CategoryGeneral.objects.all())
     vehicle_authorization = serializers.SlugRelatedField(
-        allow_null=True, slug_field='uf', queryset=VehicleCompany.objects.all())
+        allow_null=True, slug_field='uf', queryset=Vehicle.objects.all())
 
     countries_authorization = serializers.SlugRelatedField(
         many=True, slug_field='uf', queryset=Country.objects.all())

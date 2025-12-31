@@ -9,7 +9,7 @@ from abb.models import Country, Currency
 from abb.utils import assign_new_num, hex_uuid, default_notification_status_3, upload_to
 from app.models import CategoryGeneral, Company, TypeGeneral
 from axx.models import Ctr, Exp, Inv, Load, Tor, Trip
-from att.models import Contact, ContactSite, Person, VehicleCompany
+from att.models import Contact, ContactSite, Person, Vehicle
 
 from .utils import dynamic_upload_path, user_photo_upload_path
 
@@ -115,7 +115,7 @@ class Document(models.Model):
         Person, on_delete=models.CASCADE, blank=True, null=True, related_name='person_documents')
 
     company_vehicle = models.ForeignKey(
-        VehicleCompany, on_delete=models.CASCADE, blank=True, null=True, related_name='company_vehicle_documents')
+        Vehicle, on_delete=models.CASCADE, blank=True, null=True, related_name='company_vehicle_documents')
 
     notifications = ArrayField(models.BooleanField(
     ), default=default_notification_status_3, size=3)
@@ -253,9 +253,9 @@ class RouteSheet(models.Model):
     end_location = models.ForeignKey(
         Contact, on_delete=models.RESTRICT, null=True, blank=True, related_name="ending_route_sheets")
     vehicle_tractor = models.ForeignKey(
-        VehicleCompany, on_delete=models.RESTRICT, blank=True, null=True, related_name='vehicle_tractor_route_sheets')
+        Vehicle, on_delete=models.RESTRICT, blank=True, null=True, related_name='vehicle_tractor_route_sheets')
     vehicle_trailer = models.ForeignKey(
-        VehicleCompany, on_delete=models.RESTRICT, blank=True, null=True, related_name='vehicle_trailer_route_sheets')
+        Vehicle, on_delete=models.RESTRICT, blank=True, null=True, related_name='vehicle_trailer_route_sheets')
     currency = models.ForeignKey(
         Currency, on_delete=models.RESTRICT, null=True, blank=True, related_name='currency_route_sheets')
 
@@ -637,7 +637,7 @@ class AuthorizationStockBatch(models.Model):
                                            null=True, blank=True, related_name='type_authorizations')
     category_authorization = models.ForeignKey(CategoryGeneral, on_delete=models.SET_NULL,
                                                null=True, blank=True, related_name='category_authorizations')
-    vehicle_authorization = models.ForeignKey(VehicleCompany, on_delete=models.SET_NULL,
+    vehicle_authorization = models.ForeignKey(Vehicle, on_delete=models.SET_NULL,
                                               null=True, blank=True, related_name='vehicle_authorizations')
     countries_authorization = models.ManyToManyField(
         Country, related_name="authorization_countries")
@@ -680,7 +680,7 @@ class DamageReport(models.Model):
         Company, on_delete=models.CASCADE, related_name="company_damage_reports")
 
     vehicle = models.ForeignKey(
-        VehicleCompany, on_delete=models.CASCADE, related_name="vehicle_damage_reports", null=True, blank=True)
+        Vehicle, on_delete=models.CASCADE, related_name="vehicle_damage_reports", null=True, blank=True)
 
     damage_report_type = models.CharField(
         max_length=20, choices=DAMAGE_REPORT_TYPE_CHOICES, blank=True)

@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Contact, ContactSite, EmissionClass, PaymentTerm, VehicleBrand, VehicleCompany, VehicleUnit, Person, BankAccount
+from .models import Contact, ContactSite, EmissionClass, PaymentTerm, VehicleBrand, Vehicle, VehicleUnit, Person, BankAccount
 
 
 @admin.register(BankAccount)
@@ -54,9 +54,9 @@ class VehicleUnitAdmin(admin.ModelAdmin):
     ordering = ['-id']
 
 
-@admin.register(VehicleCompany)
-class VehicleCompanyAdmin(admin.ModelAdmin):
-    list_display = ('id', 'company', 'reg_number', 'vehicle_type')
+@admin.register(Vehicle)
+class VehicleAdmin(admin.ModelAdmin):
+    list_display = ('id', 'company', 'contact', 'reg_number', 'vehicle_type')
 
     search_fields = ('reg_number', 'company')
 

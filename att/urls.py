@@ -2,8 +2,8 @@ from django.urls import path
 from rest_framework.urlpatterns import format_suffix_patterns
 
 from att.views import BodyTypeListView, CategoryGeneralListView, EmissionClassListView, IncotermListView, \
-    ModeTypeListView, StatusTypeListView, TypeGeneralListView, VehicleBrandListView, VehicleCompanyCreateView, \
-    VehicleCompanyDetailView, VehicleCompanyListView
+    ModeTypeListView, RouteSheetStockBatchDetailsView, RouteSheetStockBatchListCreateView, StatusTypeListView, TypeGeneralListView, VehicleBrandListView, VehicleCreateView, \
+    VehicleDetailView, VehicleListView
 
 urlpatterns = [
 
@@ -21,12 +21,16 @@ urlpatterns = [
          name='emission-classes'),
     path('vehicle-brands/', VehicleBrandListView.as_view(), name='vehicle-brands'),
 
-    path('vehicles/create/', VehicleCompanyCreateView.as_view(),
+    path('vehicles/create/', VehicleCreateView.as_view(),
          name='vehicle-create'),
-    path('vehicles/', VehicleCompanyListView.as_view(), name='vehicle-list'),
-    path('vehicles/<str:uf>/', VehicleCompanyDetailView.as_view(),
+    path('vehicles/', VehicleListView.as_view(), name='vehicle-list'),
+    path('vehicles/<str:uf>/', VehicleDetailView.as_view(),
          name='vehicle-details'),
 
+    path('route-sheet-stock/', RouteSheetStockBatchListCreateView.as_view(),
+         name='route-sheets_list_create'),
+    path('route-sheet-stock/<str:uf>/', RouteSheetStockBatchDetailsView.as_view(),
+         name='route-sheets_details'),
 
 ]
 

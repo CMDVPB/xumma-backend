@@ -14,8 +14,8 @@ from abb.serializers import CurrencySerializer
 from abb.utils import get_user_company
 from app.models import CategoryGeneral
 from app.serializers import UserBasicSerializer, UserSerializer
-from att.models import Contact, PaymentTerm, Person, VehicleUnit
-from att.serializers import BodyTypeSerializer, IncotermSerializer, ModeTypeSerializer, StatusTypeSerializer
+from att.models import Contact, PaymentTerm, Person, Vehicle, VehicleUnit
+from att.serializers import BodyTypeSerializer, IncotermSerializer, ModeTypeSerializer, StatusTypeSerializer, VehicleSerializer
 from axx.models import Ctr, Exp, Inv, Load, Tor, Trip
 from ayy.models import CMR
 from dff.serializers.serializers_ctr import CtrSerializer
@@ -40,8 +40,8 @@ class LoadTripListSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
 class TorLoadListSerializer(WritableNestedModelSerializer):
 
     carrier = ContactSerializer(allow_null=True)
-    vehicle_tractor = VehicleUnitSerializer(allow_null=True)
-    vehicle_trailer = VehicleUnitSerializer(allow_null=True)
+    vehicle_tractor = VehicleSerializer(allow_null=True)
+    vehicle_trailer = VehicleSerializer(allow_null=True)
 
     class Meta:
         model = Tor
@@ -115,8 +115,8 @@ class LoadListSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
     currency = CurrencySerializer(allow_null=True)
     status = StatusTypeSerializer(allow_null=True)
     incoterm = IncotermSerializer(allow_null=True)
-    vehicle_tractor = VehicleUnitSerializer(allow_null=True)
-    vehicle_trailer = VehicleUnitSerializer(allow_null=True)
+    vehicle_tractor = VehicleSerializer(allow_null=True)
+    vehicle_trailer = VehicleSerializer(allow_null=True)
 
     carrier = ContactBasicReadSerializer(allow_null=True)
     entry_loads = EntryBasicReadListSerializer(many=True)
@@ -194,11 +194,11 @@ class LoadSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
     driver = SlugRelatedGetOrCreateField(
         allow_null=True, slug_field='uf', queryset=Person.objects.all(), write_only=True)
     vehicle_tractor = SlugRelatedGetOrCreateField(
-        allow_null=True, slug_field='uf', queryset=VehicleUnit.objects.all(), write_only=True)
+        allow_null=True, slug_field='uf', queryset=Vehicle.objects.all(), write_only=True)
     vehicle_trailer = SlugRelatedGetOrCreateField(
-        allow_null=True, slug_field='uf', queryset=VehicleUnit.objects.all(), write_only=True)
+        allow_null=True, slug_field='uf', queryset=Vehicle.objects.all(), write_only=True)
     trip = serializers.SlugRelatedField(
-        allow_null=True, slug_field='uf', queryset=VehicleUnit.objects.none(), write_only=True)
+        allow_null=True, slug_field='uf', queryset=Vehicle.objects.none(), write_only=True)
 
     load_tors = serializers.SlugRelatedField(
         many=True, slug_field='uf', queryset=Tor.objects.all(), write_only=True)
@@ -362,9 +362,9 @@ class LoadSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
             instance.person_carrier).data if instance.person_carrier else None
         response['driver'] = PersonSerializer(
             instance.driver).data if instance.driver else None
-        response['vehicle_tractor'] = VehicleUnitSerializer(
+        response['vehicle_tractor'] = VehicleSerializer(
             instance.vehicle_tractor).data if instance.vehicle_tractor else None
-        response['vehicle_trailer'] = VehicleUnitSerializer(
+        response['vehicle_trailer'] = VehicleSerializer(
             instance.vehicle_trailer).data if instance.vehicle_trailer else None
 
         response['load_tors'] = TorSerializer(

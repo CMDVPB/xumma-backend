@@ -7,8 +7,8 @@ from drf_writable_nested.mixins import UniqueFieldsMixin, NestedCreateMixin, Nes
 from rest_framework import serializers
 
 from abb.utils import get_user_company
-from att.models import VehicleCompany
-from att.serializers import VehicleCompanySerializer
+from att.models import Vehicle
+from att.serializers import VehicleSerializer
 from ayy.models import DamageReport, VehicleDamage
 
 User = get_user_model()
@@ -65,11 +65,11 @@ class DamageReportSerializer(WritableNestedModelSerializer):
             self.fields['driver'].queryset = user_company.user.filter(
                 groups__name='level_driver'
             )
-            self.fields['vehicle'].queryset = VehicleCompany.objects.filter(
+            self.fields['vehicle'].queryset = Vehicle.objects.filter(
                 company=user_company)
 
     vehicle = serializers.SlugRelatedField(
-        allow_null=True, slug_field='uf', queryset=VehicleCompany.objects.none())
+        allow_null=True, slug_field='uf', queryset=Vehicle.objects.none())
     reported_by = serializers.SlugRelatedField(
         allow_null=True, slug_field='uf', queryset=User.objects.none())
     driver = serializers.SlugRelatedField(

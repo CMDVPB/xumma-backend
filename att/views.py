@@ -1,3 +1,5 @@
+from django.utils.timezone import now
+from django.db import transaction
 import math
 from django.conf import settings
 from datetime import datetime
@@ -13,13 +15,14 @@ from rest_framework.views import APIView  # exception_handler
 from rest_framework import permissions, status
 from rest_framework.permissions import IsAuthenticated
 
+from abb.constants import DOCUMENT_STATUS_CHOICES
 from abb.models import BodyType, Incoterm, ModeType, StatusType
 from abb.pagination import LimitResultsSetPagination
 from abb.utils import get_user_company, is_valid_queryparam
 from app.models import CategoryGeneral, TypeGeneral
-from att.models import EmissionClass, VehicleBrand, VehicleCompany
-from att.serializers import BodyTypeSerializer, CategoryGeneralSerializer, EmissionClassSerializer, IncotermSerializer, ModeTypeSerializer, StatusTypeSerializer, TypeGeneralSerializer, \
-    VehicleBrandSerializer, VehicleCompanySerializer
+from att.models import EmissionClass, RouteSheetNumber, RouteSheetStockBatch, VehicleBrand, Vehicle
+from att.serializers import BodyTypeSerializer, CategoryGeneralSerializer, EmissionClassSerializer, IncotermSerializer, ModeTypeSerializer, RouteSheetStockBatchSerializer, StatusTypeSerializer, TypeGeneralSerializer, \
+    VehicleBrandSerializer, VehicleSerializer
 
 
 import logging
@@ -146,19 +149,19 @@ class VehicleBrandListView(ListAPIView):
         return self.list(request, *args, **kwargs)
 
 
-class VehicleCompanyCreateView(CreateAPIView):
-    serializer_class = VehicleCompanySerializer
+class VehicleCreateView(CreateAPIView):
+    serializer_class = VehicleSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         try:
             user = self.request.user
             user_company = get_user_company(user)
-            return VehicleCompany.objects.filter(company__id=user_company.id).distinct()
+            return Vehicle.objects.filter(company__id=user_company.id).distinct()
         except Exception as e:
             logger.error(
                 f'ERRORLOG573 VehicleCompanyCreate. get_queryset. Error: {e}')
-            return VehicleCompany.objects.none()
+            return Vehicle.objects.none()
 
     def perform_create(self, serializer):
         try:
@@ -171,8 +174,8 @@ class VehicleCompanyCreateView(CreateAPIView):
             serializer.save()
 
 
-class VehicleCompanyListView(ListAPIView):
-    serializer_class = VehicleCompanySerializer
+class VehicleListView(ListAPIView):
+    serializer_class = VehicleSerializer
     permission_classes = [IsAuthenticated]
     ordering = ['-date_registered']
 
@@ -180,14 +183,14 @@ class VehicleCompanyListView(ListAPIView):
         try:
             user = self.request.user
             user_company = get_user_company(user)
-            queryset = VehicleCompany.objects.filter(
+            queryset = Vehicle.objects.filter(
                 company__id=user_company.id)
 
             return queryset
         except Exception as e:
             logger.error(
                 f'ERRORLOG735 VehicleCompanyListView. get_queryset. Error: {e}')
-            return VehicleCompany.objects.none()
+            return Vehicle.objects.none()
 
     def filter_queryset(self, queryset: QuerySet, **kwargs):
         # print('4960',)
@@ -206,7 +209,7 @@ class VehicleCompanyListView(ListAPIView):
 
             # print('4968', queryset.count())
 
-            return queryset.distinct()
+            return queryset.distinct().order_by('-created_at')
 
         except Exception as e:
             logger.error(
@@ -214,9 +217,9 @@ class VehicleCompanyListView(ListAPIView):
             return queryset
 
 
-class VehicleCompanyDetailView(RetrieveUpdateDestroyAPIView):
+class VehicleDetailView(RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAuthenticated]
-    serializer_class = VehicleCompanySerializer
+    serializer_class = VehicleSerializer
     lookup_field = 'uf'
 
     def get_queryset(self):
@@ -224,14 +227,14 @@ class VehicleCompanyDetailView(RetrieveUpdateDestroyAPIView):
             print('6800', self.request.user)
             user = self.request.user
             user_company = get_user_company(user)
-            queryset = VehicleCompany.objects.filter(
+            queryset = Vehicle.objects.filter(
                 company__id=user_company.id)
 
             return queryset.distinct()
         except Exception as e:
             logger.error(
                 f'ERRORLOG549 VehicleCompanyDetailView. get_queryset. Error: {e}')
-            return VehicleCompany.objects.none()
+            return Vehicle.objects.none()
 
     # def patch(self, request, *args, **kwargs):
     #     instance = self.get_object()
@@ -248,3 +251,62 @@ class VehicleCompanyDetailView(RetrieveUpdateDestroyAPIView):
     #     except Exception as e:
     #         logger.error(f'EV549 VehicleUnitDetail. put. Error: {e}')
     #         return Response(status=status.HTTP_400_BAD_REQUEST)
+
+
+class RouteSheetStockBatchListCreateView(ListCreateAPIView):
+    serializer_class = RouteSheetStockBatchSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        try:
+            user_company = get_user_company(self.request.user)
+
+            queryset = RouteSheetStockBatch.objects.filter(
+                company__id=user_company.id)
+
+            return queryset.distinct()
+
+        except Exception as e:
+            logger.error(
+                f'ERRORLOG365 RouteSheetStockBatchView. get_queryset. Error: {e}')
+            return RouteSheetStockBatch.objects.none()
+
+
+class RouteSheetStockBatchDetailsView(RetrieveUpdateDestroyAPIView):
+    serializer_class = RouteSheetStockBatchSerializer
+    permission_classes = [IsAuthenticated]
+    lookup_field = 'uf'
+
+    def get_queryset(self):
+        try:
+            user_company = get_user_company(self.request.user)
+
+            queryset = RouteSheetStockBatch.objects.filter(
+                company__id=user_company.id)
+
+            return queryset.distinct()
+
+        except Exception as e:
+            logger.error(
+                f'ERRORLOG367 RouteSheetStockBatchView. get_queryset. Error: {e}')
+            return RouteSheetStockBatch.objects.none()
+
+
+def reserve_trip_number(customer):
+    with transaction.atomic():
+        number = (
+            RouteSheetNumber.objects
+            .select_for_update(skip_locked=True)
+            .filter(customer=customer, status=DOCUMENT_STATUS_CHOICES[0][0])
+            .order_by("number")
+            .first()
+        )
+
+        if not number:
+            raise ValueError("No free trip numbers")
+
+        number.status = DOCUMENT_STATUS_CHOICES[1][0]
+        number.reserved_at = now()
+        number.save(update_fields=["status", "reserved_at"])
+
+        return number

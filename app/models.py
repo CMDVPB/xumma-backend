@@ -240,7 +240,6 @@ class Company(models.Model):
     comment = models.CharField(max_length=500, null=True, blank=True)
 
     is_vat_payer = models.BooleanField(default=False)
-    is_vat_on_receipt = models.BooleanField(default=False)
     e_factura = models.BooleanField(default=False)
 
     objects = CompanyManager()
