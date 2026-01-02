@@ -37,7 +37,8 @@ class PaymentTermAdmin(admin.ModelAdmin):
 
 @admin.register(Person)
 class PersonAdmin(admin.ModelAdmin):
-    list_display = ('id', 'first_name', 'last_name', 'contact', 'site')
+    list_display = ('id', 'first_name', 'last_name',
+                    'contact', 'site', 'is_driver')
 
 
 @admin.register(VehicleBrand)
