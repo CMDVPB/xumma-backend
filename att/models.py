@@ -142,7 +142,8 @@ class Person(ProtectedDeleteMixin, models.Model):
     '''
     Person to be used as contact person or driver at ContactSite
     '''
-    protected_related = ["routesheet_set"]
+    # protected_related = ["routesheet_set"]
+    protected_related = []
 
     uf = models.CharField(max_length=36, default=hex_uuid,
                           db_index=True, unique=True)

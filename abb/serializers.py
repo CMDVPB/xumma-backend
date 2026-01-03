@@ -3,6 +3,7 @@ from drf_writable_nested.serializers import WritableNestedModelSerializer
 from drf_writable_nested.mixins import UniqueFieldsMixin
 
 from abb.models import Country, Currency
+from abb.serializers_drf_writable import CustomUniqueFieldsMixin, CustomWritableNestedModelSerializer
 
 
 class CountrySerializer(UniqueFieldsMixin, WritableNestedModelSerializer):

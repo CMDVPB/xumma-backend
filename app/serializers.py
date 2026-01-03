@@ -137,6 +137,6 @@ class UserSettingsSerializer(serializers.ModelSerializer):
         model = UserSettings
         fields = ('theme', 'notifications_enabled', 'simplified_load', 'uf',
                   'base_doc_lang', 'rows_per_page', 'myitems_all', 'order_by',
-                  'load_columns', 'trip_columns', 'tor_columns', 'ctr_columns', 'quote_columns', 'inv_columns', 'exp_columns',
+                  'load_columns', 'trip_loads_columns', 'trip_columns', 'tor_columns', 'ctr_columns', 'quote_columns', 'inv_columns', 'exp_columns',
                   'default_document_tab',
                   )

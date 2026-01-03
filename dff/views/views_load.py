@@ -22,7 +22,7 @@ from rest_framework.permissions import IsAuthenticated  # used for FBV
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.exceptions import ValidationError
 
-from abb.constants import LOAD_TYPES
+from abb.constants import LOAD_SIZE, LOAD_TYPES
 from abb.pagination import LimitResultsSetPagination
 from abb.permissions import AssignedUserManagerOrReadOnlyIfLocked, AssignedUserOrManagerOrReadOnly
 from abb.utils import get_user_company, is_valid_queryparam
@@ -161,6 +161,8 @@ class LoadListView(ListAPIView):
             else:
                 order_pre_order_all_index = self.request.query_params.get(
                     'buttonIndex', None)
+                type_loading_query = self.request.query_params.get(
+                    'typeLoadingQuery', None)
                 sortByQuery = self.request.query_params.get(
                     'sortByQuery', None)
                 billtoQuery = self.request.query_params.get(
@@ -220,6 +222,16 @@ class LoadListView(ListAPIView):
                         queryset = queryset.filter(trip__isnull=True)
                     elif order_pre_order_all_index == '4':
                         queryset = queryset.filter(load_type=LOAD_TYPES[1][0])
+                    else:
+                        pass
+
+                if is_valid_queryparam(type_loading_query):
+                    if type_loading_query == 'ltl':
+                        queryset = queryset.filter(load_size=LOAD_SIZE[0][0])
+                    elif type_loading_query == 'ftl':
+                        queryset = queryset.filter(load_size=LOAD_SIZE[1][0])
+                    elif type_loading_query == 'xpr':
+                        queryset = queryset.filter(load_type=LOAD_TYPES[2][0])
                     else:
                         pass
 
@@ -424,9 +436,11 @@ class LoadDetailView(RetrieveUpdateDestroyAPIView):
         # Use a different serializer for PATCH & simpleload requests
 
         data = self.request.data
-        load_status_umpdate = data.get('loadStatusUpdate', False)
+        load_status_update = data.get('loadStatusUpdate', False)
 
-        if self.request.method == "PATCH" and load_status_umpdate:
+        # print('5680', data)
+
+        if self.request.method == "PATCH" and load_status_update:
             return LoadPatchSerializer
         return super().get_serializer_class()
 

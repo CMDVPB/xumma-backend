@@ -4,6 +4,7 @@ from django.contrib.auth import get_user_model
 from drf_writable_nested.serializers import WritableNestedModelSerializer
 from drf_writable_nested.mixins import UniqueFieldsMixin, NestedCreateMixin, NestedUpdateMixin
 from rest_framework import serializers
+from rest_framework.serializers import SlugRelatedField
 from django.core.exceptions import ValidationError
 from rest_framework.validators import UniqueTogetherValidator
 
@@ -241,7 +242,7 @@ class ContactSiteListSerializer(WritableNestedModelSerializer):
                   )
 
 
-class ContactSiteSerializer(WritableNestedModelSerializer):
+class ContactSiteSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -257,15 +258,18 @@ class ContactSiteSerializer(WritableNestedModelSerializer):
             self.fields['contact'].queryset = Contact.objects.filter(
                 company=user_company)
 
-    country_code_site = serializers.SlugRelatedField(
-        allow_null=True, slug_field='uf', queryset=Country.objects.all(), required=False)
     contact = serializers.SlugRelatedField(
         allow_null=True, slug_field='uf', queryset=Contact.objects.none(), write_only=True)
 
+    country_code_site = SlugRelatedField(
+        allow_null=True, slug_field='uf', queryset=Country.objects.all(), write_only=True)
     site_persons = PersonSerializer(many=True)
 
     def to_representation(self, instance):
         response = super().to_representation(instance)
+
+        response['country_code_site'] = CountrySerializer(
+            instance.country_code_site).data if instance.country_code_site else None
 
         response['contact'] = ContactBasicReadSerializer(
             instance.contact).data if instance.contact else None

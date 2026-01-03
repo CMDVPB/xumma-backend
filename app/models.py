@@ -152,19 +152,21 @@ class UserSettings(models.Model):
         max_length=20, null=True, blank=True), default=get_order_by_default, size=7)
 
     load_columns = ArrayField(models.CharField(
-        max_length=20, null=True, blank=True), null=True, blank=True, size=25, validators=[validate_columns_arrayfield_length_min_5])
+        max_length=20, null=True, blank=True), null=True, blank=True, size=30, validators=[validate_columns_arrayfield_length_min_5])
+    trip_loads_columns = ArrayField(models.CharField(
+        max_length=20, null=True, blank=True), null=True, blank=True, size=30, validators=[validate_columns_arrayfield_length_min_5])
     trip_columns = ArrayField(models.CharField(
-        max_length=20, null=True, blank=True), null=True, blank=True, size=25, validators=[validate_columns_arrayfield_length_min_5])
+        max_length=20, null=True, blank=True), null=True, blank=True, size=30, validators=[validate_columns_arrayfield_length_min_5])
     tor_columns = ArrayField(models.CharField(
-        max_length=20, null=True, blank=True), null=True, blank=True, size=25, validators=[validate_columns_arrayfield_length_min_5])
+        max_length=20, null=True, blank=True), null=True, blank=True, size=30, validators=[validate_columns_arrayfield_length_min_5])
     ctr_columns = ArrayField(models.CharField(
-        max_length=20, null=True, blank=True), null=True, blank=True, size=25, validators=[validate_columns_arrayfield_length_min_5])
+        max_length=20, null=True, blank=True), null=True, blank=True, size=30, validators=[validate_columns_arrayfield_length_min_5])
     quote_columns = ArrayField(models.CharField(
-        max_length=20, null=True, blank=True), null=True, blank=True, size=25, validators=[validate_columns_arrayfield_length_min_5])
+        max_length=20, null=True, blank=True), null=True, blank=True, size=30, validators=[validate_columns_arrayfield_length_min_5])
     inv_columns = ArrayField(models.CharField(
-        max_length=20, null=True, blank=True), null=True, blank=True, size=25, validators=[validate_columns_arrayfield_length_min_5])
+        max_length=20, null=True, blank=True), null=True, blank=True, size=30, validators=[validate_columns_arrayfield_length_min_5])
     exp_columns = ArrayField(models.CharField(
-        max_length=20, null=True, blank=True), null=True, blank=True, size=25, validators=[validate_columns_arrayfield_length_min_5])
+        max_length=20, null=True, blank=True), null=True, blank=True, size=30, validators=[validate_columns_arrayfield_length_min_5])
 
     class Meta:
         verbose_name = "User Settings"
@@ -503,6 +505,8 @@ class CategoryGeneral(models.Model):
     code = models.CharField(unique=True)
     label = models.CharField(max_length=100)
 
+    is_system = models.BooleanField(default=False)
+
     class Meta:
         verbose_name = "Category General"
         verbose_name_plural = "Categories General"
@@ -522,6 +526,8 @@ class TypeGeneral(models.Model):
     serial_number = models.SmallIntegerField(unique=True)
     code = models.CharField(unique=True)
     label = models.CharField(max_length=100)
+
+    is_system = models.BooleanField(default=False)
 
     class Meta:
         verbose_name = "Type General"

@@ -16,14 +16,16 @@ class TypeGeneralSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = TypeGeneral
-        fields = ('serial_number', 'code', 'label', 'uf')
+        fields = ('serial_number', 'code', 'label', 'is_system', 'uf')
+        read_only_fields = ['is_system']
 
 
 class CategoryGeneralSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CategoryGeneral
-        fields = ('serial_number', 'code', 'label', 'uf')
+        fields = ('serial_number', 'code', 'label', 'is_system', 'uf')
+        read_only_fields = ['is_system']
 
 
 class IncotermSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):

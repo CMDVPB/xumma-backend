@@ -16,7 +16,8 @@ from dff.serializers.serializers_other import ContactBasicReadSerializer, Contac
 class ColliTypeSerializer(WritableNestedModelSerializer):
     class Meta:
         model = ColliType
-        fields = ('serial_number', 'code', 'label', 'ldm', 'is_system', 'uf')
+        fields = ('serial_number', 'code', 'label',
+                  'ldm', 'description', 'is_system', 'uf')
 
 
 class DetailSerializer(WritableNestedModelSerializer):

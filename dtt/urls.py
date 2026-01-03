@@ -3,7 +3,7 @@ from rest_framework.urlpatterns import format_suffix_patterns
 
 from dtt.views import AuthorizationStockBatchDetailsView, AuthorizationStockBatchListCreateView, BankAccountDetailView, BankAccountListCreateView, \
     CMRStockBatchDetailsView, CMRStockBatchListCreateView, CTIRStockBatchDetailsView, CTIRStockBatchListCreateView, ColliTypeListView, ContactSiteCreateView, ContactSiteDetailView, \
-    ContactSiteListView, ItemForItemCostDetailView, ItemForItemCostListCreateView, ItemForItemInvDetailView, ItemForItemInvListCreateView, NoteDetailView, NoteListCreateView, PaymentTermListCreateView, PaymentTermsDetailView, TermDetailView, TermListCreateView, UserSettingsView, \
+    ContactSiteListView, ItemForItemCostDetailView, ItemForItemCostListCreateView, ItemForItemInvDetailView, ItemForItemInvListCreateView, NoteDetailView, NoteListCreateView, PaymentTermListCreateView, PaymentTermsDetailView, PersonDetailView, TermDetailView, TermListCreateView, UserSettingsView, \
     get_post_delete_user_smtp_settings, test_smtp_connection_view, validate_or_generate_cmr
 
 urlpatterns = [
@@ -35,6 +35,8 @@ urlpatterns = [
          name='payment_terms'),
     path('terms-of-payment/<str:uf>/',
          PaymentTermsDetailView.as_view(), name='payment_term_detail'),
+
+    path('persons/<str:uf>/', PersonDetailView.as_view(), name='person_detail'),
 
     path('smtp-test/', test_smtp_connection_view, name='smtp_test'),
     path('smtp-settings/', get_post_delete_user_smtp_settings, name='smtp_settings'),

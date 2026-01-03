@@ -36,7 +36,14 @@ class TypeGeneralListView(ListAPIView):
         try:
             user = self.request.user
             user_company = get_user_company(user)
-            return TypeGeneral.objects.filter(company__id=user_company.id).order_by('serial_number').distinct()
+            return (TypeGeneral.objects
+                    .filter(
+                        Q(is_system=True) |
+                        Q(company_id=user_company.id)
+                    )
+                    .order_by('serial_number')
+                    .distinct())
+
         except Exception as e:
             logger.error(
                 f'ERRORLOG509 TypeGeneralListView. get_queryset. Error: {e}')
@@ -54,7 +61,14 @@ class CategoryGeneralListView(ListAPIView):
         try:
             user = self.request.user
             user_company = get_user_company(user)
-            return CategoryGeneral.objects.filter(company__id=user_company.id).order_by('serial_number').distinct()
+            return (CategoryGeneral.objects
+                    .filter(
+                        Q(is_system=True) |
+                        Q(company_id=user_company.id)
+                    )
+                    .order_by('serial_number')
+                    .distinct())
+
         except Exception as e:
             logger.error(
                 f'ERRORLOG507 CategoryGeneralListView. get_queryset. Error: {e}')

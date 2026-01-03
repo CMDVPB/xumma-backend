@@ -81,8 +81,9 @@ class ItemForItemInvSerializer(CustomWritableNestedModelSerializer):
     class Meta:
         model = ItemForItemInv
         lookup_field = 'uf'
-        fields = ('description', 'code', 'um', 'vat', 'company', 'archived',
+        fields = ('description', 'code', 'um', 'vat', 'company', 'is_archived', 'is_system',
                   'vat_type', 'exemption_reason', 'is_sale', 'uf')
+        read_only_fields = ['is_system']
 
 
 class ItemForItemCostSerializer(CustomWritableNestedModelSerializer):
@@ -114,7 +115,9 @@ class ItemForItemCostSerializer(CustomWritableNestedModelSerializer):
     class Meta:
         model = ItemForItemCost
         lookup_field = 'uf'
-        fields = ('description', 'code', 'vat', 'is_fuel', 'company', 'uf')
+        fields = ('description', 'code', 'vat',
+                  'is_fuel', 'is_system', 'company', 'uf')
+        read_only_fields = ['is_system']
 
 
 class ItemInvSerializer(WritableNestedModelSerializer):

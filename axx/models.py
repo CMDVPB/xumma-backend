@@ -212,7 +212,6 @@ class Load(models.Model):
     date_order = models.DateTimeField(blank=True, null=True)
     date_due = models.DateTimeField(blank=True, null=True)
 
-    date_published = models.DateTimeField(blank=True, null=True)
     load_size = models.CharField(
         choices=LOAD_SIZE, max_length=20, null=True, blank=True)
     customer_ref = models.CharField(max_length=100,  blank=True, null=True)
@@ -249,10 +248,15 @@ class Load(models.Model):
     unload_address = models.CharField(max_length=100, blank=True, null=True)
     load_detail = models.CharField(max_length=300, blank=True, null=True)
 
+    is_active = models.BooleanField(default=False)
     is_loaded = models.BooleanField(default=False)
     is_cleared = models.BooleanField(default=False)
     is_unloaded = models.BooleanField(default=False)
     is_invoiced = models.BooleanField(default=False)
+
+    date_loaded = models.DateTimeField(blank=True, null=True)
+    date_cleared = models.DateTimeField(blank=True, null=True)
+    date_unloaded = models.DateTimeField(blank=True, null=True)
 
     category = models.ForeignKey(CategoryGeneral, on_delete=models.SET_NULL,
                                  null=True, blank=True, related_name='category_loads')

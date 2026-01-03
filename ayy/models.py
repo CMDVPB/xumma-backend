@@ -30,6 +30,7 @@ class ColliType(models.Model):
     code = models.CharField(max_length=10, blank=True)
     label = models.CharField(max_length=20, blank=True)
 
+    description = models.CharField(max_length=12, blank=True)
     ldm = models.DecimalField(
         max_digits=6, decimal_places=2, null=True, blank=True)
 
@@ -390,7 +391,9 @@ class ItemForItemInv(models.Model):
         choices=VAT_EXEMPTION_REASON, max_length=20, null=True, blank=True)
 
     is_sale = models.BooleanField(default=True)
-    archived = models.BooleanField(default=False)
+    is_archived = models.BooleanField(default=False)
+
+    is_system = models.BooleanField(default=False)
 
     class Meta:
         verbose_name = "Item for iteminv"
@@ -416,7 +419,10 @@ class ItemForItemCost(models.Model):
     description = models.CharField(max_length=150)
     code = models.CharField(max_length=30, null=True, blank=True)
     vat = models.PositiveIntegerField(null=True, blank=True)
+
     is_fuel = models.BooleanField(default=False)
+
+    is_system = models.BooleanField(default=False)
 
     class Meta:
         verbose_name = "Item for itemcost"

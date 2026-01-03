@@ -13,7 +13,8 @@ class CMRStockBatchAdmin(admin.ModelAdmin):
 
 @admin.register(ColliType)
 class ColliTypeAdmin(admin.ModelAdmin):
-    list_display = ('id', 'company', 'code', 'label', 'ldm', 'is_system')
+    list_display = ('id', 'company', 'code', 'label',
+                    'ldm', 'description', 'is_system')
 
 
 @admin.register(AuthorizationStockBatch)

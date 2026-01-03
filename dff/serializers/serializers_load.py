@@ -1,7 +1,9 @@
 
 
+from django.utils import timezone
 from collections import defaultdict
 from django.db import transaction
+from django.db.models import Q
 from django.contrib.auth import get_user_model
 from drf_writable_nested.serializers import WritableNestedModelSerializer
 from drf_writable_nested.mixins import UniqueFieldsMixin, NestedCreateMixin, NestedUpdateMixin
@@ -125,19 +127,22 @@ class LoadListSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
     load_tors = TorLoadListSerializer(many=True)
 
     def to_representation(self, instance):
+        from dff.serializers.serializers_trip import TripTruckSerializer
+
         response = super().to_representation(instance)
 
         # print('3748', instance)
 
-        response['trip'] = instance.trip.uf if instance.trip else None
-        response['trip_num'] = instance.trip.rn if instance.trip else None
+        response['trip'] = TripTruckSerializer(
+            instance.trip).data if instance.trip else None
 
         return response
 
     class Meta:
         model = Load
         fields = ('sn', 'date_order', 'customer_ref', 'customer_notes', 'load_detail', 'load_size', 'load_type', 'load_add_ons', 'uf',
-                  'date_due', 'is_loaded', 'is_cleared', 'is_unloaded', 'is_invoiced',
+                  'date_due',
+                  'is_active', 'is_loaded', 'is_cleared', 'is_unloaded', 'is_invoiced', 'date_loaded', 'date_cleared', 'date_unloaded',
                   'load_address', 'unload_address', 'hb', 'mb', 'booking_number', 'comment1',
                   'assigned_user', 'bill_to', 'mode', 'bt', 'currency', 'status', 'incoterm', 'carrier', 'vehicle_tractor', 'vehicle_trailer',
                   'load_comments', 'load_tors', 'entry_loads', 'load_iteminvs',
@@ -161,7 +166,9 @@ class LoadSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
             self.fields['trip'].queryset = Trip.objects.filter(
                 company=user_company)
             self.fields['category'].queryset = CategoryGeneral.objects.filter(
-                company=user_company)
+                Q(is_system=True) |
+                Q(company_id=user_company.id)
+            )
             self.fields['payment_term'].queryset = PaymentTerm.objects.filter(
                 company=user_company)
 
@@ -447,7 +454,7 @@ class LoadSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
         fields = ('assigned_user', 'sn', 'date_order', 'customer_ref', 'customer_notes', 'is_locked', 'uf',
                   'load_detail', 'load_size', 'load_type', 'load_add_ons', 'ins_details', 'dgg_details', 'tmc_details',
                   'date_due', 'doc_lang', 'load_address', 'unload_address',
-                  'is_loaded', 'is_cleared', 'is_unloaded', 'is_invoiced',
+                  'is_active', 'is_loaded', 'is_cleared', 'is_unloaded', 'is_invoiced', 'date_loaded', 'date_cleared', 'date_unloaded',
                   'hb', 'mb', 'booking_number', 'comment1',
                   'category', 'bill_to', 'person', 'currency', 'mode', 'bt', 'status', 'incoterm', 'cmr',
                   'load_comments', 'payment_term', 'entry_loads', 'load_iteminvs', 'load_tors', 'load_ctrs', 'load_imageuploads', 'load_invs',
@@ -457,8 +464,30 @@ class LoadSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
 
 
 class LoadPatchSerializer(WritableNestedModelSerializer):
+    AUTO_DATE_FIELDS = {
+        'is_loaded': 'date_loaded',
+        'is_cleared': 'date_cleared',
+        'is_unloaded': 'date_unloaded',
+    }
+
     def update(self, instance, validated_data):
         print('6464', validated_data)
+
+        # ✅ business rule
+        now = timezone.now()
+
+        for flag_field, date_field in self.AUTO_DATE_FIELDS.items():
+            if (
+                validated_data.get(flag_field) is True
+                and date_field not in validated_data
+                and getattr(instance, date_field) is None
+            ):
+                validated_data[date_field] = now
+            elif (
+                validated_data.get(flag_field) is False
+                and date_field not in validated_data
+            ):
+                validated_data[date_field] = None
 
         relations, reverse_relations = self._extract_relations(validated_data)
 
@@ -483,7 +512,8 @@ class LoadPatchSerializer(WritableNestedModelSerializer):
     class Meta:
         model = Load
         # Only include the fields to allow patching
-        fields = ['is_loaded', "is_cleared", "is_unloaded", "is_invoiced"]
+        fields = ['is_active', 'is_loaded', 'is_cleared', 'is_unloaded', 'is_invoiced',
+                  'date_loaded', 'date_cleared', 'date_unloaded']
 
         # Should never be updated
         read_only_fields = ["id", "company", "assigned_user", "uf"]
@@ -525,8 +555,8 @@ class LoadListForTripSerializer(UniqueFieldsMixin, WritableNestedModelSerializer
 
     class Meta:
         model = Load
-        fields = ('sn', 'date_order', 'customer_ref', 'customer_notes', 'load_detail', 'load_size', 'load_add_ons', 'uf',
-                  'is_loaded', 'is_cleared', 'is_unloaded', 'is_invoiced',
+        fields = ('sn', 'customer_ref', 'customer_notes', 'load_detail', 'load_size', 'load_add_ons', 'uf',
+                  'date_loaded', 'date_cleared', 'date_unloaded', 'is_loaded', 'is_cleared', 'is_unloaded', 'is_invoiced',
                   'load_address', 'unload_address', 'hb', 'mb', 'booking_number', 'comment1',
                   'bill_to', 'mode', 'bt', 'currency', 'status',
                   'load_comments', 'entry_loads', 'load_iteminvs',

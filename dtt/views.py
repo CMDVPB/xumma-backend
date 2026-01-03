@@ -19,7 +19,7 @@ from rest_framework.permissions import IsAuthenticated
 from abb.utils import assign_new_num, get_user_company
 from app.models import SMTPSettings, UserSettings
 from app.serializers import UserSettingsSerializer
-from att.models import BankAccount, ContactSite, Note, PaymentTerm, Term
+from att.models import BankAccount, ContactSite, Note, PaymentTerm, Person, Term
 from axx.models import Load
 from ayy.models import CMR, AuthorizationStockBatch, CMRStockBatch, CTIRStockBatch, ColliType, ItemForItemCost, ItemForItemInv
 from ayy.serializers import ItemForItemCostSerializer
@@ -27,7 +27,7 @@ from dff.serializers.serializers_bce import BankAccountSerializer, NoteSerialize
 from dff.serializers.serializers_document import AuthorizationStockBatchSerializer, CMRStockBatchSerializer, CTIRStockBatchSerializer
 from dff.serializers.serializers_entry_detail import ColliTypeSerializer
 from dff.serializers.serializers_item_inv import ItemForItemInvSerializer
-from dff.serializers.serializers_other import ContactSiteListSerializer, ContactSiteSerializer, PaymentTermSerializer, TermSerializer
+from dff.serializers.serializers_other import ContactSiteListSerializer, ContactSiteSerializer, PaymentTermSerializer, PersonSerializer, TermSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -592,10 +592,11 @@ class ColliTypeListView(ListCreateAPIView):
             return (
                 ColliType.objects
                 .filter(
-                    Q(company_id=user_company.id) | Q(is_system=True)
+                    Q(company_id=user_company.id) |
+                    Q(is_system=True)
                 )
+                .order_by('serial_number')
                 .distinct()
-                .order_by('-serial_number')
             )
 
         except Exception:
@@ -606,7 +607,47 @@ class ColliTypeListView(ListCreateAPIView):
         serializer.save(company=user_company)
 
 
+class PersonDetailView(RetrieveUpdateDestroyAPIView):
+    serializer_class = PersonSerializer
+    lookup_field = 'uf'
+
+    def get_queryset(self):
+        try:
+            user = self.request.user
+            user_company = get_user_company(user)
+
+            qs = (Person.objects
+                        .select_related(
+                            'contact',
+                            'contact__company',
+                            'site',
+                            'site__company',
+                        )
+                  .filter(
+                            Q(contact__company__id=user_company.id) |
+                            Q(site__company__id=user_company.id)
+                        )
+                  )
+
+            return qs
+        except Exception as e:
+            logger.error(
+                f'ERRORLOG3373 PersonDetail. get_queryset. Error: {e}')
+            return Person.objects.none()
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        try:
+            instance.delete()
+        except Exception as e:
+            logger.error(f'ERRORLOG3393 PersonDetail. destroy. Error: {e}')
+            raise ValidationError(
+                detail="entry_not_deleted_used_in_related_documents")
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
 ### Start SMTP Settings ###
+
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def test_smtp_connection_view(request):

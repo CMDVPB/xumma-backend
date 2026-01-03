@@ -101,6 +101,8 @@ class TripListView(ListAPIView):
             else:
                 own_external_all_index = self.request.query_params.get(
                     'buttonIndex', None)
+                opened_closed_all = self.request.query_params.get(
+                    'buttonIndexSecond', None)
                 sortByQuery = self.request.query_params.get(
                     'sortByQuery', None)
                 billtoQuery = self.request.query_params.get(
@@ -135,13 +137,21 @@ class TripListView(ListAPIView):
                 endDate = self.request.query_params.get(
                     'endDate', None)
 
-                print('3040', own_external_all_index)
+                print('3040', opened_closed_all)
 
                 if is_valid_queryparam(own_external_all_index):
                     if own_external_all_index == '0':
                         queryset = queryset.filter(trip_type=LOAD_TYPES[0][0])
                     elif own_external_all_index == '1':
                         queryset = queryset.filter(trip_type=LOAD_TYPES[1][0])
+                    else:
+                        pass
+
+                if is_valid_queryparam(opened_closed_all):
+                    if opened_closed_all == '4':
+                        queryset = queryset.filter(status__serial_number=1000)
+                    elif opened_closed_all == '5':
+                        queryset = queryset.filter(status__serial_number=1010)
                     else:
                         pass
 
