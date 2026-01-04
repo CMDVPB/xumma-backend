@@ -214,16 +214,23 @@ class LoadListView(ListAPIView):
                     'startDate', None)
                 endDate = self.request.query_params.get(
                     'endDate', None)
+                is_cleared_query = self.request.query_params.get(
+                    'isClearedQuery', None)
 
                 if is_valid_queryparam(order_pre_order_all_index):
-                    if order_pre_order_all_index == '0':
-                        queryset = queryset.filter(trip__isnull=False)
-                    elif order_pre_order_all_index == '1':
-                        queryset = queryset.filter(trip__isnull=True)
-                    elif order_pre_order_all_index == '4':
-                        queryset = queryset.filter(load_type=LOAD_TYPES[1][0])
-                    else:
-                        pass
+                    if is_cleared_query != '1':
+                        if order_pre_order_all_index == '0':
+                            queryset = queryset.filter(trip__isnull=False)
+                        elif order_pre_order_all_index == '1':
+                            queryset = queryset.filter(trip__isnull=True)
+                        elif order_pre_order_all_index == '4':
+                            queryset = queryset.filter(
+                                load_type=LOAD_TYPES[1][0])
+                        else:
+                            pass
+                    elif is_cleared_query == '1':
+                        if order_pre_order_all_index == '1':
+                            queryset = queryset.filter(is_paid=True)
 
                 if is_valid_queryparam(type_loading_query):
                     if type_loading_query == 'ltl':
@@ -231,7 +238,7 @@ class LoadListView(ListAPIView):
                     elif type_loading_query == 'ftl':
                         queryset = queryset.filter(load_size=LOAD_SIZE[1][0])
                     elif type_loading_query == 'xpr':
-                        queryset = queryset.filter(load_type=LOAD_TYPES[2][0])
+                        queryset = queryset.filter(load_type=LOAD_SIZE[2][0])
                     else:
                         pass
 
@@ -348,6 +355,10 @@ class LoadListView(ListAPIView):
 
                         queryset = queryset.filter(
                             date_order__lt=dte + timedelta(days=1))
+
+                if is_valid_queryparam(is_cleared_query):
+                    if is_cleared_query == '1':
+                        queryset = queryset.filter(is_cleared=True)
 
                 # print('2260', queryset.count())
 
@@ -600,8 +611,6 @@ class LoadListForTripView(ListAPIView):
                 'bill_to__country_code_post',
                 'mode',
                 'bt',
-                'currency',
-                'status',
             )
 
             entries_qs = (Entry.objects

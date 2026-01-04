@@ -177,11 +177,15 @@ class EmissionClass(models.Model):
     """
     uf = models.CharField(max_length=36, default=hex_uuid, db_index=True)
     company = models.ForeignKey(
-        Company, on_delete=models.CASCADE, related_name='company_emission_classes')
+        Company, on_delete=models.CASCADE, null=True, blank=True, related_name='company_emission_classes')
+
+    serial_number = models.SmallIntegerField(
+        null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     code = models.CharField(max_length=20, unique=True)
     label = models.CharField(max_length=50)
+
     description = models.TextField(blank=True, null=True)
 
     is_active = models.BooleanField(default=True)
@@ -191,7 +195,8 @@ class EmissionClass(models.Model):
     class Meta:
         verbose_name = "Emission Class"
         verbose_name_plural = "Emission Classes"
-        ordering = ["code"]
+        ordering = ["-serial_number"]
+        unique_together = ("serial_number", "company")
 
     def __str__(self):
         return f'{self.code} - {self.label}'
@@ -277,7 +282,7 @@ class Vehicle(ProtectedDeleteMixin, models.Model):
     has_l_paket = models.BooleanField(default=False)
 
     is_rented = models.BooleanField(default=False)
-    is_service_vehicle = models.BooleanField(default=False)
+    is_service = models.BooleanField(default=False)
     is_available = models.BooleanField(default=True)
     is_archived = models.BooleanField(default=False)
 

@@ -142,7 +142,8 @@ class LoadListSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
         model = Load
         fields = ('sn', 'date_order', 'customer_ref', 'customer_notes', 'load_detail', 'load_size', 'load_type', 'load_add_ons', 'uf',
                   'date_due',
-                  'is_active', 'is_loaded', 'is_cleared', 'is_unloaded', 'is_invoiced', 'date_loaded', 'date_cleared', 'date_unloaded',
+                  'is_active', 'is_loaded', 'is_cleared', 'is_unloaded', 'is_invoiced', 'is_signed', 'is_paid',
+                  'date_loaded', 'date_cleared', 'date_unloaded', 'date_invoiced', 'date_signed',
                   'load_address', 'unload_address', 'hb', 'mb', 'booking_number', 'comment1',
                   'assigned_user', 'bill_to', 'mode', 'bt', 'currency', 'status', 'incoterm', 'carrier', 'vehicle_tractor', 'vehicle_trailer',
                   'load_comments', 'load_tors', 'entry_loads', 'load_iteminvs',
@@ -454,7 +455,8 @@ class LoadSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
         fields = ('assigned_user', 'sn', 'date_order', 'customer_ref', 'customer_notes', 'is_locked', 'uf',
                   'load_detail', 'load_size', 'load_type', 'load_add_ons', 'ins_details', 'dgg_details', 'tmc_details',
                   'date_due', 'doc_lang', 'load_address', 'unload_address',
-                  'is_active', 'is_loaded', 'is_cleared', 'is_unloaded', 'is_invoiced', 'date_loaded', 'date_cleared', 'date_unloaded',
+                  'is_active', 'is_loaded', 'is_cleared', 'is_unloaded', 'is_invoiced',
+                  'date_loaded', 'date_cleared', 'date_unloaded', 'date_invoiced',
                   'hb', 'mb', 'booking_number', 'comment1',
                   'category', 'bill_to', 'person', 'currency', 'mode', 'bt', 'status', 'incoterm', 'cmr',
                   'load_comments', 'payment_term', 'entry_loads', 'load_iteminvs', 'load_tors', 'load_ctrs', 'load_imageuploads', 'load_invs',
@@ -468,7 +470,34 @@ class LoadPatchSerializer(WritableNestedModelSerializer):
         'is_loaded': 'date_loaded',
         'is_cleared': 'date_cleared',
         'is_unloaded': 'date_unloaded',
+        'is_signed': 'date_signed',
+
+
     }
+
+    def validate(self, attrs):
+        instance = self.instance
+
+        # Merge instance + incoming PATCH data
+        date_loaded = attrs.get(
+            'date_loaded', instance.date_loaded if instance else None)
+        date_cleared = attrs.get(
+            'date_cleared', instance.date_cleared if instance else None)
+        date_unloaded = attrs.get(
+            'date_unloaded', instance.date_unloaded if instance else None)
+
+        # 🔒 Business rules
+        if date_loaded and date_cleared and date_cleared < date_loaded:
+            raise serializers.ValidationError({
+                'date_cleared': 'date_cleared cannot be before date_loaded.'
+            })
+
+        if date_cleared and date_unloaded and date_unloaded < date_cleared:
+            raise serializers.ValidationError({
+                'date_unloaded': 'date_unloaded cannot be before date_cleared.'
+            })
+
+        return attrs
 
     def update(self, instance, validated_data):
         print('6464', validated_data)
@@ -512,8 +541,8 @@ class LoadPatchSerializer(WritableNestedModelSerializer):
     class Meta:
         model = Load
         # Only include the fields to allow patching
-        fields = ['is_active', 'is_loaded', 'is_cleared', 'is_unloaded', 'is_invoiced',
-                  'date_loaded', 'date_cleared', 'date_unloaded']
+        fields = ['is_active', 'is_loaded', 'is_cleared', 'is_unloaded', 'is_invoiced', 'is_signed', 'is_paid',
+                  'date_loaded', 'date_cleared', 'date_unloaded', 'date_invoiced', 'date_signed']
 
         # Should never be updated
         read_only_fields = ["id", "company", "assigned_user", "uf"]
@@ -542,12 +571,11 @@ class LoadBasicSerializer(WritableNestedModelSerializer):
 class LoadListForTripSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
     ''' Get only the loads for a particular 1 trip '''
 
-    # assigned_user = UserBasicSerializer(allow_null=True)
     bill_to = ContactBasicReadSerializer(allow_null=True)
     mode = ModeTypeSerializer(allow_null=True)
     bt = BodyTypeSerializer(allow_null=True)
-    currency = CurrencySerializer(allow_null=True)
-    status = StatusTypeSerializer(allow_null=True)
+    # currency = CurrencySerializer(allow_null=True)
+    # status = StatusTypeSerializer(allow_null=True)
 
     entry_loads = EntryBasicReadListSerializer(many=True)
     load_iteminvs = ItemInvSerializer(many=True)
@@ -556,8 +584,9 @@ class LoadListForTripSerializer(UniqueFieldsMixin, WritableNestedModelSerializer
     class Meta:
         model = Load
         fields = ('sn', 'customer_ref', 'customer_notes', 'load_detail', 'load_size', 'load_add_ons', 'uf',
-                  'date_loaded', 'date_cleared', 'date_unloaded', 'is_loaded', 'is_cleared', 'is_unloaded', 'is_invoiced',
+                  'is_loaded', 'is_cleared', 'is_unloaded', 'is_invoiced',
+                  'date_loaded', 'date_cleared', 'date_unloaded', 'date_invoiced',
                   'load_address', 'unload_address', 'hb', 'mb', 'booking_number', 'comment1',
-                  'bill_to', 'mode', 'bt', 'currency', 'status',
+                  'bill_to', 'mode', 'bt',
                   'load_comments', 'entry_loads', 'load_iteminvs',
                   )

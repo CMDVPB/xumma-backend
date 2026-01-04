@@ -463,6 +463,7 @@ def get_trips_trucks_view(request):
 
         own = LOAD_TYPES[0][0]
         external = LOAD_TYPES[1][0]
+        local = LOAD_TYPES[2][0]
 
         if trip_type == own:
             queryset = queryset.filter(
@@ -470,6 +471,8 @@ def get_trips_trucks_view(request):
             )
         elif trip_type == external:
             queryset = queryset.filter(trip_type=external)
+        elif trip_type == local:
+            queryset = queryset.filter(trip_type=local)
 
         # print('5678', queryset.values())
 

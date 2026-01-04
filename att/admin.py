@@ -26,7 +26,8 @@ class ContactSiteAdmin(admin.ModelAdmin):
 
 @admin.register(EmissionClass)
 class EmissionClassAdmin(admin.ModelAdmin):
-    list_display = ('id', 'company', 'code', 'label', 'description')
+    list_display = ('id', 'company',  'serial_number', 'code',
+                    'label', 'description', 'is_system')
 
 
 @admin.register(PaymentTerm)

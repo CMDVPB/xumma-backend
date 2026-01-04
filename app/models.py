@@ -153,6 +153,8 @@ class UserSettings(models.Model):
 
     load_columns = ArrayField(models.CharField(
         max_length=20, null=True, blank=True), null=True, blank=True, size=30, validators=[validate_columns_arrayfield_length_min_5])
+    load_due_columns = ArrayField(models.CharField(
+        max_length=20, null=True, blank=True), null=True, blank=True, size=30, validators=[validate_columns_arrayfield_length_min_5])
     trip_loads_columns = ArrayField(models.CharField(
         max_length=20, null=True, blank=True), null=True, blank=True, size=30, validators=[validate_columns_arrayfield_length_min_5])
     trip_columns = ArrayField(models.CharField(

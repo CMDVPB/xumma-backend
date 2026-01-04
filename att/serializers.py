@@ -55,7 +55,7 @@ class EmissionClassSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
 
     class Meta:
         model = EmissionClass
-        fields = ('code', 'label', 'description',
+        fields = ('code', 'label', 'description', 'serial_number',
                   'is_active', 'is_system', 'uf')
 
 
@@ -182,7 +182,7 @@ class VehicleSerializer(WritableNestedModelSerializer):
 
     class Meta:
         model = Vehicle
-        fields = ('id', 'reg_number', 'vin', 'vehicle_type', 'date_registered', 'is_available', 'is_archived', 'uf',
+        fields = ('id', 'reg_number', 'vin', 'vehicle_type', 'date_registered', 'is_available', 'is_archived', 'is_service', 'uf',
                   'length', 'width', 'height', 'weight_capacity', 'volume_capacity',
                   'tank_volume', 'change_oil_interval', 'consumption_summer', 'consumption_winter', 'buy_price', 'sell_price', 'km_initial',
                   'interval_taho', 'last_date_unload_taho', 'comment',

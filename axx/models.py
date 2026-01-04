@@ -253,10 +253,14 @@ class Load(models.Model):
     is_cleared = models.BooleanField(default=False)
     is_unloaded = models.BooleanField(default=False)
     is_invoiced = models.BooleanField(default=False)
+    is_signed = models.BooleanField(default=False)
+    is_paid = models.BooleanField(default=False)
 
     date_loaded = models.DateTimeField(blank=True, null=True)
     date_cleared = models.DateTimeField(blank=True, null=True)
     date_unloaded = models.DateTimeField(blank=True, null=True)
+    date_invoiced = models.DateTimeField(blank=True, null=True)
+    date_signed = models.DateTimeField(blank=True, null=True)
 
     category = models.ForeignKey(CategoryGeneral, on_delete=models.SET_NULL,
                                  null=True, blank=True, related_name='category_loads')

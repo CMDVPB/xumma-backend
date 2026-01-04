@@ -124,8 +124,12 @@ class EmissionClassListView(ListAPIView):
 
         try:
             user_company = get_user_company(self.request.user)
-            queryset = EmissionClass.objects.filter(
-                company__id=user_company.id)
+            queryset = (EmissionClass.objects
+                        .filter(
+                            Q(is_system=True) |
+                            Q(company_id=user_company.id)
+                        )
+                        .order_by('serial_number'))
 
             return queryset.distinct()
 
@@ -206,29 +210,34 @@ class VehicleListView(ListAPIView):
                 f'ERRORLOG735 VehicleCompanyListView. get_queryset. Error: {e}')
             return Vehicle.objects.none()
 
-    def filter_queryset(self, queryset: QuerySet, **kwargs):
+    def filter_queryset(self, qs: QuerySet, **kwargs):
         # print('4960',)
 
-        queryset = super().filter_queryset(queryset=queryset, **kwargs)
+        qs = super().filter_queryset(queryset=qs, **kwargs)
 
         try:
-            vehicle_type = self.request.query_params.get('vehicleType', None)
+            vehicle_type = self.request.query_params.get('vehicleType')
+            is_service = self.request.query_params.get('isService')
 
             if is_valid_queryparam(vehicle_type):
                 if vehicle_type == 'tractor':
-                    queryset = queryset.filter(Q(vehicle_type='tractor') |
-                                               Q(vehicle_type='truck'))
+                    qs = qs.filter(Q(vehicle_type='tractor') |
+                                   Q(vehicle_type='truck'))
                 elif vehicle_type == 'trailer':
-                    queryset = queryset.filter(vehicle_type='trailer')
+                    qs = qs.filter(vehicle_type='trailer')
+
+            if is_valid_queryparam(is_service):
+                if is_service == '0':
+                    qs = qs.filter(is_service=True)
 
             # print('4968', queryset.count())
 
-            return queryset.distinct().order_by('-created_at')
+            return qs.distinct().order_by('-created_at')
 
         except Exception as e:
             logger.error(
                 f'ERRORLOG7535 VehicleCompanyListView. filter_queryset. Error: {e}')
-            return queryset
+            return qs
 
 
 class VehicleDetailView(RetrieveUpdateDestroyAPIView):

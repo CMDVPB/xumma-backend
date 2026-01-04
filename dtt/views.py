@@ -37,7 +37,6 @@ User = get_user_model()
 class UserSettingsView(RetrieveUpdateDestroyAPIView):
     serializer_class = UserSettingsSerializer
     permission_classes = [IsAuthenticated]
-    http_method_names = ['head', 'get', 'patch']
 
     def get_object(self):
         # Always return settings for the currently logged-in user
@@ -173,6 +172,7 @@ class ContactSiteListView(ListAPIView):
     lookup_field = 'uf'
 
     def get_queryset(self):
+        print('ContactSiteListView get_queryset 2050')
         try:
             user = self.request.user
             user_company = get_user_company(user)
