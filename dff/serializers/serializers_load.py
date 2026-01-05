@@ -455,8 +455,8 @@ class LoadSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
         fields = ('assigned_user', 'sn', 'date_order', 'customer_ref', 'customer_notes', 'is_locked', 'uf',
                   'load_detail', 'load_size', 'load_type', 'load_add_ons', 'ins_details', 'dgg_details', 'tmc_details',
                   'date_due', 'doc_lang', 'load_address', 'unload_address',
-                  'is_active', 'is_loaded', 'is_cleared', 'is_unloaded', 'is_invoiced',
-                  'date_loaded', 'date_cleared', 'date_unloaded', 'date_invoiced',
+                  'is_active', 'is_loaded', 'is_cleared', 'is_unloaded', 'is_invoiced', 'is_signed', 'is_paid',
+                  'date_loaded', 'date_cleared', 'date_unloaded', 'date_invoiced', 'date_signed',
                   'hb', 'mb', 'booking_number', 'comment1',
                   'category', 'bill_to', 'person', 'currency', 'mode', 'bt', 'status', 'incoterm', 'cmr',
                   'load_comments', 'payment_term', 'entry_loads', 'load_iteminvs', 'load_tors', 'load_ctrs', 'load_imageuploads', 'load_invs',
@@ -500,7 +500,7 @@ class LoadPatchSerializer(WritableNestedModelSerializer):
         return attrs
 
     def update(self, instance, validated_data):
-        print('6464', validated_data)
+        # print('6464', validated_data)
 
         # ✅ business rule
         now = timezone.now()

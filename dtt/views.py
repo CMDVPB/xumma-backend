@@ -45,7 +45,7 @@ class UserSettingsView(RetrieveUpdateDestroyAPIView):
         return settings
 
     def patch(self, request, *args, **kwargs):
-        print('5749', request.data)
+        # print('5748', request.data)
         return self.partial_update(request, *args, **kwargs)
 
 
