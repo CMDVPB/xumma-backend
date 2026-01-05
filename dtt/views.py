@@ -387,15 +387,20 @@ class ItemForItemCostListCreateView(ListCreateAPIView):
     def get_queryset(self):
         try:
             user_company = get_user_company(self.request.user)
-            queryset = ItemForItemCost.objects.filter(
-                company__id=user_company.id)
+            queryset = (ItemForItemCost.objects
+                        .select_related(
+                            'company')
+                        .filter(
+                            Q(is_system=True) |
+                            Q(company__id=user_company.id))
+                        )
 
-            queryset = queryset.select_related(
-                'company').distinct().order_by('serial_number', 'description')
+            queryset = queryset.distinct().order_by('serial_number', 'description')
 
             return queryset
         except Exception as e:
-            print('E341', e)
+            logger.error(
+                f'ERRORLOG4119 ItemForItemCostListCreateView. get_queryset. ERROR: {e}')
             return ItemForItemCost.objects.none()
 
     def post(self, request, *args, **kwargs):
@@ -412,7 +417,8 @@ class ItemForItemCostListCreateView(ListCreateAPIView):
             user_company = get_user_company(user)
             serializer.save(company=user_company)
         except Exception as e:
-            print('E269', e)
+            logger.error(
+                f'ERRORLOG4669 ItemForItemCostListCreateView. perform_create. ERROR: {e}')
             serializer.save()
 
 

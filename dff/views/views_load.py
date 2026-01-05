@@ -222,7 +222,11 @@ class LoadListView(ListAPIView):
                 if is_valid_queryparam(order_pre_order_all_index):
                     if is_cleared_query != '1':
                         if order_pre_order_all_index == '0':
-                            queryset = queryset.filter(trip__isnull=False)
+                            queryset = (queryset
+                                        .filter(
+                                            Q(trip__isnull=False) &
+                                            Q(is_unloaded=True))
+                                        )
                         elif order_pre_order_all_index == '1':
                             queryset = queryset.filter(trip__isnull=True)
                         elif order_pre_order_all_index == '4':

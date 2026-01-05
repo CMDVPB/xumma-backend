@@ -44,8 +44,10 @@ class ItemForItemCostSerializer(CustomWritableNestedModelSerializer):
     class Meta:
         model = ItemForItemCost
         lookup_field = 'uf'
-        fields = ('description', 'code', 'vat',
-                  'is_fuel', 'company', 'is_system', 'uf')
+        fields = ('description', 'code', 'vat', 'uf',
+                  'is_card', 'is_fuel', 'is_system',
+                  'company',
+                  )
         read_only_fields = ['is_system']
 
 

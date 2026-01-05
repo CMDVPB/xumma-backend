@@ -420,6 +420,7 @@ class ItemForItemCost(models.Model):
     code = models.CharField(max_length=30, null=True, blank=True)
     vat = models.PositiveIntegerField(null=True, blank=True)
 
+    is_card = models.BooleanField(default=False)
     is_fuel = models.BooleanField(default=False)
 
     is_system = models.BooleanField(default=False)
@@ -484,8 +485,8 @@ class ItemCost(models.Model):
     currency = models.ForeignKey(
         Currency, on_delete=models.RESTRICT, null=True, blank=True, related_name='currency_itemcosts')
 
-    route_sheet = models.ForeignKey(
-        RouteSheet, on_delete=models.CASCADE, null=True, blank=True, related_name='route_sheet_itemcosts')
+    trip = models.ForeignKey(
+        Trip, on_delete=models.CASCADE, null=True, blank=True, related_name='trip_itemcosts')
 
     class Meta:
         verbose_name = "Item cost"
