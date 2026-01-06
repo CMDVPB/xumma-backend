@@ -9,6 +9,8 @@ from abb.models import Currency
 from abb.serializers import CurrencySerializer
 from abb.serializers_drf_writable import CustomWritableNestedModelSerializer, CustomUniqueFieldsMixin
 from att.models import BankAccount, Note
+from axx.models import Load
+from ayy.models import ImageUpload
 
 
 User = get_user_model()
@@ -115,3 +117,41 @@ class NoteSerializer(WritableNestedModelSerializer):
     class Meta:
         model = Note
         fields = ('note_short', 'note_description', 'uf')
+
+
+class ImageUploadSerializer(WritableNestedModelSerializer):
+
+    load = serializers.SlugRelatedField(
+        allow_null=True, slug_field='uf', queryset=Load.objects.all(), write_only=True, required=False)
+    user = serializers.SlugRelatedField(
+        allow_null=True, slug_field='uf', queryset=User.objects.all(), write_only=True, required=False)
+
+    def to_internal_value(self, data):
+        # print('4574',)
+
+        if 'load' in data and data['load'] == '':
+            data['load'] = None
+
+        return super(ImageUploadSerializer, self).to_internal_value(data)
+
+    def validate(self, attrs):
+        relations = [
+            attrs.get('load'),
+            attrs.get('user'),
+            attrs.get('vehicle'),
+            attrs.get('company'),
+        ]
+
+        if sum(bool(r) for r in relations) != 1:
+            raise serializers.ValidationError(
+                'Exactly one relation (load, user, vehicle, company) must be provided.'
+            )
+
+        return attrs
+
+    class Meta:
+        model = ImageUpload
+        fields = ('load', 'unique_field', 'company',
+                  'file_name', 'file_obj', 's3_url',
+                  'load', 'user',
+                  )

@@ -80,6 +80,7 @@ class Trip(models.Model):
     date_created = models.DateTimeField(
         auto_now_add=True, null=True, blank=True)
     date_order = models.DateTimeField(blank=True, null=True)
+    date_end = models.DateTimeField(blank=True, null=True)
     load_size = models.CharField(
         choices=LOAD_SIZE, max_length=20, null=True, blank=True)
     trip_type = models.CharField(
@@ -216,6 +217,8 @@ class Load(models.Model):
         choices=LOAD_SIZE, max_length=20, null=True, blank=True)
     customer_ref = models.CharField(max_length=100,  blank=True, null=True)
     customer_notes = models.CharField(max_length=200, blank=True, null=True)
+    freight_price = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True)
     load_add_ons = ArrayField(models.CharField(
         max_length=20, null=True, blank=True), blank=True, null=True, size=3)
     ins_details = models.CharField(max_length=150, blank=True, null=True)

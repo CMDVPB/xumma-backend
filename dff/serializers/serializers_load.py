@@ -140,8 +140,8 @@ class LoadListSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
 
     class Meta:
         model = Load
-        fields = ('sn', 'date_order', 'customer_ref', 'customer_notes', 'load_detail', 'load_size', 'load_type', 'load_add_ons', 'uf',
-                  'date_due',
+        fields = ('sn', 'date_order', 'customer_ref', 'customer_notes', 'load_detail', 'load_size', 'freight_price', 'uf',
+                  'date_due', 'load_type', 'load_add_ons',
                   'is_active', 'is_loaded', 'is_cleared', 'is_unloaded', 'is_invoiced', 'is_signed', 'is_paid',
                   'date_loaded', 'date_cleared', 'date_unloaded', 'date_invoiced', 'date_signed',
                   'load_address', 'unload_address', 'hb', 'mb', 'booking_number', 'comment1',
@@ -453,7 +453,7 @@ class LoadSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
     class Meta:
         model = Load
         fields = ('assigned_user', 'sn', 'date_order', 'customer_ref', 'customer_notes', 'is_locked', 'uf',
-                  'load_detail', 'load_size', 'load_type', 'load_add_ons', 'ins_details', 'dgg_details', 'tmc_details',
+                  'load_detail', 'load_size', 'freight_price', 'load_type', 'load_add_ons', 'ins_details', 'dgg_details', 'tmc_details',
                   'date_due', 'doc_lang', 'load_address', 'unload_address',
                   'is_active', 'is_loaded', 'is_cleared', 'is_unloaded', 'is_invoiced', 'is_signed', 'is_paid',
                   'date_loaded', 'date_cleared', 'date_unloaded', 'date_invoiced', 'date_signed',
@@ -583,7 +583,7 @@ class LoadListForTripSerializer(UniqueFieldsMixin, WritableNestedModelSerializer
 
     class Meta:
         model = Load
-        fields = ('sn', 'customer_ref', 'customer_notes', 'load_detail', 'load_size', 'load_add_ons', 'uf',
+        fields = ('sn', 'customer_ref', 'customer_notes', 'load_detail', 'load_size', 'freight_price', 'load_add_ons', 'uf',
                   'is_loaded', 'is_cleared', 'is_unloaded', 'is_invoiced',
                   'date_loaded', 'date_cleared', 'date_unloaded', 'date_invoiced',
                   'load_address', 'unload_address', 'hb', 'mb', 'booking_number', 'comment1',

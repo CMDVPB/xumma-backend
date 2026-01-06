@@ -1,3 +1,4 @@
+import os
 import uuid
 import re
 from django.conf import settings
@@ -356,3 +357,36 @@ def get_request_language(request, default="ro"):
         return default
 
     return getattr(request, "LANGUAGE_CODE", default)
+
+
+###### Start Image, files uploads utils ######
+
+def image_upload_path(instance, filename):
+    """
+    Decide upload folder based on related object.
+    """
+
+    base_folder = 'uploads'
+
+    if instance.load_id:
+        subfolder = 'loads'
+        entity_uf = instance.load.uf
+    elif instance.vehicle_id:
+        subfolder = 'vehicles'
+        entity_uf = instance.vehicle.uf
+    elif instance.user_id:
+        subfolder = 'users'
+        entity_uf = instance.user.id
+    elif instance.company_id:
+        subfolder = 'companies'
+        entity_uf = instance.company.uf
+    else:
+        subfolder = 'misc'
+        entity_uf = 'unknown'
+
+    # preserve extension
+    name, ext = os.path.splitext(filename)
+
+    return f'{base_folder}/{subfolder}/{entity_uf}/{filename}'
+
+###### End Image, files uploads utils ######

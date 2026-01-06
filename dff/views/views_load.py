@@ -159,7 +159,7 @@ class LoadListView(ListAPIView):
                 )
 
             else:
-                order_pre_order_all_index = self.request.query_params.get(
+                button_index = self.request.query_params.get(
                     'buttonIndex', None)
                 button_index_30 = self.request.query_params.get(
                     'buttonIndex30', None)
@@ -219,23 +219,28 @@ class LoadListView(ListAPIView):
                 is_cleared_query = self.request.query_params.get(
                     'isClearedQuery', None)
 
-                if is_valid_queryparam(order_pre_order_all_index):
+                if is_valid_queryparam(button_index):
                     if is_cleared_query != '1':
-                        if order_pre_order_all_index == '0':
+                        if button_index == '0':
                             queryset = (queryset
                                         .filter(
-                                            Q(trip__isnull=False) &
-                                            Q(is_unloaded=True))
+                                            Q(trip__isnull=True) &
+                                            Q(is_active=True))
                                         )
-                        elif order_pre_order_all_index == '1':
-                            queryset = queryset.filter(trip__isnull=True)
-                        elif order_pre_order_all_index == '4':
-                            queryset = queryset.filter(
-                                load_type=LOAD_TYPES[1][0])
+                        elif button_index == '1':
+                            queryset = (queryset
+                                        .filter(
+                                            Q(is_active=False)
+                                        ))
+                        elif button_index == '4':
+                            queryset = (queryset
+                                        .filter(
+                                            load_type=LOAD_TYPES[1][0])
+                                        )
                         else:
                             pass
                     elif is_cleared_query == '1':
-                        if order_pre_order_all_index == 'true':
+                        if button_index == 'true':
                             queryset = queryset.filter(is_paid=True)
 
                 if is_valid_queryparam(button_index_30):
@@ -254,7 +259,7 @@ class LoadListView(ListAPIView):
                     else:
                         pass
 
-                print('2040', button_index_30)
+                # print('2040', button_index_30)
 
                 if is_valid_queryparam(sortByQuery):
                     if sortByQuery == '0':

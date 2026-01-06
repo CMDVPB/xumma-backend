@@ -1,3 +1,6 @@
+from rest_framework.views import APIView
+from django.http import HttpResponseRedirect
+from django.shortcuts import get_object_or_404
 import logging
 import smtplib
 from datetime import datetime, timedelta
@@ -15,15 +18,16 @@ from rest_framework import status
 from rest_framework import permissions, status, exceptions
 from rest_framework.decorators import authentication_classes, api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.parsers import MultiPartParser, FormParser
 
-from abb.utils import assign_new_num, get_user_company
+from abb.utils import assign_new_num, get_company_manager, get_user_company
 from app.models import SMTPSettings, UserSettings
 from app.serializers import UserSettingsSerializer
 from att.models import BankAccount, ContactSite, Note, PaymentTerm, Person, Term
 from axx.models import Load
-from ayy.models import CMR, AuthorizationStockBatch, CMRStockBatch, CTIRStockBatch, ColliType, ItemForItemCost, ItemForItemInv
+from ayy.models import CMR, AuthorizationStockBatch, CMRStockBatch, CTIRStockBatch, ColliType, ImageUpload, ItemForItemCost, ItemForItemInv
 from ayy.serializers import ItemForItemCostSerializer
-from dff.serializers.serializers_bce import BankAccountSerializer, NoteSerializer
+from dff.serializers.serializers_bce import BankAccountSerializer, ImageUploadSerializer, NoteSerializer
 from dff.serializers.serializers_document import AuthorizationStockBatchSerializer, CMRStockBatchSerializer, CTIRStockBatchSerializer
 from dff.serializers.serializers_entry_detail import ColliTypeSerializer
 from dff.serializers.serializers_item_inv import ItemForItemInvSerializer
@@ -650,6 +654,44 @@ class PersonDetailView(RetrieveUpdateDestroyAPIView):
             raise ValidationError(
                 detail="entry_not_deleted_used_in_related_documents")
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class ImageView(CreateAPIView, RetrieveUpdateDestroyAPIView):
+    serializer_class = ImageUploadSerializer
+    parser_classes = [MultiPartParser, FormParser]
+    lookup_field = 'unique_field'
+
+    def get_queryset(self):
+        try:
+            user_company = get_user_company(self.request.user)
+            # print('5682', user_company)
+            return ImageUpload.objects.filter(company__id=user_company.id).distinct()
+        except Exception as e:
+            logger.error(f'ERRORV741 ImageView. get_queryset. Error: {e}')
+            return ImageUpload.objects.none()
+
+    def perform_create(self, serializer):
+        try:
+            user = self.request.user
+            user_company = get_user_company(user)
+            # print('4642', user_company)
+            serializer.save(company=user_company)
+        except Exception as e:
+            logger.error(f'ERRORV461 ImageView. perform_create. Error: {e}')
+            serializer.save()
+
+
+class ImageDownloadView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, unique_field):
+        image = get_object_or_404(ImageUpload, unique_field=unique_field)
+
+        # ownership check
+        if image.company != get_user_company(request.user):
+            return Response(status=403)
+
+        return HttpResponseRedirect(image.file_obj.url)
 
 ### Start SMTP Settings ###
 

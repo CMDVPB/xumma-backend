@@ -274,7 +274,6 @@ class ContactSuggestionAPIView(APIView):
 class DamageReportListView(ListAPIView):
     serializer_class = DamageReportSerializer
     permission_classes = [IsAuthenticated]
-    lookup_field = 'uf'
 
     def get_queryset(self):
         try:
@@ -284,7 +283,8 @@ class DamageReportListView(ListAPIView):
 
             return queryset.distinct().order_by('-reported_at')
         except Exception as e:
-            print('E511', e)
+            logger.error(
+                f'ERRORLOG3793 DamageReportListView get_queryset. ERROR: {e}')
             return DamageReport.objects.none()
 
 

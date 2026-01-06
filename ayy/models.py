@@ -1,12 +1,14 @@
+import os
 from django.db import models
 from django.contrib.auth import get_user_model
 from django.contrib.postgres.fields import ArrayField
 from django.db.models import QuerySet, Prefetch, Q, F
+from django.core.exceptions import ValidationError
 from phonenumber_field.modelfields import PhoneNumberField
 
 from abb.constants import ACTION_CHOICES, UNIT_MEASUREMENT_CHOICES, VAT_CHOICES, VAT_EXEMPTION_REASON, VAT_TYPE_CHOICES
 from abb.models import Country, Currency
-from abb.utils import assign_new_num, hex_uuid, default_notification_status_3, upload_to
+from abb.utils import assign_new_num, hex_uuid, default_notification_status_3, image_upload_path, upload_to
 from app.models import CategoryGeneral, Company, TypeGeneral
 from axx.models import Ctr, Exp, Inv, Load, Tor, Trip
 from att.models import Contact, ContactSite, Person, Vehicle
@@ -160,31 +162,48 @@ class ImageUpload(models.Model):
         default=hex_uuid, editable=False)
     file_name = models.CharField(
         max_length=500, blank=True, null=True)
-    file_obj = models.FileField(blank=True, null=True, upload_to='uploads/')
+    file_obj = models.FileField(upload_to=image_upload_path)
     file_size = models.PositiveIntegerField(blank=True, null=True)
 
     load = models.ForeignKey(
         Load, on_delete=models.CASCADE, null=True, blank=True, related_name='load_imageuploads')
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, null=True, blank=True, related_name='user_imageuploads')
+    vehicle = models.ForeignKey(
+        Vehicle, on_delete=models.CASCADE, null=True, blank=True, related_name='vehicle_imageuploads')
+
+    # def save(self, *args, **kwargs):
+    #     if self.file_obj:
+    #         # print('M676', )
+    #         if self.company:
+    #             company_short_uf = self.company.uf[0: 5]
+
+    #             print('M678', company_short_uf)
+
+    #             file_name_split = (self.file_obj.name).rsplit(
+    #                 '.', 1)
+    #             self.file_obj.name = company_short_uf + '_' + \
+    #                 file_name_split[0] + '.'+file_name_split[1]
+    #             self.file_name = file_name_split[0]
+
+    #         self.file_size = int(self.file_obj.size)
+    #         self.file_name = self.file_obj.name
+
+    #         super(ImageUpload, self).save(*args, **kwargs)
+
+    def clean(self):
+        relations = [self.load, self.vehicle, self.user]
+        if sum(bool(r) for r in relations) != 1:
+            raise ValidationError(
+                'Exactly one relation (load, vehicle, user) must be set.'
+            )
 
     def save(self, *args, **kwargs):
-
         if self.file_obj:
-            # print('M676', )
-            if self.company:
-                company_short_uf = self.company.uf[0: 5]
+            self.file_size = self.file_obj.size
+            self.file_name = os.path.basename(self.file_obj.name)
 
-                print('M678', company_short_uf)
-
-                file_name_split = (self.file_obj.name).rsplit(
-                    '.', 1)
-                self.file_obj.name = company_short_uf + '_' + \
-                    file_name_split[0] + '.'+file_name_split[1]
-                self.file_name = file_name_split[0]
-
-            self.file_size = int(self.file_obj.size)
-            self.file_name = self.file_obj.name
-
-            super(ImageUpload, self).save(*args, **kwargs)
+        super().save(*args, **kwargs)
 
     @property
     def s3_url(self):

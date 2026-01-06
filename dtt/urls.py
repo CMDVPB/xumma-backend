@@ -3,7 +3,7 @@ from rest_framework.urlpatterns import format_suffix_patterns
 
 from dtt.views import AuthorizationStockBatchDetailsView, AuthorizationStockBatchListCreateView, BankAccountDetailView, BankAccountListCreateView, \
     CMRStockBatchDetailsView, CMRStockBatchListCreateView, CTIRStockBatchDetailsView, CTIRStockBatchListCreateView, ColliTypeListView, ContactSiteCreateView, ContactSiteDetailView, \
-    ContactSiteListView, ItemForItemCostDetailView, ItemForItemCostListCreateView, ItemForItemInvDetailView, ItemForItemInvListCreateView, NoteDetailView, NoteListCreateView, PaymentTermListCreateView, PaymentTermsDetailView, PersonDetailView, TermDetailView, TermListCreateView, UserSettingsView, \
+    ContactSiteListView, ImageDownloadView, ImageView, ItemForItemCostDetailView, ItemForItemCostListCreateView, ItemForItemInvDetailView, ItemForItemInvListCreateView, NoteDetailView, NoteListCreateView, PaymentTermListCreateView, PaymentTermsDetailView, PersonDetailView, TermDetailView, TermListCreateView, UserSettingsView, \
     get_post_delete_user_smtp_settings, test_smtp_connection_view, validate_or_generate_cmr
 
 urlpatterns = [
@@ -61,6 +61,11 @@ urlpatterns = [
 
     path('load/validate-cmr/<str:uf>/',
          validate_or_generate_cmr, name='validate-cmr'),
+
+    path('image/', ImageView.as_view(), name='images'),
+    path('image/<str:unique_field>/', ImageView.as_view(), name='image_detail'),
+    path('image/<uuid:unique_field>/download/',
+         ImageDownloadView.as_view(), name='image_download'),
 
 ]
 

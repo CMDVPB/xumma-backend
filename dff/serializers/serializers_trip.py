@@ -424,7 +424,7 @@ class TripListSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
 
     class Meta:
         model = Trip
-        fields = ('rn', 'num_loads', 'load_size', 'trip_type', 'date_order', 'uf',
+        fields = ('rn', 'num_loads', 'load_size', 'trip_type', 'date_order', 'date_end', 'uf',
                   'carrier', 'status', 'bt', 'mode', 'vehicle_tractor', 'vehicle_trailer',
                   'trip_loads', 'trip_comments', 'totals_trip',
                   'rs_number',
@@ -584,7 +584,7 @@ class TripSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
 
     class Meta:
         model = Trip
-        fields = ('rn', 'assigned_user', 'date_order', 'person', 'driver', 'vehicle_tractor', 'incl_loads_costs', 'doc_lang',
+        fields = ('rn', 'assigned_user', 'date_order', 'date_end', 'person', 'driver', 'vehicle_tractor', 'incl_loads_costs', 'doc_lang',
                   'vehicle_trailer', 'carrier', 'load_size', 'trip_type', 'load_order', 'mode', 'bt', 'currency', 'status', 'is_locked',
                   'km_departure', 'km_arrival', 'km_exit', 'km_entry', 'trip_number', 'date_trip', 'date_departure', 'date_arrival',
                   'trip_details', 'l_departure', 'l_arrival', 'trip_add_info', 'trip_loads', 'trip_comments', 'trip_histories', 'uf',

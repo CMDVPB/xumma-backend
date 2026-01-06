@@ -11,6 +11,7 @@ import logging
 from abb.serializers import CountrySerializer
 from abb.utils import company_latest_exp_date_subscription, get_company_manager, get_company_users, get_user_company
 from app.models import Company, UserSettings
+from dff.serializers.serializers_bce import ImageUploadSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +46,9 @@ class UserBasicPlusSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
     user_phone_numbers = PhoneNumberSerializer(
         many=True, context={'request': 'request'})
 
+    user_imageuploads = ImageUploadSerializer(
+        many=True, context={'request': 'request'}, read_only=True)
+
     def to_representation(self, instance):
         response = super().to_representation(instance)
 
@@ -63,7 +67,7 @@ class UserBasicPlusSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
         fields = ('email', 'first_name', 'last_name', 'personal_id', 'uf',
                   'comment', 'date_registered', 'date_of_birth', 'date_termination', 'is_archived',
                   'image', 'phone', 'messanger',
-                  'user_documents', 'user_phone_numbers',
+                  'user_documents', 'user_phone_numbers', 'user_imageuploads',
                   )
 
 
@@ -76,6 +80,8 @@ class UserSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
         many=True, context={'request': 'request'})
     user_phone_numbers = PhoneNumberSerializer(
         many=True, context={'request': 'request'})
+    user_imageuploads = ImageUploadSerializer(
+        many=True, context={'request': 'request'}, read_only=True)
 
     def to_representation(self, instance):
         response = super().to_representation(instance)
@@ -128,7 +134,7 @@ class UserSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
         fields = ('email', 'first_name', 'last_name', 'personal_id', 'phone', 'messanger', 'comment', 'image', 'lang', 'uf',
                   'date_registered', 'date_of_birth', 'date_termination', 'is_archived',
                   'company',
-                  'user_documents', 'user_phone_numbers',
+                  'user_documents', 'user_phone_numbers', 'user_imageuploads',
                   )
 
 
