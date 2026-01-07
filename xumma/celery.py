@@ -18,11 +18,10 @@ if not settings.configured:
 
 
 app = Celery("xumma")
-app.config_from_object("xumma.celeryconfig", namespace="CELERY")
+app.config_from_object("xumma.celeryconfig")
 app.autodiscover_tasks()
 
 
 @app.task(bind=True)
 def debug_task(self):
     print(f'Request: {self.request!r}')
-

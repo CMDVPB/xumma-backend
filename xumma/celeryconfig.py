@@ -11,8 +11,6 @@ broker_url = f"redis://{REDIS_HOST}:6379/1"
 result_backend = f"redis://{REDIS_HOST}:6379/2"
 broker_connection_retry_on_startup = True
 
-broker_connection_retry_on_startup = True
-
 task_track_started = True
 task_time_limit = 30 * 60
 result_extended = True

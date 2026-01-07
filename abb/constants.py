@@ -68,3 +68,10 @@ DOC_LANG_CHOICES = (('ro', 'Romanian'), ('en', 'English'),
 
 DOCUMENT_STATUS_CHOICES = (
     ('free', 'Free'), ('reserved', 'Reserved'), ('used', 'Used'))
+
+
+EMAIL_TEMPLATE_CODES = {
+    "request_info_from_shipper",
+    "request_info_from_consignee",
+    "send_docs_to_import_broker",
+}

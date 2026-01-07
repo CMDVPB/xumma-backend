@@ -24,6 +24,7 @@ urlpatterns = [
     path('api/', include('dff.urls')),
     path('api/', include('dtt.urls')),
     path('api/', include('eff.urls')),
+    path('api/', include('eml.urls')),
 ]
 
 if settings.DEBUG:

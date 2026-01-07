@@ -854,3 +854,74 @@ class DamagePayment(models.Model):
 
 
 ###### End Damages Models ######
+
+class UserEmail(models.Model):
+    STATUS_CHOICES = (
+        ('queued', 'Queued'),
+        ('sent', 'Sent'),
+        ('failed', 'Failed'),
+    )
+
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='user_sent_emails')
+
+    # Mailbox fields
+    from_email = models.EmailField()
+    to = models.JSONField()
+    cc = models.JSONField(blank=True, null=True)
+    bcc = models.JSONField(blank=True, null=True)
+
+    subject = models.CharField(max_length=255)
+    body = models.TextField()
+
+    # UX flags (gmail-like)
+    is_read = models.BooleanField(default=True)  # sent mail is read
+    is_draft = models.BooleanField(default=False)
+
+    # Delivery status
+    status = models.CharField(
+        max_length=10,  choices=STATUS_CHOICES, default='queued')
+
+    error = models.TextField(blank=True, null=True)
+
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    sent_at = models.DateTimeField(blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.subject} → {self.to}"
+
+
+class EmailTemplate(models.Model):
+    uf = models.CharField(max_length=36, default=hex_uuid, db_index=True)
+    company = models.ForeignKey(
+        Company, on_delete=models.CASCADE, related_name="company_email_templates")
+
+    code = models.CharField(max_length=100)  # e.g. "invoice_sent"
+    label = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL,
+                                   null=True, blank=True, related_name="created_by_email_templates")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("company", "code")
+
+
+class EmailTemplateTranslation(models.Model):
+    template = models.ForeignKey(
+        EmailTemplate, on_delete=models.CASCADE, related_name="template_email_translations")
+    language = models.CharField(max_length=2)  # "en", "ro", "ru"
+    subject = models.CharField(max_length=255, blank=True)
+    body = models.TextField(blank=True)  # HTML
+
+    class Meta:
+        unique_together = ("template", "language")
+
+
+class EmailTemplateVariable(models.Model):
+    template = models.ForeignKey(EmailTemplate, on_delete=models.CASCADE)
+    key = models.CharField(max_length=50)  # invoice_number
+    description = models.CharField(max_length=255)

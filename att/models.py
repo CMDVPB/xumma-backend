@@ -128,6 +128,8 @@ class ContactSite(models.Model):
     comment1 = models.CharField(max_length=500, null=True, blank=True)
     comment2 = models.CharField(max_length=500, null=True, blank=True)
 
+    language = models.CharField(max_length=2, blank=True, null=True)
+
     lat = models.FloatField(null=True, blank=True)
     lon = models.FloatField(null=True, blank=True)
 
@@ -163,6 +165,8 @@ class Person(ProtectedDeleteMixin, models.Model):
 
     site = models.ForeignKey(
         ContactSite, on_delete=models.CASCADE, blank=True, null=True, related_name="site_persons")
+
+    default = models.BooleanField(default=False)
 
     target_group = models.ManyToManyField(
         TargetGroup, related_name="target_group_persons")

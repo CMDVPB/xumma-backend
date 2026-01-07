@@ -10,13 +10,13 @@
 
 - start in development:
   - %h automatically adds the hostname
-    celery -A xumma worker --loglevel=INFO --concurrency=1 -P solo -E -Q celery -n celery@%h ////// (for all other tasks)
+    celery -A xumma.celery:app worker --loglevel=INFO --concurrency=1 -P solo -E -Q celery -n celery@%h ////// (for all other tasks)
     \*\*\* -P solo = one task at a time, fine for development on windows
 
 ### Celery beat
 
 - start in development:
-  celery -A xumma beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+  celery -A xumma.celery:app beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
 - start in production:
   docker compose
 

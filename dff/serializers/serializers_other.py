@@ -101,7 +101,8 @@ class VehicleUnitSerializer(CustomUniqueFieldsMixin, CustomWritableNestedModelSe
 class PersonBasicReadSerializer(WritableNestedModelSerializer):
     class Meta:
         model = Person
-        fields = ('last_name', 'first_name', 'is_driver', 'is_private', 'uf')
+        fields = ('last_name', 'first_name', 'is_driver',
+                  'is_private', 'default', 'uf')
 
 
 class PersonSerializer(CustomUniqueFieldsMixin, CustomWritableNestedModelSerializer):
@@ -115,7 +116,7 @@ class PersonSerializer(CustomUniqueFieldsMixin, CustomWritableNestedModelSeriali
     class Meta:
         model = Person
         lookup_field = 'uf'
-        fields = ('last_name', 'first_name', 'email', 'phone',
+        fields = ('last_name', 'first_name', 'email', 'phone', 'default',
                   'comment', 'is_driver', "is_private", 'uf')
 
 
@@ -237,7 +238,7 @@ class ContactSiteListSerializer(WritableNestedModelSerializer):
         model = ContactSite
         lookup_field = 'uf'
         fields = ('name_site', 'address_site', 'city_site', 'zip_code_site', 'lat', 'lon', 'uf',
-                  'phone', 'email', 'comment1', 'comment2',
+                  'phone', 'email', 'comment1', 'comment2', 'language',
                   'country_code_site',
                   )
 
@@ -280,7 +281,7 @@ class ContactSiteSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
         model = ContactSite
         lookup_field = 'uf'
         fields = ('name_site', 'address_site', 'city_site', 'zip_code_site', 'lat', 'lon', 'uf',
-                  'phone', 'email', 'comment1', 'comment2',
+                  'phone', 'email', 'comment1', 'comment2', 'language',
                   'country_code_site', 'contact',
                   'site_persons',
                   )

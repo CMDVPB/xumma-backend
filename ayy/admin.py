@@ -1,6 +1,7 @@
 from django.contrib import admin
 
-from ayy.models import AuthorizationStockBatch, CMRStockBatch, ColliType, DamageReport, PhoneNumber
+from app.views import User
+from ayy.models import AuthorizationStockBatch, CMRStockBatch, ColliType, DamageReport, EmailTemplate, PhoneNumber, UserEmail
 
 
 @admin.register(CMRStockBatch)
@@ -40,3 +41,17 @@ class DamageReportAdmin(admin.ModelAdmin):
 
     search_fields = ('company__company_name', 'vehicle__reg_number', 'driver__email', 'driver__first_name', 'driver__last_name',
                      )
+
+
+@admin.register(UserEmail)
+class UserEmailAdmin(admin.ModelAdmin):
+    list_display = ('id', 'user', 'to', 'status', 'sent_at')
+
+    search_fields = ('to',
+                     )
+
+
+@admin.register(EmailTemplate)
+class EmailTemplateAdmin(admin.ModelAdmin):
+    list_display = ('id', 'company',  'code', 'label',
+                    'created_by', 'created_at')
