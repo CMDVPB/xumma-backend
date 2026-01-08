@@ -1,7 +1,6 @@
 import email
 import json
 import logging
-# from celery import shared_task
 from ayy.models import UserEmail
 from xumma.celery import app
 from django.conf import settings
@@ -25,6 +24,9 @@ def send_basic_email_task(self, email_id):
     """
 
     try:
+        email = UserEmail.objects.select_related(
+            "user").prefetch_related("email_attachments").get(id=email_id)
+
         with get_connection(
             host=settings.EMAIL_HOST_AWS,
             port=settings.EMAIL_PORT_AWS,
@@ -46,6 +48,11 @@ def send_basic_email_task(self, email_id):
             )
 
             msg.content_subtype = "html"
+
+            # ✅ Attach files (optional)
+            for attachment in email.email_attachments.all():
+                msg.attach_file(attachment.file.path)
+
             msg.send()
 
         email.status = "sent"

@@ -3,6 +3,8 @@
 from rest_framework import status, permissions
 import json
 import logging
+from django.utils import timezone
+from datetime import timedelta
 from datetime import datetime, timedelta
 from smtplib import SMTPException
 from django.conf import settings
@@ -11,17 +13,20 @@ from django.core.cache import cache
 from django.http import HttpResponse
 from django.db.models import QuerySet, Prefetch, Q, F
 from django.shortcuts import get_object_or_404
+from django.db import transaction
 from rest_framework import exceptions
 from rest_framework.views import APIView
-from rest_framework.generics import ListAPIView
+from rest_framework.generics import ListAPIView, RetrieveAPIView
 from rest_framework.decorators import authentication_classes, api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.parsers import MultiPartParser, FormParser
 
 from abb.utils import get_user_company
-from ayy.models import EmailTemplate, EmailTemplateTranslation, UserEmail
-from eml.serializers import EmailTemplateCreateSerializer, EmailTemplateDetailSerializer, EmailTemplateSerializer, EmailTemplateUpdateSerializer
+from ayy.models import EmailTemplate, EmailTemplateTranslation, MailLabelV2, MailMessage, UserEmail, UserEmailAttachment
+from eml.serializers import EmailTemplateCreateSerializer, EmailTemplateDetailSerializer, EmailTemplateSerializer, \
+    EmailTemplateUpdateSerializer, MailLabelV2Serializer, MailMessageDetailSerializer, MailMessageListSerializer
 from eml.tasks import send_basic_email_task
 from eml.utils import safe_json_list
 
@@ -31,11 +36,12 @@ logger = logging.getLogger(__name__)
 ### System email service ###
 
 
-class BasicEmailNoAttachmentView(APIView):
+class BasicEmailOptionalAttachmentsView(APIView):
     '''
     Using celery task to send basic email.
     '''
     permission_classes = [IsAuthenticated]
+    parser_classes = (MultiPartParser, FormParser)
 
     def post(self, request, format=None):
         to = safe_json_list(request.data.get('to'))
@@ -47,23 +53,65 @@ class BasicEmailNoAttachmentView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        email = UserEmail.objects.create(
-            user=request.user,
-            from_email=settings.DEFAULT_FROM_EMAIL_AWS,
-            to=to,
-            cc=cc,
-            subject=request.data.get('subject', ''),
-            body=request.data.get('body', ''),
-            status='queued'
-        )
+        user = request.user
+        files = request.FILES.getlist("attachments")  # 👈 optional
 
-        ### enqueue task ###
-        send_basic_email_task.delay(email.id)
+        with transaction.atomic():
+            email = UserEmail.objects.create(
+                user=user,
+                from_email=settings.DEFAULT_FROM_EMAIL_AWS,
+                to=to,
+                cc=cc,
+                subject=request.data.get('subject', ''),
+                body=request.data.get('body', ''),
+                status='queued'
+            )
 
-        return Response(
-            {"detail": "Email queued for sending"},
-            status=status.HTTP_202_ACCEPTED
-        )
+            print('3348', files)
+
+            # 📎 Save attachments (if any)
+            for f in files:
+                UserEmailAttachment.objects.create(
+                    email=email,
+                    file=f,
+                    filename=f.name,
+                    size=f.size,
+                )
+
+            ### safe get-or-create "Sent" label ###
+            sent_label, _ = MailLabelV2.objects.get_or_create(
+                user=user,
+                slug="sent",
+                defaults={
+                    "name": "Sent",
+                    "type": MailLabelV2.SYSTEM,
+                    "order": 2,
+                },
+            )
+
+            mailbox_msg = MailMessage.objects.create(
+                user=user,
+                sent_email=email,
+                from_email=email.from_email,
+                to=email.to,
+                subject=email.subject,
+                body=email.body,
+                is_read=True,
+            )
+
+            mailbox_msg.labels.add(sent_label)
+
+            ### enqueue task ###
+            send_basic_email_task.delay(email.id)
+
+            return Response(
+                {
+                    "detail": "Email queued for sending",
+                    "mailbox_id": mailbox_msg.id,
+                    "email_attachments": len(files),
+                },
+                status=status.HTTP_202_ACCEPTED
+            )
 
 
 ### Email Templates ###
@@ -83,7 +131,6 @@ class EmailTemplateCreateView(APIView):
 
         return Response(
             {
-
                 "uf": template.uf,
                 "message": "Email template created successfully."
             },
@@ -177,3 +224,66 @@ class EmailTemplateUpdateView(APIView):
         serializer.save()
 
         return Response({"message": "Template replaced."}, status=status.HTTP_200_OK)
+
+
+### Mail Labels and Messages ###
+class MailLabelV2ListAPIView(ListAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = MailLabelV2Serializer
+
+    def get_queryset(self):
+        return MailLabelV2.objects.filter(
+            user=self.request.user
+        ).order_by("order")
+
+    def list(self, request, *args, **kwargs):
+        response = super().list(request, *args, **kwargs)
+        return Response({"labels": response.data})
+
+
+class MailListAPIView(ListAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = MailMessageListSerializer
+
+    def get_queryset(self):
+        label_slug = self.request.query_params.get("labelId")
+        since = timezone.now() - timedelta(days=31)
+
+        return (
+            MailMessage.objects
+            .filter(
+                user=self.request.user,
+                labels__slug=label_slug,
+                created_at__gte=since,   # ✅ last 31 days
+            )
+            .select_related("sent_email")
+            .order_by("-created_at")
+        )
+
+    def list(self, request, *args, **kwargs):
+        response = super().list(request, *args, **kwargs)
+        return Response({"mails": response.data})
+
+
+class MailDetailAPIView(RetrieveAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = MailMessageDetailSerializer
+
+    def get_queryset(self):
+        return MailMessage.objects.filter(user=self.request.user)
+
+    def get(self, request):
+        mail_id = request.query_params.get("mailId")
+
+        mail = get_object_or_404(
+            MailMessage,
+            id=mail_id,
+            user=request.user,
+        )
+
+        if not mail.is_read:
+            mail.is_read = True
+            mail.save(update_fields=["is_read"])
+
+        serializer = MailMessageDetailSerializer(mail)
+        return Response({"mail": serializer.data})

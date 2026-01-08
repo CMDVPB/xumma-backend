@@ -3,16 +3,16 @@ from collections import defaultdict
 import queue
 from django.db import transaction
 from django.contrib.auth import get_user_model
-from drf_writable_nested.serializers import WritableNestedModelSerializer
-from drf_writable_nested.mixins import UniqueFieldsMixin, NestedCreateMixin, NestedUpdateMixin
+from django.core.exceptions import ValidationError
 from rest_framework import serializers
 from rest_framework.serializers import SlugRelatedField
-from django.core.exceptions import ValidationError
 from rest_framework.validators import UniqueTogetherValidator
+from drf_writable_nested.serializers import WritableNestedModelSerializer
+from drf_writable_nested.mixins import UniqueFieldsMixin, NestedCreateMixin, NestedUpdateMixin
 
 from abb.constants import EMAIL_TEMPLATE_CODES
 from abb.utils import get_user_company
-from ayy.models import EmailTemplate, EmailTemplateTranslation
+from ayy.models import EmailTemplate, EmailTemplateTranslation, MailLabelV2, MailMessage
 
 
 User = get_user_model()
@@ -60,8 +60,8 @@ class EmailTemplateSerializer(serializers.ModelSerializer):
 
 
 class EmailTemplateTranslationCreateSerializer(serializers.Serializer):
-    subject = serializers.CharField(max_length=255)
-    body = serializers.CharField()
+    subject = serializers.CharField(allow_blank=True, required=True)
+    body = serializers.CharField(allow_blank=True, required=True)
 
 
 class EmailTemplateCreateSerializer(serializers.ModelSerializer):
@@ -90,9 +90,14 @@ class EmailTemplateCreateSerializer(serializers.ModelSerializer):
                     f"Invalid language code: {lang}"
                 )
 
-            if not data.get("subject") or not data.get("body"):
+            if "subject" not in data or "body" not in data:
                 raise serializers.ValidationError(
                     f"Subject and body are required for language '{lang}'."
+                )
+
+            if not isinstance(data.get("subject"), str) or not isinstance(data.get("body"), str):
+                raise serializers.ValidationError(
+                    f"Subject and body must be strings for language '{lang}'."
                 )
 
         return value
@@ -292,3 +297,86 @@ class EmailTemplateUpdateSerializer(serializers.ModelSerializer):
             ).delete()
 
         return instance
+
+
+### Mail Labels and Messages Serializers ###
+
+
+class MailLabelV2Serializer(serializers.ModelSerializer):
+    class Meta:
+        model = MailLabelV2
+        fields = ["id", "slug", "name", "type", "order"]
+
+
+class MailMessageListSerializer(serializers.ModelSerializer):
+    createdAt = serializers.DateTimeField(source="created_at")
+    isRead = serializers.BooleanField(source="is_read")
+    to = serializers.SerializerMethodField()
+
+    class Meta:
+        model = MailMessage
+        fields = [
+            "id",
+            "subject",
+            "createdAt",
+            "isRead",
+            "to",
+        ]
+
+    def get_to(self, obj):
+        # obj.to is JSONField → list of strings
+        return [{"email": email} for email in (obj.to or [])]
+
+
+class MailMessageDetailSerializer(serializers.ModelSerializer):
+    message = serializers.CharField(source="body")
+    createdAt = serializers.DateTimeField(source="created_at")
+
+    from_ = serializers.SerializerMethodField()
+    to = serializers.SerializerMethodField()
+    labelIds = serializers.SerializerMethodField()
+    attachments = serializers.SerializerMethodField()
+
+    isRead = serializers.BooleanField(source="is_read")
+    isStarred = serializers.SerializerMethodField()
+    isImportant = serializers.SerializerMethodField()
+
+    class Meta:
+        model = MailMessage
+        fields = [
+            "id",
+            "subject",
+            "message",
+            "createdAt",
+            "from_",
+            "to",
+            "labelIds",
+            "isRead",
+            "isStarred",
+            "isImportant",
+            "attachments",
+        ]
+
+    def get_from_(self, obj):
+        email = obj.from_email or ""
+
+        return {
+            "name": email.split("@")[0] if email else "Sistem",
+            "email": email,
+            "avatarUrl": None,
+        }
+
+    def get_to(self, obj):
+        return [{"email": email} for email in (obj.to or [])]
+
+    def get_labelIds(self, obj):
+        return list(obj.labels.values_list("slug", flat=True))
+
+    def get_attachments(self, obj):
+        return []
+
+    def get_isStarred(self, obj):
+        return False
+
+    def get_isImportant(self, obj):
+        return False

@@ -1,7 +1,7 @@
 from django.contrib import admin
 
 from app.views import User
-from ayy.models import AuthorizationStockBatch, CMRStockBatch, ColliType, DamageReport, EmailTemplate, PhoneNumber, UserEmail
+from ayy.models import AuthorizationStockBatch, CMRStockBatch, ColliType, DamageReport, EmailTemplate, MailLabelV2, MailMessage, PhoneNumber, UserEmail
 
 
 @admin.register(CMRStockBatch)
@@ -55,3 +55,17 @@ class UserEmailAdmin(admin.ModelAdmin):
 class EmailTemplateAdmin(admin.ModelAdmin):
     list_display = ('id', 'company',  'code', 'label',
                     'created_by', 'created_at')
+
+
+@admin.register(MailLabelV2)
+class MailLabelV2Admin(admin.ModelAdmin):
+    list_display = ('id', "name", "user", "type", "order")
+
+    list_filter = ("type",)
+
+
+@admin.register(MailMessage)
+class MailMessageAdmin(admin.ModelAdmin):
+    list_display = ('id', "user", "to", "subject", "is_read", "created_at")
+
+    list_filter = ("user", "is_read")

@@ -142,6 +142,8 @@ class ImageUploadSerializer(WritableNestedModelSerializer):
             attrs.get('company'),
         ]
 
+        print('3972', attrs)
+
         if sum(bool(r) for r in relations) != 1:
             raise serializers.ValidationError(
                 'Exactly one relation (load, user, vehicle, company) must be provided.'

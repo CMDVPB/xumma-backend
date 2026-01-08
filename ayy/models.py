@@ -888,8 +888,20 @@ class UserEmail(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     sent_at = models.DateTimeField(blank=True, null=True)
 
+    # sent mails are read by default
+    is_read = models.BooleanField(default=True)
+
     def __str__(self):
         return f"{self.subject} → {self.to}"
+
+
+class UserEmailAttachment(models.Model):
+    email = models.ForeignKey(
+        UserEmail, related_name="email_attachments", on_delete=models.CASCADE)
+    file = models.FileField(upload_to="email_attachments/")
+    filename = models.CharField(max_length=255)
+    size = models.PositiveIntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
 
 
 class EmailTemplate(models.Model):
@@ -925,3 +937,67 @@ class EmailTemplateVariable(models.Model):
     template = models.ForeignKey(EmailTemplate, on_delete=models.CASCADE)
     key = models.CharField(max_length=50)  # invoice_number
     description = models.CharField(max_length=255)
+
+
+class MailLabelV2(models.Model):
+    SYSTEM = "system"
+    CUSTOM = "custom"
+
+    TYPE_CHOICES = [
+        (SYSTEM, "System"),
+        (CUSTOM, "Custom"),
+    ]
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="mail_labels_v2",
+        null=True,
+        blank=True,
+    )
+
+    slug = models.SlugField()
+    name = models.CharField(max_length=50)
+    type = models.CharField(max_length=10, choices=TYPE_CHOICES)
+    order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        unique_together = ("user", "slug")
+        ordering = ["order"]
+
+    def __str__(self):
+        return f"{self.slug}"
+
+
+class MailMessage(models.Model):
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="mailbox_messages",
+    )
+
+    # Optional link to sent email
+    sent_email = models.OneToOneField(
+        UserEmail,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="mail_message",
+    )
+
+    from_email = models.EmailField()
+    to = models.JSONField()
+
+    subject = models.CharField(max_length=255)
+    body = models.TextField()
+
+    labels = models.ManyToManyField(
+        MailLabelV2,
+        related_name="messages",
+    )
+
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.subject

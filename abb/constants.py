@@ -75,3 +75,10 @@ EMAIL_TEMPLATE_CODES = {
     "request_info_from_consignee",
     "send_docs_to_import_broker",
 }
+
+SYSTEM_LABELS = [
+    ("inbox", "Inbox", 1),
+    ("sent", "Sent", 2),
+    ("drafts", "Drafts", 3),
+    ("trash", "Trash", 99),
+]
