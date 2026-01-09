@@ -425,25 +425,6 @@ class CommentSerializer(WritableNestedModelSerializer):
         fields = ('comment', 'uf')
 
 
-class ImageSerializer(WritableNestedModelSerializer):
-
-    load = serializers.SlugRelatedField(
-        allow_null=True, slug_field='uf', queryset=Load.objects.all(), write_only=True)
-
-    def to_internal_value(self, data):
-        # print('4574',)
-
-        if 'load' in data and data['load'] == '':
-            data['load'] = None
-
-        return super(ImageSerializer, self).to_internal_value(data)
-
-    class Meta:
-        model = ImageUpload
-        fields = ('load', 'unique_field', 'company',
-                  'file_name', 'file_obj', 's3_url')
-
-
 class CMRSerializer(serializers.ModelSerializer):
 
     def save(self, **kwargs):

@@ -1,3 +1,4 @@
+import os
 from rest_framework.views import APIView
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404
@@ -19,6 +20,10 @@ from rest_framework import permissions, status, exceptions
 from rest_framework.decorators import authentication_classes, api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser
+import mimetypes
+from django.http import FileResponse, Http404
+from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
 
 from abb.utils import assign_new_num, get_company_manager, get_user_company
 from app.models import SMTPSettings, UserSettings
@@ -27,7 +32,7 @@ from att.models import BankAccount, ContactSite, Note, PaymentTerm, Person, Term
 from axx.models import Load
 from ayy.models import CMR, AuthorizationStockBatch, CMRStockBatch, CTIRStockBatch, ColliType, ImageUpload, ItemForItemCost, ItemForItemInv
 from ayy.serializers import ItemForItemCostSerializer
-from dff.serializers.serializers_bce import BankAccountSerializer, ImageUploadSerializer, NoteSerializer
+from dff.serializers.serializers_bce import BankAccountSerializer, ImageUploadInSerializer, ImageUploadOutSerializer, NoteSerializer
 from dff.serializers.serializers_document import AuthorizationStockBatchSerializer, CMRStockBatchSerializer, CTIRStockBatchSerializer
 from dff.serializers.serializers_entry_detail import ColliTypeSerializer
 from dff.serializers.serializers_item_inv import ItemForItemInvSerializer
@@ -657,9 +662,9 @@ class PersonDetailView(RetrieveUpdateDestroyAPIView):
 
 
 class ImageView(CreateAPIView, RetrieveUpdateDestroyAPIView):
-    serializer_class = ImageUploadSerializer
+    serializer_class = ImageUploadInSerializer
     parser_classes = [MultiPartParser, FormParser]
-    lookup_field = 'unique_field'
+    lookup_field = 'uf'
 
     def get_queryset(self):
         try:
@@ -681,21 +686,82 @@ class ImageView(CreateAPIView, RetrieveUpdateDestroyAPIView):
             serializer.save()
 
 
-class ImageDownloadView(APIView):
+# class ImageDownloadView(APIView):
+#     permission_classes = [IsAuthenticated]
+
+#     def get(self, request, uf):
+#         image = get_object_or_404(ImageUpload, uf=uf)
+
+#         # ownership check
+#         if image.company != get_user_company(request.user):
+#             return Response(status=403)
+
+#         return HttpResponseRedirect(image.file_obj.url)
+
+
+class MediaProxyView(APIView):
+
     permission_classes = [IsAuthenticated]
 
-    def get(self, request, unique_field):
-        image = get_object_or_404(ImageUpload, unique_field=unique_field)
+    def get(self, request, uf):
+        image = get_object_or_404(ImageUpload, uf=uf)
+
+        # Ownership check
+        if image.company != get_user_company(request.user):
+            raise Http404()
+
+        file_field = image.file_obj  # FileField
+
+        if not file_field:
+            raise Http404()
+
+        # Check physical file existence
+        if not os.path.exists(file_field.path):
+            # Optional: log this
+            # logger.warning("Missing file for ImageUpload %s", image.id)
+            raise Http404("File not found")
+
+        content_type, _ = mimetypes.guess_type(file_field.name)
+        content_type = content_type or "application/octet-stream"
+
+        response = FileResponse(
+            file_field.open("rb"),
+            content_type=content_type,
+        )
+
+        response["Content-Disposition"] = (
+            f'inline; filename="{image.file_name}"'
+        )
+
+        return response
+
+    def delete(self, request, uf):
+        image = get_object_or_404(ImageUpload, uf=uf)
 
         # ownership check
         if image.company != get_user_company(request.user):
-            return Response(status=403)
+            raise Http404()
 
-        return HttpResponseRedirect(image.file_obj.url)
+        file_field = image.file_obj
+
+        # delete physical file first
+        if file_field and os.path.exists(file_field.path):
+            try:
+                os.remove(file_field.path)
+            except OSError:
+                # optional: log error
+                pass
+
+        # delete DB record
+        image.delete()
+
+        return Response(
+            {"detail": "File deleted successfully"},
+            status=status.HTTP_204_NO_CONTENT,
+        )
+
 
 ### Start SMTP Settings ###
-
-
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def test_smtp_connection_view(request):

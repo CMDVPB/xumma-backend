@@ -20,12 +20,14 @@ from att.models import Contact, PaymentTerm, Person, Vehicle, VehicleUnit
 from att.serializers import BodyTypeSerializer, IncotermSerializer, ModeTypeSerializer, StatusTypeSerializer, VehicleSerializer
 from axx.models import Ctr, Exp, Inv, Load, Tor, Trip
 from ayy.models import CMR
+from dff.serializers.serializers_bce import ImageUploadOutSerializer
 from dff.serializers.serializers_ctr import CtrSerializer
 from dff.serializers.serializers_entry_detail import EntryBasicReadListSerializer, EntrySerializer
 from dff.serializers.serializers_exp import ExpSerializer
 from dff.serializers.serializers_inv import InvSerializer
 from dff.serializers.serializers_item_inv import ItemInvSerializer
-from dff.serializers.serializers_other import CMRSerializer, CommentSerializer, ContactBasicReadSerializer, ContactSerializer, HistorySerializer, ImageSerializer, PaymentTermSerializer, PersonSerializer, VehicleUnitSerializer
+from dff.serializers.serializers_other import CMRSerializer, CommentSerializer, ContactBasicReadSerializer, ContactSerializer, HistorySerializer, \
+    PaymentTermSerializer, PersonSerializer, VehicleUnitSerializer
 from dff.serializers.serializers_tor import TorSerializer
 
 
@@ -223,7 +225,7 @@ class LoadSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
     load_iteminvs = ItemInvSerializer(many=True)
     load_comments = CommentSerializer(many=True)
     load_histories = HistorySerializer(many=True, read_only=True)
-    load_imageuploads = ImageSerializer(many=True, read_only=True)
+    load_imageuploads = ImageUploadOutSerializer(many=True, read_only=True)
 
     def to_internal_value(self, data):
         # print('6080', data)

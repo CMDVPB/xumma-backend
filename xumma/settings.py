@@ -265,6 +265,10 @@ STATICFILES_STORAGE = "django.contrib.staticfiles.storage.StaticFilesStorage"
 DEFAULT_FILE_STORAGE = "django.core.files.storage.FileSystemStorage"
 
 
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+USE_X_FORWARDED_HOST = True
+
+
 DJOSER = {
     'LOGIN_FIELD': 'email',
     'TOKEN_MODEL': None,

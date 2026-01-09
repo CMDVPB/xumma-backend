@@ -10,6 +10,7 @@ from abb.serializers_drf_writable import CustomUniqueFieldsMixin, CustomWritable
 from abb.utils import get_request_language, get_user_company
 from app.models import CategoryGeneral, TypeGeneral
 from att.models import Contact, EmissionClass, RouteSheetStockBatch, VehicleBrand, Vehicle
+from dff.serializers.serializers_bce import ImageUploadOutSerializer
 
 
 class TypeGeneralSerializer(serializers.ModelSerializer):
@@ -110,6 +111,7 @@ class VehicleSerializer(WritableNestedModelSerializer):
         allow_null=True, slug_field='uf', queryset=BodyType.objects.all())
     emission_class = serializers.SlugRelatedField(
         allow_null=True, slug_field='code', queryset=EmissionClass.objects.all())
+    vehicle_imageuploads = ImageUploadOutSerializer(many=True, read_only=True)
 
     # vehicle_gendocs = GenDocSerializer(many=True)
 
@@ -188,6 +190,7 @@ class VehicleSerializer(WritableNestedModelSerializer):
                   'interval_taho', 'last_date_unload_taho', 'comment',
                   'brand', 'vehicle_category', 'vehicle_category_type', 'vehicle_body', 'emission_class',
                   'contact',
+                  'vehicle_imageuploads',
                   )
 
 

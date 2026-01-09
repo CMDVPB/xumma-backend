@@ -158,8 +158,7 @@ class ImageUpload(models.Model):
     uf = models.CharField(max_length=36, default=hex_uuid)
     company = models.ForeignKey(
         Company, on_delete=models.CASCADE, null=True, blank=True, related_name='company_imageuploads')
-    unique_field = models.UUIDField(
-        default=hex_uuid, editable=False)
+
     file_name = models.CharField(
         max_length=500, blank=True, null=True)
     file_obj = models.FileField(upload_to=image_upload_path)
@@ -205,9 +204,9 @@ class ImageUpload(models.Model):
 
         super().save(*args, **kwargs)
 
-    @property
-    def s3_url(self):
-        return self.file_obj.url
+    # @property
+    # def s3_url(self):
+    #     return self.file_obj.url
 
     def __str__(self):
         return str(self.file_obj) or ''
@@ -232,9 +231,9 @@ class FileUpload(models.Model):
 
         super(FileUpload, self).save(*args, **kwargs)
 
-    @property
-    def s3_url(self):
-        return self.file_obj.url if self.file_obj else None
+    # @property
+    # def s3_url(self):
+    #     return self.file_obj.url if self.file_obj else None
 
     def __str__(self):
         return str(self.file_name or self.id or 'File name')

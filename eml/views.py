@@ -250,14 +250,17 @@ class MailListAPIView(ListAPIView):
         since = timezone.now() - timedelta(days=31)
 
         return (
-            MailMessage.objects
-            .filter(
-                user=self.request.user,
-                labels__slug=label_slug,
-                created_at__gte=since,   # ✅ last 31 days
-            )
-            .select_related("sent_email")
-            .order_by("-created_at")
+            (MailMessage.objects
+             .select_related("sent_email")
+             .prefetch_related("labels")
+             .filter(
+                 user=self.request.user,
+                 labels__slug=label_slug,
+                 created_at__gte=since,   # ✅ last 31 days
+             )
+             .order_by("-created_at")
+             )
+
         )
 
     def list(self, request, *args, **kwargs):

@@ -1,14 +1,16 @@
+from django.conf import settings
 from collections import defaultdict
 from django.db import transaction
 from django.contrib.auth import get_user_model
 from drf_writable_nested.serializers import WritableNestedModelSerializer
 from drf_writable_nested.mixins import UniqueFieldsMixin, NestedCreateMixin, NestedUpdateMixin
 from rest_framework import serializers
+from rest_framework.serializers import SlugRelatedField
 
 from abb.models import Currency
 from abb.serializers import CurrencySerializer
 from abb.serializers_drf_writable import CustomWritableNestedModelSerializer, CustomUniqueFieldsMixin
-from att.models import BankAccount, Note
+from att.models import BankAccount, Note, Vehicle
 from axx.models import Load
 from ayy.models import ImageUpload
 
@@ -119,12 +121,71 @@ class NoteSerializer(WritableNestedModelSerializer):
         fields = ('note_short', 'note_description', 'uf')
 
 
-class ImageUploadSerializer(WritableNestedModelSerializer):
+class ImageUploadInSerializer(WritableNestedModelSerializer):
+
+    load = SlugRelatedField(
+        allow_null=True,
+        slug_field='uf',
+        queryset=Load.objects.all(),
+        required=False,
+        write_only=True
+    )
+
+    user = SlugRelatedField(
+        allow_null=True,
+        slug_field='uf',
+        queryset=User.objects.all(),
+        required=False,
+        write_only=True,
+    )
+
+    vehicle = SlugRelatedField(
+        allow_null=True,
+        slug_field='uf',
+        queryset=Vehicle.objects.all(),
+        required=False,
+        write_only=True,
+    )
+
+    def to_internal_value(self, data):
+        # normalize empty strings → None
+        for field in ("load", "user", "vehicle"):
+            if data.get(field) == "":
+                data[field] = None
+
+        return super().to_internal_value(data)
+
+    def validate(self, attrs):
+        """
+        Exactly ONE of load / user / vehicle must be set
+        """
+        relations = [
+            attrs.get("load"),
+            attrs.get("user"),
+            attrs.get("vehicle"),
+        ]
+
+        if sum(bool(rel) for rel in relations) != 1:
+            raise serializers.ValidationError(
+                "Exactly one of 'load', 'user', or 'vehicle' must be provided."
+            )
+
+        return attrs
+
+    class Meta:
+        model = ImageUpload
+        fields = ('file_name', 'file_obj', 'uf',
+                  'company', 'load', 'user', 'vehicle',
+                  )
+
+
+class ImageUploadOutSerializer(WritableNestedModelSerializer):
 
     load = serializers.SlugRelatedField(
         allow_null=True, slug_field='uf', queryset=Load.objects.all(), write_only=True, required=False)
     user = serializers.SlugRelatedField(
         allow_null=True, slug_field='uf', queryset=User.objects.all(), write_only=True, required=False)
+    file_obj = serializers.SerializerMethodField(read_only=True)
 
     def to_internal_value(self, data):
         # print('4574',)
@@ -132,7 +193,7 @@ class ImageUploadSerializer(WritableNestedModelSerializer):
         if 'load' in data and data['load'] == '':
             data['load'] = None
 
-        return super(ImageUploadSerializer, self).to_internal_value(data)
+        return super(ImageUploadOutSerializer, self).to_internal_value(data)
 
     def validate(self, attrs):
         relations = [
@@ -153,7 +214,11 @@ class ImageUploadSerializer(WritableNestedModelSerializer):
 
     class Meta:
         model = ImageUpload
-        fields = ('load', 'unique_field', 'company',
-                  'file_name', 'file_obj', 's3_url',
+        fields = ('uf', 'company',
+                  'file_name', 'file_obj',
                   'load', 'user',
                   )
+
+    def get_file_obj(self, obj):
+        # ✅ ALWAYS return backend proxy URL
+        return f"{settings.BACKEND_URL}/api/image/{obj.uf}/"

@@ -11,7 +11,7 @@ import logging
 from abb.serializers import CountrySerializer
 from abb.utils import company_latest_exp_date_subscription, get_company_manager, get_company_users, get_user_company
 from app.models import Company, UserSettings
-from dff.serializers.serializers_bce import ImageUploadSerializer
+from dff.serializers.serializers_bce import ImageUploadOutSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +46,7 @@ class UserBasicPlusSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
     user_phone_numbers = PhoneNumberSerializer(
         many=True, context={'request': 'request'})
 
-    user_imageuploads = ImageUploadSerializer(
+    user_imageuploads = ImageUploadOutSerializer(
         many=True, context={'request': 'request'}, read_only=True)
 
     def to_representation(self, instance):
@@ -80,7 +80,7 @@ class UserSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
         many=True, context={'request': 'request'})
     user_phone_numbers = PhoneNumberSerializer(
         many=True, context={'request': 'request'})
-    user_imageuploads = ImageUploadSerializer(
+    user_imageuploads = ImageUploadOutSerializer(
         many=True, context={'request': 'request'}, read_only=True)
 
     def to_representation(self, instance):
