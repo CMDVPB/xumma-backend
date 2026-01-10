@@ -1,7 +1,7 @@
 from django.contrib import admin
 
 from app.views import User
-from ayy.models import AuthorizationStockBatch, CMRStockBatch, ColliType, DamageReport, EmailTemplate, ImageUpload, MailLabelV2, MailMessage, PhoneNumber, UserEmail
+from ayy.models import AuthorizationStockBatch, CMRStockBatch, ColliType, DamageReport, EmailTemplate, ImageUpload, ItemCost, ItemForItemCost, MailLabelV2, MailMessage, PhoneNumber, UserEmail
 
 
 @admin.register(CMRStockBatch)
@@ -76,3 +76,21 @@ class ImageUploadAdmin(admin.ModelAdmin):
     list_display = ('id', 'company', 'file_name', 'load', 'user', 'vehicle')
 
     list_filter = ('company', "user", "load", 'vehicle')
+
+
+@admin.register(ItemCost)
+class ItemCostAdmin(admin.ModelAdmin):
+    list_display = ('id', 'company',
+                    )
+
+    search_fields = ('company__company_name',
+                     )
+
+
+@admin.register(ItemForItemCost)
+class ItemForItemCostAdmin(admin.ModelAdmin):
+    list_display = ('id', 'company', 'serial_number',
+                    'description', 'code', 'vat', 'is_system')
+
+    search_fields = ('company__company_name',
+                     )

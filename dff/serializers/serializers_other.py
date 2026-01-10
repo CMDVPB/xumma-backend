@@ -434,7 +434,7 @@ class CMRSerializer(serializers.ModelSerializer):
         parent_load = kwargs.get("load")
         if not parent_load:
             raise serializers.ValidationError(
-                "E681 A valid parent instance is required.")
+                "E683 A valid parent instance is required.")
 
         # Attach load to validated data
         self.validated_data["load"] = parent_load

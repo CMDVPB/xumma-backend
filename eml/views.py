@@ -56,6 +56,9 @@ class BasicEmailOptionalAttachmentsView(APIView):
         user = request.user
         files = request.FILES.getlist("attachments")  # 👈 optional
 
+        load_uf = request.data.get('loadUf')
+        event_type = request.data.get('eventType')
+
         with transaction.atomic():
             email = UserEmail.objects.create(
                 user=user,
@@ -102,7 +105,7 @@ class BasicEmailOptionalAttachmentsView(APIView):
             mailbox_msg.labels.add(sent_label)
 
             ### enqueue task ###
-            send_basic_email_task.delay(email.id)
+            send_basic_email_task.delay(email.id, load_uf, event_type)
 
             return Response(
                 {

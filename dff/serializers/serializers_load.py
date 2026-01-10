@@ -9,6 +9,7 @@ from drf_writable_nested.serializers import WritableNestedModelSerializer
 from drf_writable_nested.mixins import UniqueFieldsMixin, NestedCreateMixin, NestedUpdateMixin
 from rest_framework import serializers
 from rest_framework.serializers import SlugRelatedField
+from django.db import IntegrityError
 
 from abb.custom_serializers import SlugRelatedGetOrCreateField
 from abb.models import BodyType, Currency, Incoterm, ModeType, StatusType
@@ -18,7 +19,7 @@ from app.models import CategoryGeneral
 from app.serializers import UserBasicSerializer, UserSerializer
 from att.models import Contact, PaymentTerm, Person, Vehicle, VehicleUnit
 from att.serializers import BodyTypeSerializer, IncotermSerializer, ModeTypeSerializer, StatusTypeSerializer, VehicleSerializer
-from axx.models import Ctr, Exp, Inv, Load, Tor, Trip
+from axx.models import Ctr, Exp, Inv, Load, LoadEvent, Tor, Trip
 from ayy.models import CMR
 from dff.serializers.serializers_bce import ImageUploadOutSerializer
 from dff.serializers.serializers_ctr import CtrSerializer
@@ -33,12 +34,40 @@ from dff.serializers.serializers_tor import TorSerializer
 
 User = get_user_model()
 
+LOAD_EVENT_FLAG_MAP = {
+    "shipper_confirmed": "SHIPPER_CONFIRMED",
+    "shipper_email_sent": "SHIPPER_EMAIL_SENT",
+    "docs_sent_cnee_broker": "DOCS_SENT_CNEE_BROKER",
+}
+
+
+class LoadEventOutSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LoadEvent
+        fields = (
+            "uf",
+            "event_type",
+            "created_at",
+            "created_by",
+        )
+
+
+class LoadEventSerializer(WritableNestedModelSerializer):
+
+    class Meta:
+        model = LoadEvent
+        fields = ('event_type', 'created_at', 'created_by', 'uf')
+
 
 class LoadTripListSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
+    currency_code = serializers.CharField(
+        source='currency.currency_code',
+        read_only=True
+    )
 
     class Meta:
         model = Load
-        fields = ('uf', )
+        fields = ('freight_price', 'currency_code', 'date_order', 'uf')
 
 
 class TorLoadListSerializer(WritableNestedModelSerializer):
@@ -127,6 +156,7 @@ class LoadListSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
     load_iteminvs = ItemInvSerializer(many=True)
     load_comments = CommentSerializer(many=True)
     load_tors = TorLoadListSerializer(many=True)
+    load_events = LoadEventSerializer(many=True)
 
     def to_representation(self, instance):
         from dff.serializers.serializers_trip import TripTruckSerializer
@@ -148,8 +178,9 @@ class LoadListSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
                   'date_loaded', 'date_cleared', 'date_unloaded', 'date_invoiced', 'date_signed',
                   'load_address', 'unload_address', 'hb', 'mb', 'booking_number', 'comment1',
                   'assigned_user', 'bill_to', 'mode', 'bt', 'currency', 'status', 'incoterm', 'carrier', 'vehicle_tractor', 'vehicle_trailer',
-                  'load_comments', 'load_tors', 'entry_loads', 'load_iteminvs',
+                  'load_comments', 'load_tors', 'entry_loads', 'load_iteminvs', 'load_events',
                   )
+        read_only_fields = ['load_events']
 
 
 class LoadSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
@@ -226,6 +257,7 @@ class LoadSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
     load_comments = CommentSerializer(many=True)
     load_histories = HistorySerializer(many=True, read_only=True)
     load_imageuploads = ImageUploadOutSerializer(many=True, read_only=True)
+    load_events = LoadEventSerializer(many=True)
 
     def to_internal_value(self, data):
         # print('6080', data)
@@ -464,7 +496,9 @@ class LoadSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
                   'load_comments', 'payment_term', 'entry_loads', 'load_iteminvs', 'load_tors', 'load_ctrs', 'load_imageuploads', 'load_invs',
                   'load_histories', 'load_exps',
                   'trip', 'carrier', 'person_carrier', 'driver', 'vehicle_tractor', 'vehicle_trailer',
+                  'load_events',
                   )
+        read_only_fields = ['load_events']
 
 
 class LoadPatchSerializer(WritableNestedModelSerializer):
@@ -476,6 +510,17 @@ class LoadPatchSerializer(WritableNestedModelSerializer):
 
 
     }
+
+    load_events = LoadEventOutSerializer(
+        many=True,
+        read_only=True
+    )
+    shipper_confirmed = serializers.BooleanField(
+        write_only=True, required=False)
+    shipper_email_sent = serializers.BooleanField(
+        write_only=True, required=False)
+    docs_sent_cnee_broker = serializers.BooleanField(
+        write_only=True, required=False)
 
     def validate(self, attrs):
         instance = self.instance
@@ -501,12 +546,56 @@ class LoadPatchSerializer(WritableNestedModelSerializer):
 
         return attrs
 
-    def update(self, instance, validated_data):
-        # print('6464', validated_data)
+    # def update(self, instance, validated_data):
+    #     # print('6464', validated_data)
 
-        # ✅ business rule
+    #     # ✅ business rule
+    #     now = timezone.now()
+
+    #     for flag_field, date_field in self.AUTO_DATE_FIELDS.items():
+    #         if (
+    #             validated_data.get(flag_field) is True
+    #             and date_field not in validated_data
+    #             and getattr(instance, date_field) is None
+    #         ):
+    #             validated_data[date_field] = now
+    #         elif (
+    #             validated_data.get(flag_field) is False
+    #             and date_field not in validated_data
+    #         ):
+    #             validated_data[date_field] = None
+
+    #     relations, reverse_relations = self._extract_relations(validated_data)
+
+    #     # Create or update direct relations (foreign key, one-to-one)
+    #     self.update_or_create_direct_relations(
+    #         validated_data,
+    #         relations,
+    #     )
+
+    #     # Update instance with atomic
+    #     with transaction.atomic():
+    #         instance = super(NestedUpdateMixin, self).update(
+    #             instance,
+    #             validated_data,
+    #         )
+    #         self.update_or_create_reverse_relations(
+    #             instance, reverse_relations)
+    #         self.delete_reverse_relations_if_need(instance, reverse_relations)
+    #         instance.refresh_from_db()
+    #         return instance
+
+    def update(self, instance, validated_data):
         now = timezone.now()
 
+        # 🔹 extract event flags
+        event_type = None
+        for flag, mapped_event in LOAD_EVENT_FLAG_MAP.items():
+            if validated_data.pop(flag, False) is True:
+                event_type = mapped_event
+                break  # ✅ exactly ONE event per request
+
+        # 🔹 auto-date logic (unchanged)
         for flag_field, date_field in self.AUTO_DATE_FIELDS.items():
             if (
                 validated_data.get(flag_field) is True
@@ -522,29 +611,42 @@ class LoadPatchSerializer(WritableNestedModelSerializer):
 
         relations, reverse_relations = self._extract_relations(validated_data)
 
-        # Create or update direct relations (foreign key, one-to-one)
-        self.update_or_create_direct_relations(
-            validated_data,
-            relations,
-        )
-
-        # Update instance with atomic
         with transaction.atomic():
             instance = super(NestedUpdateMixin, self).update(
                 instance,
                 validated_data,
             )
+
             self.update_or_create_reverse_relations(
                 instance, reverse_relations)
             self.delete_reverse_relations_if_need(instance, reverse_relations)
+
+            # 🔹 create LoadEvent (retry-safe)
+            if event_type:
+                try:
+                    LoadEvent.objects.create(
+                        load=instance,
+                        event_type=event_type,
+                        created_by=self.context["request"].user,
+                    )
+                except IntegrityError:
+                    pass
+
             instance.refresh_from_db()
             return instance
 
     class Meta:
         model = Load
         # Only include the fields to allow patching
-        fields = ['is_active', 'is_loaded', 'is_cleared', 'is_unloaded', 'is_invoiced', 'is_signed', 'is_paid',
-                  'date_loaded', 'date_cleared', 'date_unloaded', 'date_invoiced', 'date_signed']
+        fields = ('is_active', 'is_loaded', 'is_cleared', 'is_unloaded', 'is_invoiced', 'is_signed', 'is_paid',
+                  'date_loaded', 'date_cleared', 'date_unloaded', 'date_invoiced', 'date_signed',
+                  # write-only flags
+                  'shipper_confirmed',
+                  'shipper_email_sent',
+                  'docs_sent_cnee_broker',
+                  # read-only output
+                  'load_events',
+                  )
 
         # Should never be updated
         read_only_fields = ["id", "company", "assigned_user", "uf"]

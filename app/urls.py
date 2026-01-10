@@ -7,6 +7,7 @@ from app.views import (
     CustomTokenRefreshView,
     CustomTokenVerifyView,
     LogoutView,
+    get_exchange_rates_multi_view,
 )
 
 urlpatterns = [
@@ -19,6 +20,10 @@ urlpatterns = [
     path('jwt/refresh/', CustomTokenRefreshView.as_view()),
     path('jwt/verify/', CustomTokenVerifyView.as_view()),
     path('logout/', LogoutView.as_view()),
+
+
+    path('ex-rates-multi/', get_exchange_rates_multi_view,
+         name='get-exchange-rates'),
 
 
 ]

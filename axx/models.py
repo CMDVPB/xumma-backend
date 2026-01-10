@@ -314,6 +314,26 @@ class Load(models.Model):
         return str(self.sn) or ''
 
 
+class LoadEvent(models.Model):
+    LOAD_EVENT_TYPES = [
+        ('SHIPPER_EMAIL_SENT', 'Shipper email sent'),
+        ('SHIPPER_CONFIRMED', 'Shipper confirmed'),
+        ('DOCS_SENT_CNEE_BROKER', 'Docs sent to consignee broker'),
+    ]
+    uf = models.CharField(max_length=36, default=hex_uuid,
+                          db_index=True, unique=True)
+    load = models.ForeignKey(
+        Load, on_delete=models.CASCADE, related_name='load_events')
+    event_type = models.CharField(
+        max_length=50,        choices=LOAD_EVENT_TYPES)
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL)
+
+    class Meta:
+        unique_together = ('load', 'event_type')
+
+
 class Tor(models.Model):
     ''' Carrier transport order '''
     company = models.ForeignKey(

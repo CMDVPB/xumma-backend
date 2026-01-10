@@ -1,18 +1,20 @@
 import email
 import json
 import logging
+from axx.models import Load, LoadEvent
 from ayy.models import UserEmail
 from xumma.celery import app
 from django.conf import settings
 from django.core.mail import EmailMessage, get_connection
 from django.utils import timezone
+from django.db import IntegrityError
 from smtplib import SMTPException
 
 logger = logging.getLogger(__name__)
 
 
 @app.task(bind=True, autoretry_for=(SMTPException,), retry_backoff=30, retry_kwargs={'max_retries': 3})
-def send_basic_email_task(self, email_id):
+def send_basic_email_task(self, email_id, load_uf=None, event_type=None):
     """
     payload = {
         'to': [...],
@@ -55,9 +57,22 @@ def send_basic_email_task(self, email_id):
 
             msg.send()
 
+        now = timezone.now()
+
         email.status = "sent"
-        email.sent_at = timezone.now()
+        email.sent_at = now
         email.save(update_fields=["status", "sent_at"])
+
+        ### Prevent duplicate updates on retry ###
+        if load_uf and event_type:
+            try:
+                LoadEvent.objects.create(
+                    load_id=Load.objects.only("id").get(uf=load_uf).id,
+                    event_type=event_type,
+                    created_by=email.user,
+                )
+            except IntegrityError:
+                pass
 
         logger.info(f"Email sent to {email.to}")
 

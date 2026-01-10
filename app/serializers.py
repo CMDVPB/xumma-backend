@@ -8,7 +8,7 @@ from drf_writable_nested.mixins import NestedCreateMixin, NestedUpdateMixin, Uni
 
 import logging
 
-from abb.serializers import CountrySerializer
+from abb.serializers import CountrySerializer, CurrencySerializer
 from abb.utils import company_latest_exp_date_subscription, get_company_manager, get_company_users, get_user_company
 from app.models import Company, UserSettings
 from dff.serializers.serializers_bce import ImageUploadOutSerializer
@@ -139,10 +139,13 @@ class UserSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
 
 
 class UserSettingsSerializer(serializers.ModelSerializer):
+    currency_default = CurrencySerializer(allow_null=True)
+
     class Meta:
         model = UserSettings
         fields = ('theme', 'notifications_enabled', 'simplified_load', 'uf',
                   'base_doc_lang', 'rows_per_page', 'myitems_all', 'order_by',
+                  'currency_default',
                   'load_columns', 'load_2_columns', 'load_3_columns', 'load_4_columns', 'load_due_columns',
                   'trip_loads_columns', 'trip_columns', 'tor_columns', 'ctr_columns', 'quote_columns', 'inv_columns', 'exp_columns',
                   'default_document_tab',

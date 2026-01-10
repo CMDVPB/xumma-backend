@@ -9,7 +9,7 @@ from django.contrib.postgres.fields import ArrayField
 from django.utils import timezone
 from cryptography.fernet import Fernet
 
-from abb.models import Country
+from abb.models import Country, Currency
 from abb.utils import get_default_empty_strings_20, get_order_by_default, hex_uuid, get_default_notification_status_3, validate_columns_arrayfield_length_min_5
 from abb.constants import BASE_COUNTRIES, BASE_COUNTRIES_LIST, APP_LANGS, DOC_LANG_CHOICES, MEMBERSHIP_CHOICES
 from abb.validators import validate_columns_arrayfield_length_exactly_20
@@ -175,6 +175,9 @@ class UserSettings(models.Model):
         max_length=20, null=True, blank=True), null=True, blank=True, size=30, validators=[validate_columns_arrayfield_length_min_5])
     exp_columns = ArrayField(models.CharField(
         max_length=20, null=True, blank=True), null=True, blank=True, size=30, validators=[validate_columns_arrayfield_length_min_5])
+
+    currency_default = models.ForeignKey(
+        Currency, on_delete=models.SET_NULL, blank=True, null=True, related_name='currency_default_user_settings')
 
     class Meta:
         verbose_name = "User Settings"

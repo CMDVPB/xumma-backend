@@ -5,6 +5,8 @@ from django.utils import timezone
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+from rest_framework.decorators import authentication_classes, api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -18,6 +20,8 @@ from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from djoser.social.views import ProviderAuthView
 
 import logging
+
+from app.utils import get_all_exchange_rates
 logger = logging.getLogger(__name__)
 
 
@@ -294,3 +298,28 @@ class LogoutView(APIView):
         # print('A282', response)
 
         return response
+
+
+###### Start other views ######
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_exchange_rates_multi_view(request):
+    try:
+        national_bank = request.GET.get('national_bank')
+        print('4888 get_exchange_rates_multi_view', national_bank)
+
+        exchange_rates = get_all_exchange_rates(
+            national_bank)
+        data = exchange_rates
+
+        # print('4252 get_exchange_rate', data)
+
+        return Response(data, status=200)
+    except Exception as e:
+        logger.error(f'get_exchange_rates_multi_view. ERROR: {e}')
+        return Response(status=400)
+
+
+###### End other views ######

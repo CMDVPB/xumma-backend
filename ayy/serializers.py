@@ -3,10 +3,12 @@
 from collections import defaultdict
 from django.db import transaction
 from django.contrib.auth import get_user_model
+from django.forms import SlugField
 from rest_framework import serializers
 from drf_writable_nested.serializers import WritableNestedModelSerializer
 from drf_writable_nested.mixins import UniqueFieldsMixin, NestedCreateMixin, NestedUpdateMixin
 
+from abb.models import Currency
 from abb.serializers import CurrencySerializer
 from abb.serializers_drf_writable import CustomWritableNestedModelSerializer, CustomUniqueFieldsMixin
 from abb.utils import get_user_company
@@ -54,7 +56,9 @@ class ItemForItemCostSerializer(CustomWritableNestedModelSerializer):
 class ItemCostSerializer(WritableNestedModelSerializer):
     item_for_item_cost = ItemForItemCostSerializer(
         allow_null=True, context={'request': 'request'})
-    currency = CurrencySerializer(allow_null=True)
+
+    currency = serializers.SlugRelatedField(
+        allow_null=True, slug_field='uf', queryset=Currency.objects.all())
 
     def to_internal_value(self, data):
         if 'quantity' in data and type(data['quantity']) == str:
@@ -81,7 +85,7 @@ class ItemCostSerializer(WritableNestedModelSerializer):
         self._save_kwargs = defaultdict(dict, kwargs)
 
         # List of possible parent keys that may be passed in kwargs
-        possible_parents = ['route_sheet']
+        possible_parents = ['trip']
 
         # print('4750', kwargs)
 
@@ -100,7 +104,7 @@ class ItemCostSerializer(WritableNestedModelSerializer):
             self.validated_data[parent_field_name] = parent_instance
         else:
             raise serializers.ValidationError(
-                "E681 A valid parent instance is required.")
+                "E679 A valid parent instance is required.")
 
         # Get company from parent instance and attach to child
         if hasattr(parent_instance, 'company'):

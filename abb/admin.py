@@ -25,19 +25,19 @@ class CurrencyAdmin(admin.ModelAdmin):
 @admin.register(ExchangeRate)
 class ExchangeRateAdmin(admin.ModelAdmin):
 
-    def nbr(self, obj):
-        return bool(obj.metadata_nbr)
-    nbr.boolean = True
-
     def nbm(self, obj):
         return bool(obj.metadata_nbm)
     nbm.boolean = True
+
+    def nbr(self, obj):
+        return bool(obj.metadata_nbr)
+    nbr.boolean = True
 
     def nbu(self, obj):
         return bool(obj.metadata_nbu)
     nbu.boolean = True
 
-    list_display = ('date', 'nbr', 'nbm', 'nbu')
+    list_display = ('date', 'nbm', 'nbr', 'nbu')
 
 
 @admin.register(Incoterm)
