@@ -324,8 +324,7 @@ class LoadEvent(models.Model):
                           db_index=True, unique=True)
     load = models.ForeignKey(
         Load, on_delete=models.CASCADE, related_name='load_events')
-    event_type = models.CharField(
-        max_length=50,        choices=LOAD_EVENT_TYPES)
+    event_type = models.CharField(max_length=50, choices=LOAD_EVENT_TYPES)
     created_at = models.DateTimeField(auto_now_add=True)
     created_by = models.ForeignKey(
         User, null=True, blank=True, on_delete=models.SET_NULL)

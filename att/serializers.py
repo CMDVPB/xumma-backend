@@ -5,11 +5,11 @@ from rest_framework.serializers import SlugRelatedField
 from drf_writable_nested.serializers import WritableNestedModelSerializer
 from drf_writable_nested.mixins import UniqueFieldsMixin, NestedCreateMixin, NestedUpdateMixin
 
-from abb.models import BodyType, Incoterm, ModeType, StatusType
+from abb.models import BodyType, Currency, Incoterm, ModeType, StatusType
 from abb.serializers_drf_writable import CustomUniqueFieldsMixin, CustomWritableNestedModelSerializer
 from abb.utils import get_request_language, get_user_company
 from app.models import CategoryGeneral, TypeGeneral
-from att.models import Contact, EmissionClass, RouteSheetStockBatch, VehicleBrand, Vehicle
+from att.models import Contact, EmissionClass, RouteSheetStockBatch, VehicleBrand, Vehicle, VehicleKmRate
 from dff.serializers.serializers_bce import ImageUploadOutSerializer
 
 
@@ -97,6 +97,21 @@ class VehicleContactSerializer(CustomUniqueFieldsMixin, CustomWritableNestedMode
                   )
 
 
+class VehicleKmRateSerializer(serializers.ModelSerializer):
+    currency = serializers.SlugRelatedField(
+        allow_null=True, slug_field='uf', queryset=Currency.objects.all())
+
+    class Meta:
+        model = VehicleKmRate
+        fields = (
+            'id',
+            'rate_per_km',
+            'currency',
+            'valid_from',
+            'valid_to',
+        )
+
+
 class VehicleSerializer(WritableNestedModelSerializer):
 
     contact = SlugRelatedField(
@@ -111,6 +126,8 @@ class VehicleSerializer(WritableNestedModelSerializer):
         allow_null=True, slug_field='uf', queryset=BodyType.objects.all())
     emission_class = serializers.SlugRelatedField(
         allow_null=True, slug_field='code', queryset=EmissionClass.objects.all())
+
+    vehicle_km_rates = VehicleKmRateSerializer(many=True)
     vehicle_imageuploads = ImageUploadOutSerializer(many=True, read_only=True)
 
     # vehicle_gendocs = GenDocSerializer(many=True)
@@ -190,7 +207,7 @@ class VehicleSerializer(WritableNestedModelSerializer):
                   'interval_taho', 'last_date_unload_taho', 'comment',
                   'brand', 'vehicle_category', 'vehicle_category_type', 'vehicle_body', 'emission_class',
                   'contact',
-                  'vehicle_imageuploads',
+                  'vehicle_imageuploads', 'vehicle_km_rates',
                   )
 
 

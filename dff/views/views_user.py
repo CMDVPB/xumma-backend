@@ -26,6 +26,7 @@ from abb.permissions import AddNewUserPermission, IsManager
 from app.djoser_serializers import UserBaseCreateSerializer
 from app.serializers import UserSerializer
 from app.utils import is_user_member_group
+from dff.serializers.serializers_user import UserCompleteSerializer
 logger = logging.getLogger(__name__)
 
 
@@ -168,6 +169,60 @@ class UserDetailSelfOrByManagerView(RetrieveUpdateDestroyAPIView):
         request_user_id = self.request.user.id
 
         logger.info(f"A450 {request_user_id, len(queryset)}")
+
+        return queryset
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        self.perform_destroy(instance)
+
+        response = Response(status=status.HTTP_204_NO_CONTENT)
+
+        # Delete the access and refresh tokens from the cookies if request.user is the same as the user being deleted
+        request_user_id = request.user.id
+        instance_user_id = instance.id
+
+        logger.warning(f"A460 {request_user_id, instance_user_id}")
+
+        if request_user_id == instance_user_id:
+            response.delete_cookie(
+                'access', domain=settings.AUTH_COOKIE_DOMAIN, path=settings.AUTH_COOKIE_PATH)
+            response.delete_cookie(
+                'refresh', domain=settings.AUTH_COOKIE_DOMAIN, path=settings.AUTH_COOKIE_PATH)
+
+        return response
+
+
+class UserCompleteView(RetrieveUpdateDestroyAPIView):
+    """ 
+    """
+    permission_classes = [IsAuthenticated]
+    serializer_class = UserCompleteSerializer
+    lookup_field = 'uf'
+
+    def get_queryset(self, *args, **kwargs):
+        user_company = self.request.user.company_set.all().first()
+        company_users = user_company.user.all()
+        company_users_ids = [user.id for user in company_users]
+
+        # print('2244', self.request.data)
+
+        queryset = (User.objects
+                    .filter(id__in=company_users_ids
+                            )
+                    .prefetch_related(
+                        'user_base_salaries',
+                        'user_daily_allowances',
+                        'user_vehicle_km_rate_overrides',
+                        'user_vehicle_km_rate_overrides__vehicle',
+                    ))
+
+        if not is_user_member_group(self.request.user, 'level_manager'):
+            queryset = User.objects.filter(pk=self.request.user.id)
+
+        request_user_id = self.request.user.id
+
+        logger.info(f"A4600 {request_user_id, len(queryset)}")
 
         return queryset
 

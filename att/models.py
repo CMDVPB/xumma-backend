@@ -1,7 +1,8 @@
-from django.db import models
+import logging
+from django.contrib.auth import get_user_model
 from django.contrib.postgres.fields import ArrayField
+from django.db import models, IntegrityError
 from django.db.models.functions import Lower
-from django.db import IntegrityError
 from django.core.exceptions import ValidationError
 
 from abb.models import Currency, Country, BodyType
@@ -11,8 +12,9 @@ from abb.mixins import ProtectedDeleteMixin
 from abb.constants import DOCUMENT_STATUS_CHOICES, VEHICLE_TYPES
 from app.models import CategoryGeneral, Company, TypeGeneral
 
-import logging
 logger = logging.getLogger(__name__)
+
+User = get_user_model()
 
 
 class TargetGroup(models.Model):
@@ -308,6 +310,88 @@ class Vehicle(ProtectedDeleteMixin, models.Model):
 
     def __str__(self):
         return self.reg_number or ''
+
+
+class VehicleKmRate(models.Model):
+    vehicle = models.ForeignKey(
+        Vehicle, on_delete=models.CASCADE, related_name="vehicle_km_rates")
+    rate_per_km = models.DecimalField(max_digits=6, decimal_places=3)
+    currency = models.ForeignKey(Currency, on_delete=models.CASCADE)
+    valid_from = models.DateField()
+    valid_to = models.DateField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-valid_from"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["vehicle", "valid_from"],
+                name="unique_vehicle_km_rate_start"
+            )
+        ]
+
+
+class UserBaseSalary(models.Model):
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="user_base_salaries")
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    currency = models.ForeignKey(
+        Currency, on_delete=models.CASCADE, related_name="currency_userbasesalary")
+    valid_from = models.DateField()
+    valid_to = models.DateField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-valid_from"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "valid_from"],
+                name="unique_user_salary_start_date"
+            )
+        ]
+
+
+class UserDailyAllowance(models.Model):
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="user_daily_allowances")
+    amount_per_day = models.DecimalField(max_digits=8, decimal_places=2)
+    currency = models.ForeignKey(
+        Currency, on_delete=models.CASCADE, null=True, blank=True)
+    applies_only_during_trip = models.BooleanField(default=True)
+    valid_from = models.DateField()
+    valid_to = models.DateField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-valid_from"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "valid_from"],
+                name="unique_user_daily_allowance_start"
+            )
+        ]
+
+
+class UserVehicleKmRateOverride(models.Model):
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="user_vehicle_km_rate_overrides"
+    )
+    vehicle = models.ForeignKey(
+        Vehicle,
+        on_delete=models.CASCADE,
+        related_name="user_rate_overrides"
+    )
+    rate_per_km = models.DecimalField(max_digits=6, decimal_places=3)
+    currency = models.ForeignKey(Currency, on_delete=models.CASCADE)
+    valid_from = models.DateField()
+    valid_to = models.DateField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "vehicle", "valid_from"],
+                name="unique_user_vehicle_km_override"
+            )
+        ]
 
 
 class VehicleUnit(ProtectedDeleteMixin, models.Model):

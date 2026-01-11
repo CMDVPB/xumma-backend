@@ -39,7 +39,7 @@ class UserAdmin(admin.ModelAdmin):
         return ", ".join([k.name for k in obj.groups.all()])
 
     list_display = ('id', 'email', 'user_companies', 'user_groups',
-                    'get_full_name', 'base_country', 'is_superuser', 'is_staff', 'is_active', 'lang', 'phone')
+                    'get_full_name', 'base_country', 'is_superuser', 'is_staff', 'is_active', 'lang', 'uf')
 
     search_fields = ('id', 'email', 'username', 'groups__name')
 

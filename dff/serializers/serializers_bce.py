@@ -12,7 +12,7 @@ from abb.serializers import CurrencySerializer
 from abb.serializers_drf_writable import CustomWritableNestedModelSerializer, CustomUniqueFieldsMixin
 from att.models import BankAccount, Note, Vehicle
 from axx.models import Load
-from ayy.models import ImageUpload
+from ayy.models import DamageReport, ImageUpload
 
 
 User = get_user_model()
@@ -147,9 +147,17 @@ class ImageUploadInSerializer(WritableNestedModelSerializer):
         write_only=True,
     )
 
+    damage = SlugRelatedField(
+        allow_null=True,
+        slug_field='uf',
+        queryset=DamageReport.objects.all(),
+        required=False,
+        write_only=True,
+    )
+
     def to_internal_value(self, data):
         # normalize empty strings → None
-        for field in ("load", "user", "vehicle"):
+        for field in ("load", "user", "vehicle", "damage"):
             if data.get(field) == "":
                 data[field] = None
 
@@ -163,11 +171,12 @@ class ImageUploadInSerializer(WritableNestedModelSerializer):
             attrs.get("load"),
             attrs.get("user"),
             attrs.get("vehicle"),
+            attrs.get("damage"),
         ]
 
         if sum(bool(rel) for rel in relations) != 1:
             raise serializers.ValidationError(
-                "Exactly one of 'load', 'user', or 'vehicle' must be provided."
+                "Exactly one of 'load', 'user', 'vehicle', 'damage' must be provided."
             )
 
         return attrs
@@ -175,39 +184,41 @@ class ImageUploadInSerializer(WritableNestedModelSerializer):
     class Meta:
         model = ImageUpload
         fields = ('file_name', 'file_obj', 'uf',
-                  'company', 'load', 'user', 'vehicle',
+                  'company', 'load', 'user', 'vehicle', 'damage',
                   )
 
 
 class ImageUploadOutSerializer(WritableNestedModelSerializer):
 
-    load = serializers.SlugRelatedField(
-        allow_null=True, slug_field='uf', queryset=Load.objects.all(), write_only=True, required=False)
-    user = serializers.SlugRelatedField(
-        allow_null=True, slug_field='uf', queryset=User.objects.all(), write_only=True, required=False)
+    # load = serializers.SlugRelatedField(
+    #     allow_null=True, slug_field='uf', queryset=Load.objects.all(), write_only=True, required=False)
+    # user = serializers.SlugRelatedField(
+    #     allow_null=True, slug_field='uf', queryset=User.objects.all(), write_only=True, required=False)
+
     file_obj = serializers.SerializerMethodField(read_only=True)
 
-    def to_internal_value(self, data):
-        # print('4574',)
+    # def to_internal_value(self, data):
+    #     # print('4574',)
 
-        if 'load' in data and data['load'] == '':
-            data['load'] = None
+    #     if 'load' in data and data['load'] == '':
+    #         data['load'] = None
 
-        return super(ImageUploadOutSerializer, self).to_internal_value(data)
+    #     return super(ImageUploadOutSerializer, self).to_internal_value(data)
 
     def validate(self, attrs):
         relations = [
+            attrs.get('company'),
             attrs.get('load'),
             attrs.get('user'),
             attrs.get('vehicle'),
-            attrs.get('company'),
+            attrs.get('damaage'),
         ]
 
-        print('3972', attrs)
+        # print('3972', attrs)
 
         if sum(bool(r) for r in relations) != 1:
             raise serializers.ValidationError(
-                'Exactly one relation (load, user, vehicle, company) must be provided.'
+                'Exactly one relation (load, user, vehicle, company, damage) must be provided.'
             )
 
         return attrs
@@ -216,7 +227,7 @@ class ImageUploadOutSerializer(WritableNestedModelSerializer):
         model = ImageUpload
         fields = ('uf', 'company',
                   'file_name', 'file_obj',
-                  'load', 'user',
+                  'load', 'user', 'damage',
                   )
 
     def get_file_obj(self, obj):

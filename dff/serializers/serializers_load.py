@@ -42,6 +42,8 @@ LOAD_EVENT_FLAG_MAP = {
 
 
 class LoadEventOutSerializer(serializers.ModelSerializer):
+    created_by = serializers.CharField(source="created_by.uf", read_only=True)
+
     class Meta:
         model = LoadEvent
         fields = (
@@ -156,7 +158,7 @@ class LoadListSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
     load_iteminvs = ItemInvSerializer(many=True)
     load_comments = CommentSerializer(many=True)
     load_tors = TorLoadListSerializer(many=True)
-    load_events = LoadEventSerializer(many=True)
+    load_events = LoadEventOutSerializer(many=True)
 
     def to_representation(self, instance):
         from dff.serializers.serializers_trip import TripTruckSerializer
@@ -257,7 +259,7 @@ class LoadSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
     load_comments = CommentSerializer(many=True)
     load_histories = HistorySerializer(many=True, read_only=True)
     load_imageuploads = ImageUploadOutSerializer(many=True, read_only=True)
-    load_events = LoadEventSerializer(many=True)
+    load_events = LoadEventOutSerializer(many=True)
 
     def to_internal_value(self, data):
         # print('6080', data)
@@ -507,8 +509,6 @@ class LoadPatchSerializer(WritableNestedModelSerializer):
         'is_cleared': 'date_cleared',
         'is_unloaded': 'date_unloaded',
         'is_signed': 'date_signed',
-
-
     }
 
     load_events = LoadEventOutSerializer(
@@ -611,6 +611,8 @@ class LoadPatchSerializer(WritableNestedModelSerializer):
 
         relations, reverse_relations = self._extract_relations(validated_data)
 
+        print('5608', event_type)
+
         with transaction.atomic():
             instance = super(NestedUpdateMixin, self).update(
                 instance,
@@ -621,16 +623,23 @@ class LoadPatchSerializer(WritableNestedModelSerializer):
                 instance, reverse_relations)
             self.delete_reverse_relations_if_need(instance, reverse_relations)
 
-            # 🔹 create LoadEvent (retry-safe)
+            # create OR delete LoadEvent (retry-safe)
             if event_type:
-                try:
+                event = (
+                    LoadEvent.objects
+                    .select_for_update()
+                    .filter(load=instance, event_type=event_type)
+                    .first()
+                )
+
+                if event:
+                    event.delete()
+                else:
                     LoadEvent.objects.create(
                         load=instance,
                         event_type=event_type,
                         created_by=self.context["request"].user,
                     )
-                except IntegrityError:
-                    pass
 
             instance.refresh_from_db()
             return instance

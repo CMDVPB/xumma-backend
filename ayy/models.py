@@ -170,31 +170,14 @@ class ImageUpload(models.Model):
         User, on_delete=models.CASCADE, null=True, blank=True, related_name='user_imageuploads')
     vehicle = models.ForeignKey(
         Vehicle, on_delete=models.CASCADE, null=True, blank=True, related_name='vehicle_imageuploads')
-
-    # def save(self, *args, **kwargs):
-    #     if self.file_obj:
-    #         # print('M676', )
-    #         if self.company:
-    #             company_short_uf = self.company.uf[0: 5]
-
-    #             print('M678', company_short_uf)
-
-    #             file_name_split = (self.file_obj.name).rsplit(
-    #                 '.', 1)
-    #             self.file_obj.name = company_short_uf + '_' + \
-    #                 file_name_split[0] + '.'+file_name_split[1]
-    #             self.file_name = file_name_split[0]
-
-    #         self.file_size = int(self.file_obj.size)
-    #         self.file_name = self.file_obj.name
-
-    #         super(ImageUpload, self).save(*args, **kwargs)
+    damage = models.ForeignKey(
+        'DamageReport', on_delete=models.CASCADE, null=True, blank=True, related_name='damage_imageuploads')
 
     def clean(self):
         relations = [self.load, self.vehicle, self.user]
         if sum(bool(r) for r in relations) != 1:
             raise ValidationError(
-                'Exactly one relation (load, vehicle, user) must be set.'
+                'Exactly one relation (load, vehicle, user, damage) must be set.'
             )
 
     def save(self, *args, **kwargs):
@@ -204,39 +187,8 @@ class ImageUpload(models.Model):
 
         super().save(*args, **kwargs)
 
-    # @property
-    # def s3_url(self):
-    #     return self.file_obj.url
-
     def __str__(self):
         return str(self.file_obj) or ''
-
-
-class FileUpload(models.Model):
-    uf = models.CharField(max_length=36, default=hex_uuid)
-    created_at = models.DateTimeField(auto_now_add=True)
-    company = models.ForeignKey(
-        Company, on_delete=models.CASCADE, related_name='company_fileuploads')
-    inv = models.ForeignKey(Inv, on_delete=models.CASCADE,
-                            blank=True, null=True, related_name='inv_fileuploads')
-
-    file_obj = models.FileField(
-        blank=True, null=True, upload_to=dynamic_upload_path)
-    file_size = models.PositiveIntegerField(blank=True, null=True)
-    file_name = models.CharField(max_length=1000, blank=True, null=True)
-
-    def save(self, *args, **kwargs):
-        if self.file_obj:
-            self.file_size = int(self.file_obj.size)
-
-        super(FileUpload, self).save(*args, **kwargs)
-
-    # @property
-    # def s3_url(self):
-    #     return self.file_obj.url if self.file_obj else None
-
-    def __str__(self):
-        return str(self.file_name or self.id or 'File name')
 
 
 class RouteSheet(models.Model):

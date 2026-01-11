@@ -10,6 +10,7 @@ from abb.utils import get_user_company
 from att.models import Vehicle
 from att.serializers import VehicleSerializer
 from ayy.models import DamageReport, VehicleDamage
+from dff.serializers.serializers_bce import ImageUploadOutSerializer
 
 User = get_user_model()
 
@@ -76,6 +77,7 @@ class DamageReportSerializer(WritableNestedModelSerializer):
         allow_null=True, slug_field='uf', queryset=User.objects.none())
 
     report_vehicle_damages = VehicleDamageSerializer(many=True)
+    damage_imageuploads = ImageUploadOutSerializer(many=True)
 
     def create(self, validated_data):
         # print('5882:', validated_data)
@@ -127,6 +129,6 @@ class DamageReportSerializer(WritableNestedModelSerializer):
         model = DamageReport
         fields = ('damage_report_type', 'reported_at', 'location', 'notes', 'uf',
                   'vehicle', 'driver', 'reported_by',
-                  'report_vehicle_damages',
+                  'report_vehicle_damages', 'damage_imageuploads',
                   )
-        read_only_fields = ("company",)
+        read_only_fields = ("company", 'damage_imageuploads')

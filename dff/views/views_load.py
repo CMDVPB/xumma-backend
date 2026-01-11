@@ -549,7 +549,7 @@ class LoadDetailView(RetrieveUpdateDestroyAPIView):
             return Load.objects.none()
 
     def update(self, request, *args, **kwargs):
-        print('2280', request.data)
+        # print('2280', request.data)
 
         partial = kwargs.pop('partial', False)
         instance = self.get_object()

@@ -73,9 +73,10 @@ class MailMessageAdmin(admin.ModelAdmin):
 
 @admin.register(ImageUpload)
 class ImageUploadAdmin(admin.ModelAdmin):
-    list_display = ('id', 'company', 'file_name', 'load', 'user', 'vehicle')
+    list_display = ('id', 'company', 'file_name',
+                    'load', 'user', 'vehicle', 'damage')
 
-    list_filter = ('company', "user", "load", 'vehicle')
+    list_filter = ('company', "user", "load", 'vehicle', 'damage')
 
 
 @admin.register(ItemCost)
