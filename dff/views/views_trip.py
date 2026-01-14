@@ -14,7 +14,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import authentication_classes, api_view, permission_classes
 
 from abb.constants import LOAD_TYPES
-from abb.pagination import LimitResultsSetPagination
+from abb.pagination import CustomInfiniteCursorPagination, LimitResultsSetPagination
 from abb.permissions import AssignedUserManagerOrReadOnlyIfLocked, HasGroupPermission
 from abb.utils import check_not_unique_num, get_user_company, is_valid_queryparam
 from app.utils import is_user_member_group
@@ -30,7 +30,7 @@ User = get_user_model()
 
 class TripListView(ListAPIView):
     ''' Get list of trips '''
-    pagination_class = LimitResultsSetPagination
+    pagination_class = CustomInfiniteCursorPagination
     serializer_class = TripListSerializer
     permission_classes = [IsAuthenticated, HasGroupPermission]
 
@@ -317,52 +317,52 @@ class TripDetailView(RetrieveUpdateDestroyAPIView):
 
         trip_comments = Comment.objects.all()
 
-        trip_loads = Load.objects.select_related(
-            'bill_to', 'bill_to__country_code_post').select_related(
-            'status').select_related('mode').select_related('bt').select_related('currency').\
-            select_related('incoterm').select_related(
-            'assigned_user').filter(company__id=user_company.id)
+        # trip_loads = Load.objects.select_related(
+        #     'bill_to', 'bill_to__country_code_post').select_related(
+        #     'status').select_related('mode').select_related('bt').select_related('currency').\
+        #     select_related('incoterm').select_related(
+        #     'assigned_user').filter(company__id=user_company.id)
 
-        load_comments = Comment.objects.all()
+        # load_comments = Comment.objects.all()
 
-        load_entries = Entry.objects.select_related(
-            'shipper', 'shipper__company', 'shipper__country_code_site', 'shipper__country_code_site').prefetch_related('entry_details').all()
+        # load_entries = Entry.objects.select_related(
+        #     'shipper', 'shipper__company', 'shipper__country_code_site', 'shipper__country_code_site').prefetch_related('entry_details').all()
 
-        itemInvs = ItemInv.objects.select_related(
-            'item_for_item_inv').select_related('item_for_item_cost').all()
+        # itemInvs = ItemInv.objects.select_related(
+        #     'item_for_item_inv').select_related('item_for_item_cost').all()
 
-        load_tors = Tor.objects.filter(company__id=user_company.id).select_related(
-            'carrier')
+        # load_tors = Tor.objects.filter(company__id=user_company.id).select_related(
+        #     'carrier')
 
-        load_tors = load_tors.prefetch_related(
-            Prefetch('tor_iteminvs', queryset=itemInvs))
+        # load_tors = load_tors.prefetch_related(
+        #     Prefetch('tor_iteminvs', queryset=itemInvs))
 
-        load_exps = Exp.objects.filter(company__id=user_company.id).select_related(
-            'supplier', 'supplier__country_code_post')
+        # load_exps = Exp.objects.filter(company__id=user_company.id).select_related(
+        #     'supplier', 'supplier__country_code_post')
 
-        trip_loads = trip_loads.prefetch_related(
-            Prefetch('load_comments', queryset=load_comments)).prefetch_related(
-            Prefetch('entry_loads', queryset=load_entries)).prefetch_related(
-            Prefetch('load_iteminvs', queryset=itemInvs)).prefetch_related(
-            Prefetch('load_tors', queryset=load_tors)).prefetch_related(Prefetch('load_exps', queryset=load_exps))
+        # trip_loads = trip_loads.prefetch_related(
+        #     Prefetch('load_comments', queryset=load_comments)).prefetch_related(
+        #     Prefetch('entry_loads', queryset=load_entries)).prefetch_related(
+        #     Prefetch('load_iteminvs', queryset=itemInvs)).prefetch_related(
+        #     Prefetch('load_tors', queryset=load_tors)).prefetch_related(Prefetch('load_exps', queryset=load_exps))
 
-        route_sheet_qs = RouteSheet.objects.filter(company_id=user_company.id).select_related(
-            'company',
-            'assigned_user',
-            'trip',
-            'start_location',
-            'end_location',
-            'vehicle_tractor',
-            'vehicle_trailer',
-            'currency',
-        ).prefetch_related('drivers')
+        # route_sheet_qs = RouteSheet.objects.filter(company_id=user_company.id).select_related(
+        #     'company',
+        #     'assigned_user',
+        #     'trip',
+        #     'start_location',
+        #     'end_location',
+        #     'vehicle_tractor',
+        #     'vehicle_trailer',
+        #     'currency',
+        # ).prefetch_related('drivers')
 
         drivers_qs = user_company.user.all()
 
         queryset = queryset.prefetch_related(
             Prefetch('trip_comments', queryset=trip_comments),
-            Prefetch('trip_loads', queryset=trip_loads),
-            Prefetch('trip_route_sheets', queryset=route_sheet_qs),
+            # Prefetch('trip_loads', queryset=trip_loads),
+            # Prefetch('trip_route_sheets', queryset=route_sheet_qs),
             Prefetch('drivers', queryset=drivers_qs),
 
         )

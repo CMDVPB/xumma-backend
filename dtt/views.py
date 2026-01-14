@@ -181,7 +181,7 @@ class ContactSiteListView(ListAPIView):
     lookup_field = 'uf'
 
     def get_queryset(self):
-        print('ContactSiteListView get_queryset 2050')
+        # print('ContactSiteListView get_queryset 2050')
         try:
             user = self.request.user
             user_company = get_user_company(user)
@@ -705,6 +705,8 @@ class MediaProxyView(APIView):
 
     def get(self, request, uf):
         image = get_object_or_404(ImageUpload, uf=uf)
+
+        print('3232', uf)
 
         # Ownership check
         if image.company != get_user_company(request.user):

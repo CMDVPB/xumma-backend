@@ -8,8 +8,9 @@ from drf_writable_nested.mixins import NestedCreateMixin, NestedUpdateMixin, Uni
 
 from abb.models import Currency
 from abb.utils import get_company_manager, get_company_users, get_user_company
+from app.models import UserCompensationSettings
 from app.serializers import CompanyUserSerializer, UserBasicPlusSerializer
-from att.models import UserBaseSalary, UserDailyAllowance, UserVehicleKmRateOverride, Vehicle
+from att.models import UserBaseSalary, UserDailyAllowance, UserLoadingPointRate, UserUnloadingPointRate, UserVehicleKmRateOverride, Vehicle
 from ayy.serializers import PhoneNumberSerializer, DocumentSerializer
 from dff.serializers.serializers_bce import ImageUploadOutSerializer
 
@@ -20,7 +21,7 @@ User = get_user_model()
 
 class UserBaseSalarySerializer(serializers.ModelSerializer):
     currency = serializers.SlugRelatedField(
-        allow_null=True, slug_field='uf', queryset=Currency.objects.all())
+        allow_null=True, slug_field='currency_code', queryset=Currency.objects.all())
 
     class Meta:
         model = UserBaseSalary
@@ -35,7 +36,7 @@ class UserBaseSalarySerializer(serializers.ModelSerializer):
 
 class UserDailyAllowanceSerializer(serializers.ModelSerializer):
     currency = serializers.SlugRelatedField(
-        allow_null=True, slug_field='uf', queryset=Currency.objects.all())
+        allow_null=True, slug_field='currency_code', queryset=Currency.objects.all())
 
     class Meta:
         model = UserDailyAllowance
@@ -54,7 +55,7 @@ class UserVehicleKmRateOverrideSerializer(serializers.ModelSerializer):
     vehicle = serializers.SlugRelatedField(
         allow_null=True, slug_field='uf', queryset=Vehicle.objects.all())
     currency = serializers.SlugRelatedField(
-        allow_null=True, slug_field='uf', queryset=Currency.objects.all())
+        allow_null=True, slug_field='currency_code', queryset=Currency.objects.all())
 
     class Meta:
         model = UserVehicleKmRateOverride
@@ -65,6 +66,46 @@ class UserVehicleKmRateOverrideSerializer(serializers.ModelSerializer):
             'currency',
             'valid_from',
             'valid_to',
+        )
+
+
+class UserLoadingPointRateSerializer(serializers.ModelSerializer):
+    currency = serializers.SlugRelatedField(
+        allow_null=True, slug_field='currency_code', queryset=Currency.objects.all())
+
+    class Meta:
+        model = UserLoadingPointRate
+        fields = (
+            'id',
+            'amount_per_point',
+            'currency',
+            'valid_from',
+            'valid_to',
+        )
+
+
+class UserUnloadingPointRateSerializer(serializers.ModelSerializer):
+    currency = serializers.SlugRelatedField(
+        allow_null=True, slug_field='currency_code', queryset=Currency.objects.all())
+
+    class Meta:
+        model = UserUnloadingPointRate
+        fields = (
+            'id',
+            'amount_per_point',
+            'currency',
+            'valid_from',
+            'valid_to',
+        )
+
+
+class UserCompensationSettingsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserCompensationSettings
+        fields = (
+            "has_per_km_income",
+            "paid_by_loading_points",
+            "paid_by_unloading_points",
         )
 
 
@@ -79,17 +120,17 @@ class UserCompleteSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
     user_imageuploads = ImageUploadOutSerializer(
         many=True, context={'request': 'request'}, read_only=True)
 
-    user_base_salaries = UserBaseSalarySerializer(
-        many=True,
-    )
+    user_base_salaries = UserBaseSalarySerializer(many=True,)
 
-    user_daily_allowances = UserDailyAllowanceSerializer(
-        many=True,
-    )
+    user_daily_allowances = UserDailyAllowanceSerializer(many=True,)
 
     user_vehicle_km_rate_overrides = UserVehicleKmRateOverrideSerializer(
-        many=True,
-    )
+        many=True,)
+
+    user_loading_point_rates = UserLoadingPointRateSerializer(many=True,)
+    user_unloading_point_rates = UserUnloadingPointRateSerializer(many=True,)
+
+    compensation_settings = UserCompensationSettingsSerializer()
 
     def to_representation(self, instance):
         response = super().to_representation(instance)
@@ -139,4 +180,7 @@ class UserCompleteSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
                   'user_base_salaries',
                   'user_daily_allowances',
                   'user_vehicle_km_rate_overrides',
+                  'user_loading_point_rates',
+                  'user_unloading_point_rates',
+                  "compensation_settings",
                   )

@@ -99,7 +99,7 @@ class VehicleContactSerializer(CustomUniqueFieldsMixin, CustomWritableNestedMode
 
 class VehicleKmRateSerializer(serializers.ModelSerializer):
     currency = serializers.SlugRelatedField(
-        allow_null=True, slug_field='uf', queryset=Currency.objects.all())
+        allow_null=True, slug_field='currency_code', queryset=Currency.objects.all())
 
     class Meta:
         model = VehicleKmRate

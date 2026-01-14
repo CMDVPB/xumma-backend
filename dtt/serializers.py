@@ -77,7 +77,7 @@ class DamageReportSerializer(WritableNestedModelSerializer):
         allow_null=True, slug_field='uf', queryset=User.objects.none())
 
     report_vehicle_damages = VehicleDamageSerializer(many=True)
-    damage_imageuploads = ImageUploadOutSerializer(many=True)
+    damage_imageuploads = ImageUploadOutSerializer(many=True, read_only=True)
 
     def create(self, validated_data):
         # print('5882:', validated_data)
@@ -131,4 +131,4 @@ class DamageReportSerializer(WritableNestedModelSerializer):
                   'vehicle', 'driver', 'reported_by',
                   'report_vehicle_damages', 'damage_imageuploads',
                   )
-        read_only_fields = ("company", 'damage_imageuploads')
+        read_only_fields = ("company",)

@@ -23,7 +23,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.exceptions import ValidationError
 
 from abb.constants import LOAD_SIZE, LOAD_TYPES
-from abb.pagination import LimitResultsSetPagination
+from abb.pagination import CustomInfiniteCursorPagination, LimitResultsSetPagination
 from abb.permissions import AssignedUserManagerOrReadOnlyIfLocked, AssignedUserOrManagerOrReadOnly
 from abb.utils import get_user_company, is_valid_queryparam
 from app.utils import is_user_member_group
@@ -42,11 +42,10 @@ User = get_user_model()
 
 class LoadListView(ListAPIView):
     ''' Get list of loads'''
-    pagination_class = LimitResultsSetPagination
+    pagination_class = CustomInfiniteCursorPagination
     serializer_class = LoadListSerializer
     permission_classes = [IsAuthenticated]
     lookup_field = 'uf'
-    http_method_names = ['head', 'get']
 
     def get_queryset(self):
         # print('2358', self.request.user)

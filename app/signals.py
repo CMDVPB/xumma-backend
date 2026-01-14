@@ -8,7 +8,7 @@ from djoser.signals import user_registered, user_activated
 
 from abb.constants import INITIAL_VALIDITY_OF_SUBSCRIPTION_DAYS
 from abb.utils import get_user_company
-from app.models import Company, Subscription, UserSettings
+from app.models import Company, Subscription, UserCompensationSettings, UserSettings
 from app.utils import is_user_member_group
 
 import logging
@@ -90,6 +90,12 @@ def create_company_add_user_to_company_and_user_to_group_level_signal(user, requ
 def create_user_settings_signal(user, request, **kwargs):
     if user and not request.user.is_authenticated:
         UserSettings.objects.create(user=user)
+
+
+@receiver(user_registered)
+def create_compensation_settings(user, request, **kwargs):
+    if user and not request.user.is_authenticated:
+        UserCompensationSettings.objects.create(user=user)
 
 
 @receiver(user_activated)

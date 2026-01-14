@@ -21,7 +21,7 @@ from att.models import Contact, PaymentTerm, Person, Vehicle, VehicleUnit
 from att.serializers import BodyTypeSerializer, IncotermSerializer, ModeTypeSerializer, StatusTypeSerializer, VehicleSerializer
 from axx.models import Ctr, Exp, Inv, Load, LoadEvent, Tor, Trip
 from ayy.models import CMR
-from dff.serializers.serializers_bce import ImageUploadOutSerializer
+from dff.serializers.serializers_bce import ImageUploadOutSerializer, ImageUploadUFOnlySerializer
 from dff.serializers.serializers_ctr import CtrSerializer
 from dff.serializers.serializers_entry_detail import EntryBasicReadListSerializer, EntrySerializer
 from dff.serializers.serializers_exp import ExpSerializer
@@ -159,6 +159,7 @@ class LoadListSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
     load_comments = CommentSerializer(many=True)
     load_tors = TorLoadListSerializer(many=True)
     load_events = LoadEventOutSerializer(many=True)
+    load_imageuploads = ImageUploadUFOnlySerializer(many=True, read_only=True)
 
     def to_representation(self, instance):
         from dff.serializers.serializers_trip import TripTruckSerializer
@@ -181,6 +182,7 @@ class LoadListSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
                   'load_address', 'unload_address', 'hb', 'mb', 'booking_number', 'comment1',
                   'assigned_user', 'bill_to', 'mode', 'bt', 'currency', 'status', 'incoterm', 'carrier', 'vehicle_tractor', 'vehicle_trailer',
                   'load_comments', 'load_tors', 'entry_loads', 'load_iteminvs', 'load_events',
+                  'load_imageuploads',
                   )
         read_only_fields = ['load_events']
 
@@ -259,7 +261,7 @@ class LoadSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
     load_comments = CommentSerializer(many=True)
     load_histories = HistorySerializer(many=True, read_only=True)
     load_imageuploads = ImageUploadOutSerializer(many=True, read_only=True)
-    load_events = LoadEventOutSerializer(many=True)
+    load_events = LoadEventOutSerializer(many=True, read_only=True)
 
     def to_internal_value(self, data):
         # print('6080', data)
@@ -658,7 +660,8 @@ class LoadPatchSerializer(WritableNestedModelSerializer):
                   )
 
         # Should never be updated
-        read_only_fields = ["id", "company", "assigned_user", "uf"]
+        read_only_fields = ["id", "company",
+                            "assigned_user", "load_events", "uf"]
 
 
 class LoadBasicSerializer(WritableNestedModelSerializer):

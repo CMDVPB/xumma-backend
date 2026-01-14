@@ -58,7 +58,7 @@ class ItemCostSerializer(WritableNestedModelSerializer):
         allow_null=True, context={'request': 'request'})
 
     currency = serializers.SlugRelatedField(
-        allow_null=True, slug_field='uf', queryset=Currency.objects.all())
+        allow_null=True, slug_field='currency_code', queryset=Currency.objects.all())
 
     def to_internal_value(self, data):
         if 'quantity' in data and type(data['quantity']) == str:

@@ -13,7 +13,7 @@ from app.serializers import UserSerializer
 from att.models import Contact, Person, Vehicle, VehicleUnit
 from att.serializers import BodyTypeSerializer, ModeTypeSerializer, StatusTypeSerializer, VehicleSerializer
 from axx.models import Load, Trip, TripDriver
-from ayy.models import Comment, RouteSheet
+from ayy.models import Comment, Entry, RouteSheet
 from ayy.serializers import ItemCostSerializer
 from dff.serializers.serializers_load import LoadTripGetSerializer, LoadTripListSerializer
 from dff.serializers.serializers_other import CommentSerializer, ContactSerializer, ContactTripListSerializer, HistorySerializer, PersonBasicReadSerializer, PersonSerializer, VehicleBasicReadSerializer, VehicleUnitBasicReadSerializer, VehicleUnitSerializer
@@ -91,6 +91,8 @@ class TripListSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
 
 
 class TripSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
+    loading_points_count = serializers.SerializerMethodField()  # Add the read-only field
+    unloading_points_count = serializers.SerializerMethodField()  # Add the read-only field
 
     assigned_user = serializers.SlugRelatedField(
         allow_null=True, slug_field='uf', queryset=User.objects.all())
@@ -109,11 +111,6 @@ class TripSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
         allow_null=True, slug_field='uf', queryset=Currency.objects.all())
     status = serializers.SlugRelatedField(
         allow_null=True, slug_field='uf', queryset=StatusType.objects.all())
-
-    # trip_loads = serializers.SlugRelatedField(
-    #     many=True, slug_field='uf', queryset=Load.objects.all(), write_only=True)
-    # trip_route_sheets = serializers.SlugRelatedField(
-    #     many=True, slug_field='uf', queryset=RouteSheet.objects.all(), write_only=True)
 
     drivers = serializers.SlugRelatedField(
         many=True, slug_field='uf', queryset=User.objects.all())
@@ -241,6 +238,20 @@ class TripSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
 
             return instance
 
+    def get_loading_points_count(self, instance):
+        return (
+            Entry.objects
+            .filter(load__trip=instance, action='loading')
+            .count()
+        )
+
+    def get_unloading_points_count(self, instance):
+        return (
+            Entry.objects
+            .filter(load__trip=instance, action='unloading')
+            .count()
+        )
+
     class Meta:
         model = Trip
         fields = ('rn', 'assigned_user', 'date_order', 'date_end', 'person', 'driver', 'vehicle_tractor', 'incl_loads_costs', 'doc_lang',
@@ -248,8 +259,10 @@ class TripSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
                   'km_departure', 'km_arrival', 'km_exit', 'km_entry', 'trip_number', 'date_trip', 'date_departure', 'date_arrival',
                   'trip_details', 'l_departure', 'l_arrival', 'trip_add_info', 'trip_comments', 'trip_histories', 'uf',
                   'rs_number',
-                  #   'trip_loads', , 'trip_route_sheets',
                   'drivers', 'trip_itemcosts',
+                  # 👇 computed, read-only
+                  'loading_points_count',
+                  'unloading_points_count'
                   )
 
 

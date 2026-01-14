@@ -8,6 +8,7 @@ from drf_writable_nested.mixins import NestedCreateMixin, NestedUpdateMixin, Uni
 
 import logging
 
+from abb.models import Currency
 from abb.serializers import CountrySerializer, CurrencySerializer
 from abb.utils import company_latest_exp_date_subscription, get_company_manager, get_company_users, get_user_company
 from app.models import Company, UserSettings
@@ -139,7 +140,8 @@ class UserSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
 
 
 class UserSettingsSerializer(serializers.ModelSerializer):
-    currency_default = CurrencySerializer(allow_null=True)
+    currency_default = serializers.SlugRelatedField(
+        allow_null=True, slug_field='currency_code', queryset=Currency.objects.all())
 
     class Meta:
         model = UserSettings

@@ -10,8 +10,9 @@ from django.utils import timezone
 from cryptography.fernet import Fernet
 
 from abb.models import Country, Currency
-from abb.utils import get_default_empty_strings_20, get_order_by_default, hex_uuid, get_default_notification_status_3, validate_columns_arrayfield_length_min_5
-from abb.constants import BASE_COUNTRIES, BASE_COUNTRIES_LIST, APP_LANGS, DOC_LANG_CHOICES, MEMBERSHIP_CHOICES, VEHICLE_TYPES
+from abb.utils import get_default_empty_strings_20, get_order_by_default, \
+    hex_uuid, get_default_notification_status_3, validate_columns_arrayfield_length_min_5
+from abb.constants import BASE_COUNTRIES, BASE_COUNTRIES_LIST, APP_LANGS, DOC_LANG_CHOICES, MEMBERSHIP_CHOICES
 from abb.validators import validate_columns_arrayfield_length_exactly_20
 
 import logging
@@ -128,6 +129,17 @@ class UserProfile(models.Model):
 
     def __str__(self):
         return f'{self.user} profile'
+
+
+class UserCompensationSettings(models.Model):
+    uf = models.CharField(max_length=36, default=hex_uuid,
+                          db_index=True, unique=True)
+    user = models.OneToOneField(
+        User, on_delete=models.CASCADE, related_name="compensation_settings")
+
+    has_per_km_income = models.BooleanField(default=False)
+    paid_by_loading_points = models.BooleanField(default=False)
+    paid_by_unloading_points = models.BooleanField(default=False)
 
 
 class UserSettings(models.Model):

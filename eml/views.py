@@ -24,7 +24,7 @@ from rest_framework import status
 from rest_framework.parsers import MultiPartParser, FormParser
 
 from abb.utils import get_user_company
-from ayy.models import EmailTemplate, EmailTemplateTranslation, MailLabelV2, MailMessage, UserEmail, UserEmailAttachment
+from ayy.models import EmailTemplate, EmailTemplateTranslation, ImageUpload, MailLabelV2, MailMessage, UserEmail, UserEmailAttachment
 from eml.serializers import EmailTemplateCreateSerializer, EmailTemplateDetailSerializer, EmailTemplateSerializer, \
     EmailTemplateUpdateSerializer, MailLabelV2Serializer, MailMessageDetailSerializer, MailMessageListSerializer
 from eml.tasks import send_basic_email_task
@@ -46,6 +46,14 @@ class BasicEmailOptionalAttachmentsView(APIView):
     def post(self, request, format=None):
         to = safe_json_list(request.data.get('to'))
         cc = safe_json_list(request.data.get('cc'))
+        attachments_ufs_list = safe_json_list(
+            request.data.get('attachmentsUfs'))
+
+        attachments_ufs = [
+            item.get("imageUf")
+            for item in attachments_ufs_list
+            if isinstance(item, dict) and item.get("imageUf")
+        ]
 
         if not to:
             return Response(
@@ -69,6 +77,25 @@ class BasicEmailOptionalAttachmentsView(APIView):
                 body=request.data.get('body', ''),
                 status='queued'
             )
+
+            print('3340', attachments_ufs)
+
+            # 🔹 Attach ImageUpload files (if provided) via UFs
+            if attachments_ufs:
+                uploads = ImageUpload.objects.filter(
+                    uf__in=attachments_ufs,
+                    company=get_user_company(user)
+                )
+
+                for upload in uploads:
+                    # IMPORTANT: re-save file so email owns it
+                    UserEmailAttachment.objects.create(
+                        email=email,
+                        file=upload.file_obj,
+                        filename=upload.file_name,
+                        size=upload.file_size,
+                    )
+                    print('3344', upload)
 
             print('3348', files)
 

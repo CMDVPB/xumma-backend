@@ -1,3 +1,4 @@
+from django.core.validators import MinValueValidator
 import logging
 from django.contrib.auth import get_user_model
 from django.contrib.postgres.fields import ArrayField
@@ -392,6 +393,90 @@ class UserVehicleKmRateOverride(models.Model):
                 name="unique_user_vehicle_km_override"
             )
         ]
+
+
+class UserLoadingPointRate(models.Model):
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="user_loading_point_rates"
+    )
+
+    amount_per_point = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        validators=[MinValueValidator(0)]
+    )
+
+    currency = models.ForeignKey(
+        Currency,
+        on_delete=models.PROTECT
+    )
+
+    valid_from = models.DateField()
+    valid_to = models.DateField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-valid_from"]
+        verbose_name = "Loading point rate"
+        verbose_name_plural = "Loading point rates"
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(valid_to__gte=models.F("valid_from")) |
+                    models.Q(valid_to__isnull=True)
+                ),
+                name="loading_point_rate_valid_range",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.user} – {self.amount_per_point} {self.currency} / loading point"
+
+
+class UserUnloadingPointRate(models.Model):
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="user_unloading_point_rates"
+    )
+
+    amount_per_point = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        validators=[MinValueValidator(0)]
+    )
+
+    currency = models.ForeignKey(
+        Currency,
+        on_delete=models.PROTECT
+    )
+
+    valid_from = models.DateField()
+    valid_to = models.DateField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-valid_from"]
+        verbose_name = "Unloading point rate"
+        verbose_name_plural = "Unloading point rates"
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(valid_to__gte=models.F("valid_from")) |
+                    models.Q(valid_to__isnull=True)
+                ),
+                name="unloading_point_rate_valid_range",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.user} – {self.amount_per_point} {self.currency} / unloading point"
 
 
 class VehicleUnit(ProtectedDeleteMixin, models.Model):

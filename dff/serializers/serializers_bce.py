@@ -233,3 +233,9 @@ class ImageUploadOutSerializer(WritableNestedModelSerializer):
     def get_file_obj(self, obj):
         # ✅ ALWAYS return backend proxy URL
         return f"{settings.BACKEND_URL}/api/image/{obj.uf}/"
+
+
+class ImageUploadUFOnlySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ImageUpload
+        fields = ("uf",)
