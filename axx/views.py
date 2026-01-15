@@ -20,7 +20,7 @@ from rest_framework.permissions import IsAuthenticated  # used for FBV
 
 from abb.permissions import IsSubscriptionActiveOrReadOnly
 from abb.utils import get_user_company
-from att.models import Contact
+from att.models import BankAccount, Contact, Person, VehicleUnit
 from dff.serializers.serializers_other import ContactSerializer
 
 import logging
@@ -29,11 +29,8 @@ logger = logging.getLogger(__name__)
 
 class ContactListCreate(ListCreateAPIView):
     serializer_class = ContactSerializer
-    permission_classes = [IsAuthenticated,
-                          #   IsSubscriptionActiveOrReadOnly
-                          ]
+    permission_classes = [IsAuthenticated]
     lookup_field = 'uf'
-    http_method_names = ['head', 'get', 'post']
 
     def get_queryset(self):
         try:
@@ -41,29 +38,24 @@ class ContactListCreate(ListCreateAPIView):
             user_company = get_user_company(user)
             queryset = Contact.objects.filter(company__id=user_company.id)
 
-            # contact_persons = Person.objects.select_related(
-            #     'owner').all()
-            # vehicle_units = VehicleUnit.objects.select_related(
-            #     'owner').all()
-            # bank_accounts = BankAccount.objects.select_related(
-            #     'owner').select_related('currency_code').all()
+            contact_persons = Person.objects.all()
+            vehicle_units = VehicleUnit.objects.all()
+            bank_accounts = BankAccount.objects.all()
 
-            # queryset = Contact.objects.select_related('owner').select_related(
-            #     'countrycodelegal').select_related('countrycodepost')
+            queryset = queryset.prefetch_related(
+                Prefetch('contact_persons', queryset=contact_persons))
 
-            # queryset = queryset.prefetch_related(
-            #     Prefetch('contact_persons', queryset=contact_persons))
+            queryset = queryset.prefetch_related(
+                Prefetch('contact_vehicle_units', queryset=vehicle_units))
 
-            # queryset = queryset.prefetch_related(
-            #     Prefetch('contact_vehicle_units', queryset=vehicle_units))
+            queryset = queryset.prefetch_related(
+                Prefetch('contact_bank_accounts', queryset=bank_accounts)).all()
 
-            # queryset = queryset.prefetch_related(
-            #     Prefetch('contact_bank_accounts', queryset=bank_accounts)).all()
-
-            return queryset.distinct().order_by('company_name')
+            return queryset.distinct().order_by('-created_at')
 
         except Exception as e:
-            print('E587', e)
+            logger.error(
+                f'ERRORLOG3343 ContactListCreate get_queryset. ERROR: {e}')
             return Contact.objects.none()
 
     def post(self, request,  *args, **kwargs):
@@ -79,7 +71,8 @@ class ContactListCreate(ListCreateAPIView):
             user_company = get_user_company(user)
             serializer.save(company=user_company)
         except Exception as e:
-            print('E269', e)
+            logger.error(
+                f'ERRORLOG3391 ContactListCreate perform_create. ERROR: {e}')
             serializer.save()
 
 

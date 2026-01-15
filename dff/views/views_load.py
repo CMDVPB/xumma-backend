@@ -64,6 +64,7 @@ class LoadListView(ListAPIView):
                 'currency',
                 'status',
                 'incoterm',
+                'payment_term',
                 'carrier',
                 'carrier__country_code_post',
                 'vehicle_tractor',

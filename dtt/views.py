@@ -28,7 +28,7 @@ from rest_framework.permissions import IsAuthenticated
 from abb.utils import assign_new_num, get_company_manager, get_user_company
 from app.models import SMTPSettings, UserSettings
 from app.serializers import UserSettingsSerializer
-from att.models import BankAccount, ContactSite, Note, PaymentTerm, Person, Term
+from att.models import BankAccount, ContactSite, ContractReferenceDate, Note, PaymentTerm, Person, Term
 from axx.models import Load
 from ayy.models import CMR, AuthorizationStockBatch, CMRStockBatch, CTIRStockBatch, ColliType, ImageUpload, ItemForItemCost, ItemForItemInv
 from ayy.serializers import ItemForItemCostSerializer
@@ -37,6 +37,7 @@ from dff.serializers.serializers_document import AuthorizationStockBatchSerializ
 from dff.serializers.serializers_entry_detail import ColliTypeSerializer
 from dff.serializers.serializers_item_inv import ItemForItemInvSerializer
 from dff.serializers.serializers_other import ContactSiteListSerializer, ContactSiteSerializer, PaymentTermSerializer, PersonSerializer, TermSerializer
+from dtt.serializers import ContractReferenceDateSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -686,19 +687,6 @@ class ImageView(CreateAPIView, RetrieveUpdateDestroyAPIView):
             serializer.save()
 
 
-# class ImageDownloadView(APIView):
-#     permission_classes = [IsAuthenticated]
-
-#     def get(self, request, uf):
-#         image = get_object_or_404(ImageUpload, uf=uf)
-
-#         # ownership check
-#         if image.company != get_user_company(request.user):
-#             return Response(status=403)
-
-#         return HttpResponseRedirect(image.file_obj.url)
-
-
 class MediaProxyView(APIView):
 
     permission_classes = [IsAuthenticated]
@@ -763,7 +751,34 @@ class MediaProxyView(APIView):
         )
 
 
+class ContractReferenceDateListCreateView(ListCreateAPIView):
+    serializer_class = ContractReferenceDateSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user_company = get_user_company(self.request.user)
+
+        if not user_company:
+            return ContractReferenceDate.objects.none()
+
+        return (
+            ContractReferenceDate.objects.filter(
+                Q(company=user_company) | Q(is_system=True),
+                is_active=True
+            ).order_by("order", "label")
+        )
+
+    def perform_create(self, serializer):
+        user_company = get_user_company(self.request.user)
+
+        serializer.save(
+            company=user_company,
+            created_by=self.request.user
+        )
+
 ### Start SMTP Settings ###
+
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def test_smtp_connection_view(request):

@@ -11,6 +11,10 @@ BASE_COUNTRIES_LIST = ['ro', 'md', 'ua', 'eu']
 
 APP_LANGS = ('ro', 'en', 'ru')
 
+APP_LANGS_TUPLE = (("en", "English"),
+                   ("ro", "Romanian"),
+                   ("ru", "Russian"),)
+
 
 MEMBERSHIP_CHOICES = (('basic', 'basic'), ('pro', 'pro'),
                       ('premium', 'premium'))

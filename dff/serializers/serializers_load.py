@@ -161,6 +161,11 @@ class LoadListSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
     load_events = LoadEventOutSerializer(many=True)
     load_imageuploads = ImageUploadUFOnlySerializer(many=True, read_only=True)
 
+    payment_term_days = serializers.IntegerField(
+        source='payment_term.payment_term_days',
+        read_only=True
+    )
+
     def to_representation(self, instance):
         from dff.serializers.serializers_trip import TripTruckSerializer
 
@@ -183,6 +188,8 @@ class LoadListSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
                   'assigned_user', 'bill_to', 'mode', 'bt', 'currency', 'status', 'incoterm', 'carrier', 'vehicle_tractor', 'vehicle_trailer',
                   'load_comments', 'load_tors', 'entry_loads', 'load_iteminvs', 'load_events',
                   'load_imageuploads',
+
+                  'payment_term_days'
                   )
         read_only_fields = ['load_events']
 

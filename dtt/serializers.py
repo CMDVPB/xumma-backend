@@ -6,8 +6,8 @@ from drf_writable_nested.serializers import WritableNestedModelSerializer
 from drf_writable_nested.mixins import UniqueFieldsMixin, NestedCreateMixin, NestedUpdateMixin
 from rest_framework import serializers
 
-from abb.utils import get_user_company
-from att.models import Vehicle
+from abb.utils import get_request_language, get_user_company
+from att.models import ContractReferenceDate, Vehicle
 from att.serializers import VehicleSerializer
 from ayy.models import DamageReport, VehicleDamage
 from dff.serializers.serializers_bce import ImageUploadOutSerializer
@@ -132,3 +132,28 @@ class DamageReportSerializer(WritableNestedModelSerializer):
                   'report_vehicle_damages', 'damage_imageuploads',
                   )
         read_only_fields = ("company",)
+
+
+class ContractReferenceDateSerializer(serializers.ModelSerializer):
+    label = serializers.SerializerMethodField()
+
+    def get_label(self, obj):
+        request = self.context.get("request")
+        lang = get_request_language(request)
+
+        translation = obj.reference_date_translations.filter(
+            language=lang).first()
+
+        if translation:
+            return translation.label
+
+        # fallback to Romanian
+        fallback = obj.reference_date_translations.filter(
+            language="ro").first()
+        return fallback.label if fallback else obj.code
+
+    class Meta:
+        model = ContractReferenceDate
+        fields = ("id", "code", "label", "is_active", "order", 'uf',
+                  'company',
+                  )

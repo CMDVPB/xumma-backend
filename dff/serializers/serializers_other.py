@@ -14,11 +14,12 @@ from abb.serializers import CountrySerializer, CurrencySerializer
 from abb.serializers_drf_writable import CustomWritableNestedModelSerializer, CustomUniqueFieldsMixin
 from abb.utils import get_user_company
 from app.serializers import UserBasicSerializer
-from att.models import Contact, ContactSite, PaymentTerm, Person, TargetGroup, Term, Vehicle, VehicleUnit
+from att.models import Contact, ContactSite, Contract, ContractReferenceDate, PaymentTerm, Person, TargetGroup, Term, Vehicle, VehicleUnit
 from att.serializers import VehicleContactSerializer, VehicleSerializer
 from axx.models import Load
 from ayy.models import CMR, Comment, Document, History, ImageUpload
 from dff.serializers.serializers_bce import BankAccountSerializer
+from dtt.serializers import ContractReferenceDateSerializer
 
 
 class DocumentSerializer(WritableNestedModelSerializer):
@@ -120,6 +121,43 @@ class PersonSerializer(CustomUniqueFieldsMixin, CustomWritableNestedModelSeriali
                   'comment', 'is_driver', "is_private", 'uf')
 
 
+class ContractFKSerializer(CustomUniqueFieldsMixin, CustomWritableNestedModelSerializer):
+
+    reference_date = SlugRelatedField(
+        allow_null=True, slug_field='code', queryset=ContractReferenceDate.objects.all(), required=True)
+
+    def create(self, validated_data):
+        # print('5618:', validated_data)
+
+        relations, reverse_relations = self._extract_relations(validated_data)
+
+        # Create or update direct relations (foreign key, one-to-one)
+        self.update_or_create_direct_relations(
+            validated_data,
+            relations,
+        )
+
+        ### Assign the company here ###
+        request = self.context["request"]
+        user = request.user
+        validated_data["company"] = get_user_company(user)
+
+        # Create instance with atomic
+        with transaction.atomic():
+            instance = super().create(validated_data)
+            self.update_or_create_reverse_relations(
+                instance, reverse_relations)
+
+        return instance
+
+    class Meta:
+        model = Contract
+        lookup_field = 'uf'
+        fields = ("title", "is_active", "is_signed", "signed_at", "days_to_pay", 'content', "created_at", 'uf',
+                  "reference_date",
+                  )
+
+
 class ContactSiteForContactSerializer(CustomUniqueFieldsMixin, CustomWritableNestedModelSerializer):
     '''
     To be used as child serializer for ContactSerializer
@@ -161,10 +199,15 @@ class ContactSerializer(WritableNestedModelSerializer):
     country_code_legal = serializers.SlugRelatedField(
         slug_field='uf', queryset=Country.objects.all(), write_only=True, required=True)
 
+    contract_reference_date = SlugRelatedField(
+        slug_field='uf', queryset=ContractReferenceDate.objects.all(), allow_null=True, required=False)
+
     contact_sites = ContactSiteForContactSerializer(many=True)
     contact_persons = PersonSerializer(many=True)
     contact_bank_accounts = BankAccountSerializer(many=True)
     contact_vehicles = VehicleContactSerializer(many=True)
+
+    contact_contracts = ContractFKSerializer(many=True)
 
     def to_representation(self, instance):
         response = super().to_representation(instance)
@@ -210,10 +253,12 @@ class ContactSerializer(WritableNestedModelSerializer):
         fields = ('company_name', 'alias_company_name', 'is_same_address', 'contact_type', 'uf',
                   'fiscal_code', 'vat_code', 'reg_com', 'subscribed_capital',
                   'is_vat_payer', 'email', 'phone', 'messanger',
+                  'contract_reference_date',
                   'country_code_legal', 'zip_code_legal', 'city_legal', 'address_legal', 'county_legal', 'sect_legal',
                   'comment1', 'comment2',
                   'lat', 'lon',
                   'contact_persons', 'contact_vehicles', 'contact_bank_accounts', 'contact_sites',
+                  'contact_contracts',
                   )
 
 ###### Start Contact Site Serializers ######

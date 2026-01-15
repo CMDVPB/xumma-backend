@@ -10,12 +10,75 @@ from abb.models import Currency, Country, BodyType
 from abb.custom_exceptions import CustomApiException
 from abb.utils import hex_uuid, get_contact_type_default
 from abb.mixins import ProtectedDeleteMixin
-from abb.constants import DOCUMENT_STATUS_CHOICES, VEHICLE_TYPES
+from abb.constants import APP_LANGS_TUPLE, DOCUMENT_STATUS_CHOICES, VEHICLE_TYPES
 from app.models import CategoryGeneral, Company, TypeGeneral
 
 logger = logging.getLogger(__name__)
 
 User = get_user_model()
+
+
+class ContractReferenceDate(models.Model):
+    uf = models.CharField(max_length=36, default=hex_uuid,
+                          db_index=True, unique=True)
+    company = models.ForeignKey(
+        Company,
+        on_delete=models.CASCADE,
+        blank=True,
+        null=True,
+        related_name="company_contract_references"
+    )
+
+    code = models.CharField(
+        max_length=50,
+        unique=True,
+
+    )
+
+    label = models.CharField(
+        max_length=255,
+
+    )
+
+    is_active = models.BooleanField(default=True)
+
+    order = models.PositiveSmallIntegerField(default=0)
+
+    is_system = models.BooleanField(default=False)
+
+    class Meta:
+        verbose_name = "Contract reference date"
+        verbose_name_plural = "Contract reference dates"
+        ordering = ["order", "label"]
+
+    def __str__(self):
+        return self.label
+
+
+class ContractReferenceDateTranslation(models.Model):
+    reference_date = models.ForeignKey(
+        ContractReferenceDate,
+        on_delete=models.CASCADE,
+        related_name="reference_date_translations"
+    )
+
+    language = models.CharField(
+        max_length=2,
+        choices=APP_LANGS_TUPLE,
+        db_index=True
+    )
+
+    label = models.CharField(
+        max_length=255
+    )
+
+    class Meta:
+        verbose_name = ("Contract reference date translation")
+        verbose_name_plural = ("Contract reference date translations")
+        unique_together = ("reference_date", "language")
+
+    def __str__(self):
+        return f"{self.reference_date.code} [{self.language}]"
 
 
 class TargetGroup(models.Model):
@@ -87,6 +150,9 @@ class Contact(models.Model):
     contact_type = ArrayField(models.CharField(
         max_length=20, null=True, blank=True), default=get_contact_type_default, size=5)
 
+    contract_reference_date = models.ForeignKey(
+        ContractReferenceDate, on_delete=models.SET_NULL, related_name='contract_reference_date_contacts', null=True, blank=True)
+
     objects = ContactManager()
 
     class Meta:
@@ -109,6 +175,90 @@ class Contact(models.Model):
 
     def __str__(self):
         return self.company_name or str(self.id) or ''
+
+
+class ContractTemplate(models.Model):
+    uf = models.CharField(max_length=36, default=hex_uuid,
+                          db_index=True, unique=True)
+    company = models.ForeignKey(
+        Company,
+        on_delete=models.CASCADE,
+        related_name="company_contract_templates"
+    )
+
+    name = models.CharField(max_length=255)
+    language = models.CharField(max_length=5, choices=APP_LANGS_TUPLE)
+
+    content = models.TextField()
+
+    is_active = models.BooleanField(default=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["name"]
+        unique_together = ("company", "name", "language")
+
+    def __str__(self):
+        return f"{self.name} ({self.language})"
+
+
+class Contract(models.Model):
+    uf = models.CharField(max_length=36, default=hex_uuid,
+                          db_index=True, unique=True)
+    company = models.ForeignKey(
+        Company,
+        on_delete=models.CASCADE,
+        related_name="company_contracts"
+    )
+
+    contact = models.ForeignKey(
+        Contact,
+        on_delete=models.CASCADE,
+        related_name="contact_contracts"
+    )
+
+    template = models.ForeignKey(
+        ContractTemplate,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="template_contracts"
+    )
+
+    title = models.CharField(max_length=255, blank=True, null=True)
+
+    content = models.TextField()
+
+    reference_date = models.ForeignKey(
+        ContractReferenceDate,
+        on_delete=models.PROTECT,
+        related_name="reference_date_contracts",
+    )
+
+    days_to_pay = models.PositiveSmallIntegerField(default=0)
+
+    is_active = models.BooleanField(default=True)
+    is_signed = models.BooleanField(default=False)
+
+    signed_at = models.DateTimeField(null=True, blank=True)
+
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="created_by_contracts"
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.title} – {self.contact}"
 
 
 class ContactSite(models.Model):
