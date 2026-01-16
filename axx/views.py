@@ -20,8 +20,8 @@ from rest_framework.permissions import IsAuthenticated  # used for FBV
 
 from abb.permissions import IsSubscriptionActiveOrReadOnly
 from abb.utils import get_user_company
-from att.models import BankAccount, Contact, Person, VehicleUnit
-from dff.serializers.serializers_other import ContactSerializer
+from att.models import BankAccount, Contact, Contract, Person, VehicleUnit
+from dff.serializers.serializers_other import ContactSerializer, ContractFKSerializer, ContractListSerializer
 
 import logging
 logger = logging.getLogger(__name__)
@@ -129,3 +129,27 @@ class ContactDetail(RetrieveUpdateDestroyAPIView):
                 {'error': 'restricted'},
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+
+class ContractListView(ListAPIView):
+    serializer_class = ContractListSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        try:
+            user = self.request.user
+            user_company = get_user_company(user)
+            queryset = Contract.objects.filter(company__id=user_company.id)
+
+            queryset = (queryset.select_related(
+                'company',
+                'contact',
+                'reference_date'
+            ))
+
+            return queryset.order_by('-created_at')
+
+        except Exception:
+            logger.exception(
+                'ERRORLOG3007 ContractListView get_queryset')
+            return Contract.objects.none()

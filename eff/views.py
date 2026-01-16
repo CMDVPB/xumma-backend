@@ -8,10 +8,11 @@ from django.contrib.auth import get_user_model
 from django.db import IntegrityError
 from django.db.models import Exists, OuterRef, Sum, Prefetch, Q, Case, When
 from django.db.models.deletion import RestrictedError
+from django.views import View
 from django.views.decorators.cache import cache_page
 from django.http import HttpResponse
-from rest_framework.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
+from django.http import HttpResponse, HttpResponseForbidden
 from rest_framework import status, exceptions
 from rest_framework.views import APIView
 from rest_framework.generics import CreateAPIView, ListAPIView, ListCreateAPIView, CreateAPIView, \
@@ -20,12 +21,13 @@ from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser  # JSONParser
 from rest_framework.decorators import authentication_classes, api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.exceptions import ValidationError
 
 from abb.permissions import IsSubscriptionActiveOrReadOnly
-from abb.utils import get_user_company
+from abb.utils import generate_signed_url, get_user_company, verify_signed_url
 from app.models import Company
 from att.models import TargetGroup
-from ayy.models import DamageReport
+from ayy.models import DamageReport, ImageUpload
 from dff.serializers.serializers_company import CompanySerializer
 from dff.serializers.serializers_other import TargetGroupSerializer  # used for FBV
 
@@ -325,3 +327,44 @@ class DamageReportDetailView(RetrieveUpdateDestroyAPIView):
             logger.error(
                 f'ERRORLOG673 DamageReportDetailView. get_queryset. Error: {e}')
             return DamageReport.objects.none()
+
+
+class ImageGenerateSignedUrlView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, uf):
+        image = get_object_or_404(ImageUpload, uf=uf)
+
+        signed_path = generate_signed_url(
+            f"/api/image-signed/{image.token}/",
+            expires_in=3600
+        )
+
+        return Response({
+            "signed_url": f"{settings.BACKEND_URL}{signed_path}"
+        })
+
+
+class SignedImageView(View):
+    def get(self, request, token):
+        expires = request.GET.get("expires")
+        signature = request.GET.get("signature")
+
+        if not expires or not signature:
+            return HttpResponseForbidden("Missing signature")
+
+        path = request.path  # MUST match signed path exactly
+
+        if not verify_signed_url(path, expires, signature):
+            return HttpResponseForbidden("Invalid or expired URL")
+
+        image = get_object_or_404(ImageUpload, token=token)
+
+        response = HttpResponse(
+            image.file_obj.read(),
+            content_type=image.mime_type
+        )
+        response["Cache-Control"] = "public, max-age=3600"
+        response["X-Robots-Tag"] = "noindex, nofollow"
+
+        return response

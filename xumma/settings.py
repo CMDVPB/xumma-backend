@@ -19,6 +19,7 @@ TRANSLATION_MANAGER = TranslationManager(translations_path="translations")
 SECRET_KEY = os.environ.get('SECRET_KEY')
 
 ENCRYPTION_KEY = os.environ.get('ENCRYPTION_KEY')
+SIGNED_URL_TTL_SECONDS = 3600*24*7
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = str(os.environ.get('DEBUG')) == '1'
@@ -273,8 +274,8 @@ DJOSER = {
     'LOGIN_FIELD': 'email',
     'TOKEN_MODEL': None,
 
-    'PASSWORD_RESET_CONFIRM_URL': 'api/password/reset/confirm/{uid}/{token}',
-    'USERNAME_RESET_CONFIRM_URL': 'api/username/reset/confirm/{uid}/{token}',
+    'PASSWORD_RESET_CONFIRM_URL': 'auth/jwt/password/reset/confirm/{uid}/{token}',
+    'USERNAME_RESET_CONFIRM_URL': 'auth/jwt/username/reset/confirm/{uid}/{token}',
     'ACTIVATION_URL': 'auth/jwt/api/activate/{uid}/{token}',
     'SEND_ACTIVATION_EMAIL': True,
     'PASSWORD_CHANGED_EMAIL_CONFIRMATION': True,

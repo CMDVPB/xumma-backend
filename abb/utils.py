@@ -1,6 +1,9 @@
 import os
 import uuid
 import re
+import hmac
+import hashlib
+import time
 from django.utils import timezone
 from datetime import datetime, timedelta
 from django.conf import settings
@@ -8,6 +11,7 @@ from django.utils import timezone
 from django.db.models import Q
 from django.db.models.query import QuerySet
 from django.core.exceptions import ValidationError
+from urllib.parse import urlencode
 
 import logging
 logger = logging.getLogger(__name__)
@@ -400,3 +404,36 @@ def image_upload_path(instance, filename):
     return f'{base_folder}/{subfolder}/{entity_uf}/{filename}'
 
 ###### End Image, files uploads utils ######
+
+
+def generate_signed_url(path: str, expires_in: int = None):
+    expires_in = expires_in or settings.SIGNED_URL_TTL_SECONDS
+    expires = int(time.time()) + expires_in
+
+    payload = f"{path}:{expires}"
+    signature = hmac.new(
+        settings.ENCRYPTION_KEY.encode(),
+        payload.encode(),
+        hashlib.sha256
+    ).hexdigest()
+
+    query = urlencode({
+        "expires": expires,
+        "signature": signature,
+    })
+
+    return f"{path}?{query}"
+
+
+def verify_signed_url(path: str, expires: int, signature: str) -> bool:
+    if int(time.time()) > int(expires):
+        return False
+
+    payload = f"{path}:{expires}"
+    expected = hmac.new(
+        settings.SIGNED_URL_SECRET.encode(),
+        payload.encode(),
+        hashlib.sha256
+    ).hexdigest()
+
+    return hmac.compare_digest(expected, signature)

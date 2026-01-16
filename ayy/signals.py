@@ -17,10 +17,10 @@ def create_mail_labels(sender, instance, created, **kwargs):
     if not created:
         return
 
-    for label_id, name, order in SYSTEM_LABELS:
+    for slug, name, order in SYSTEM_LABELS:
         MailLabelV2.objects.create(
-            id=label_id,
             user=instance,
+            slug=slug,
             name=name,
             type=MailLabelV2.SYSTEM,
             order=order,

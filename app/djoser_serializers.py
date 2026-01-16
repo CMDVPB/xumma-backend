@@ -16,6 +16,16 @@ User = get_user_model()
 
 
 class UserBaseCreateSerializer(UserCreateSerializer):
+    """
+    Used for:
+    1. Public user registration (anonymous)
+    2. Manager creating users (authenticated)
+
+    Rules:
+    - Anonymous users cannot assign roles
+    - Authenticated managers can assign roles
+    - Company is inherited from manager
+    """
 
     level = serializers.SerializerMethodField()
 
@@ -41,33 +51,34 @@ class UserBaseCreateSerializer(UserCreateSerializer):
 
         user.groups.add(group)
 
+    @transaction.atomic
     def create(self, validated_data):
-        # print('6633', kwargs)
-        user_create_email = validated_data.get('email', None)
-
-        if User.objects.filter(email=user_create_email).exists():
-            raise PermissionDenied(
-                detail='user with this email already exists')
-
-        request = self.context["request"]
-        level = request.data.get("level")
+        request = self.context.get("request")
+        level = validated_data.pop("level", None)
 
         try:
-            user = self.perform_create(validated_data)
+            # Create user using Djoser logic
+            user = super().create(validated_data)
 
-            # Assign company (manager → user)
-            manager_company = request.user.company_set.first()
-            if manager_company:
-                user.company_set.add(manager_company)
+            # CASE 1: Manager creates user → inherit company
+            if request and request.user.is_authenticated:
+                manager_company = request.user.company_set.first()
+                if manager_company:
+                    user.company_set.add(manager_company)
 
-            # Assign group
+            # CASE 2: Assign role/group (ONLY by authenticated users)
             if level:
+                if not request or not request.user.is_authenticated:
+                    raise serializers.ValidationError(
+                        {"level": "Only managers can assign roles."}
+                    )
+
                 self._assign_group(user, level)
+
+            return user
 
         except IntegrityError:
             self.fail("cannot_create_user")
-
-        return user
 
     def perform_create(self, validated_data):
         # print('6688:', validated_data)

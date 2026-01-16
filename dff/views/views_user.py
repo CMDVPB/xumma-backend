@@ -205,7 +205,7 @@ class UserCompleteView(RetrieveUpdateDestroyAPIView):
         company_users = user_company.user.all()
         company_users_ids = [user.id for user in company_users]
 
-        # print('2244', self.request.data)
+        # print('2244', company_users_ids)
 
         queryset = (User.objects
                     .filter(id__in=company_users_ids
@@ -216,9 +216,6 @@ class UserCompleteView(RetrieveUpdateDestroyAPIView):
                         'user_vehicle_km_rate_overrides',
                         'user_vehicle_km_rate_overrides__vehicle',
                     ))
-
-        if not is_user_member_group(self.request.user, 'level_manager'):
-            queryset = User.objects.filter(pk=self.request.user.id)
 
         request_user_id = self.request.user.id
 

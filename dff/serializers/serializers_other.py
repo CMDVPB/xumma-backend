@@ -121,6 +121,30 @@ class PersonSerializer(CustomUniqueFieldsMixin, CustomWritableNestedModelSeriali
                   'comment', 'is_driver', "is_private", 'uf')
 
 
+class ContactFKSerializer(WritableNestedModelSerializer):
+
+    class Meta:
+        model = Contact
+        fields = ('company_name', 'uf',
+                  )
+
+
+class ContractListSerializer(CustomUniqueFieldsMixin, CustomWritableNestedModelSerializer):
+
+    contact = ContactFKSerializer()
+
+    reference_date = SlugRelatedField(
+        allow_null=True, slug_field='code', queryset=ContractReferenceDate.objects.all())
+
+    class Meta:
+        model = Contract
+        lookup_field = 'uf'
+        fields = ("title", 'content', "is_active", "is_signed", "signed_at", "days_to_pay",  "created_at", 'uf',
+                  'contact',
+                  "reference_date",
+                  )
+
+
 class ContractFKSerializer(CustomUniqueFieldsMixin, CustomWritableNestedModelSerializer):
 
     reference_date = SlugRelatedField(
@@ -153,7 +177,7 @@ class ContractFKSerializer(CustomUniqueFieldsMixin, CustomWritableNestedModelSer
     class Meta:
         model = Contract
         lookup_field = 'uf'
-        fields = ("title", "is_active", "is_signed", "signed_at", "days_to_pay", 'content', "created_at", 'uf',
+        fields = ("title", "is_active", "is_signed", "signed_at", "days_to_pay", 'title', 'content', "created_at", 'uf',
                   "reference_date",
                   )
 
