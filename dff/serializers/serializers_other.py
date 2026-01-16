@@ -177,7 +177,7 @@ class ContractFKSerializer(CustomUniqueFieldsMixin, CustomWritableNestedModelSer
     class Meta:
         model = Contract
         lookup_field = 'uf'
-        fields = ("title", "is_active", "is_signed", "signed_at", "days_to_pay", 'title', 'content', "created_at", 'uf',
+        fields = ("title", "is_active", "is_signed", "signed_at", "days_to_pay", 'number', 'date', 'title', 'content', "created_at", 'uf',
                   "reference_date",
                   )
 

@@ -227,8 +227,9 @@ class Contract(models.Model):
         related_name="template_contracts"
     )
 
+    number = models.CharField(max_length=50, blank=True, null=True)
+    date = models.DateField(blank=True, null=True)
     title = models.CharField(max_length=100, blank=True, null=True)
-
     content = models.TextField()
 
     reference_date = models.ForeignKey(

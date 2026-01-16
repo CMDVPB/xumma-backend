@@ -9,7 +9,7 @@ from phonenumber_field.modelfields import PhoneNumberField
 from abb.constants import ACTION_CHOICES, UNIT_MEASUREMENT_CHOICES, VAT_CHOICES, VAT_EXEMPTION_REASON, VAT_TYPE_CHOICES
 from abb.models import Country, Currency
 from abb.utils import assign_new_num, hex_uuid, default_notification_status_3, image_upload_path, upload_to
-from app.models import CategoryGeneral, Company, TypeGeneral
+from app.models import CategoryGeneral, Company, TypeCost, TypeGeneral
 from axx.models import Ctr, Exp, Inv, Load, Tor, Trip
 from att.models import Contact, ContactSite, Person, Vehicle
 
@@ -445,6 +445,12 @@ class ItemCost(models.Model):
     uf = models.CharField(max_length=36, default=hex_uuid)
     company = models.ForeignKey(
         Company, on_delete=models.CASCADE, null=True, blank=True, related_name='company_itemcosts')
+
+    date = models.DateTimeField(null=True, blank=True)
+    type = models.ForeignKey(
+        TypeCost, on_delete=models.RESTRICT, null=True, blank=True, related_name='type_itemscosts')
+    country = models.ForeignKey(
+        Country, on_delete=models.RESTRICT, null=True, blank=True, related_name='country_itemscosts')
     quantity = models.FloatField(null=True, blank=True)
     amount = models.FloatField(null=True, blank=True)
     vat = models.PositiveIntegerField(null=True, blank=True)

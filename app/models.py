@@ -556,3 +556,25 @@ class TypeGeneral(models.Model):
         verbose_name = "Type General"
         verbose_name_plural = "Type General"
         ordering = ['serial_number']
+
+
+class TypeCost(models.Model):
+    '''
+    TypeCost to be use for ItemCost
+    '''
+
+    uf = models.CharField(max_length=36, default=hex_uuid,
+                          db_index=True, unique=True)
+    company = models.ForeignKey(
+        Company, on_delete=models.CASCADE, null=True, blank=True, related_name='company_types_cost')
+
+    serial_number = models.SmallIntegerField(unique=True)
+    code = models.CharField(unique=True)
+    label = models.CharField(max_length=100)
+
+    is_system = models.BooleanField(default=False)
+
+    class Meta:
+        verbose_name = "Type Cost"
+        verbose_name_plural = "Types Cost"
+        ordering = ['serial_number']
