@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import CategoryGeneral, Company, TypeGeneral, User, DocumentSeries, Membership, Subscription, SMTPSettings, UserSettings
+from .models import CategoryGeneral, Company, TypeCost, TypeGeneral, User, DocumentSeries, Membership, Subscription, SMTPSettings, UserSettings
 from .admin_utils import DocumentSeriesNumberRangeFilter
 
 
@@ -125,6 +125,13 @@ class CategoryGeneralAdmin(admin.ModelAdmin):
 
 @admin.register(TypeGeneral)
 class TypeGeneralAdmin(admin.ModelAdmin):
+
+    list_display = ('id', 'company', 'serial_number',
+                    'code', 'label', 'is_system')
+
+
+@admin.register(TypeCost)
+class TypeCostAdmin(admin.ModelAdmin):
 
     list_display = ('id', 'company', 'serial_number',
                     'code', 'label', 'is_system')

@@ -118,6 +118,7 @@ class TripSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
     mode = ModeTypeSerializer(allow_null=True)
     bt = BodyTypeSerializer(allow_null=True)
 
+    trip_loads = LoadTripListSerializer(many=True, read_only=True)
     trip_comments = CommentSerializer(many=True)
     trip_histories = HistorySerializer(many=True, read_only=True)
     trip_itemcosts = ItemCostSerializer(many=True)
@@ -178,11 +179,6 @@ class TripSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
             instance.vehicle_tractor).data if instance.vehicle_tractor else None
         response['vehicle_trailer'] = VehicleSerializer(
             instance.vehicle_trailer).data if instance.vehicle_trailer else None
-
-        # response['trip_loads'] = LoadTripGetSerializer(
-        #     instance.trip_loads, many=True).data if instance.trip_loads else None
-        # response['trip_route_sheets'] = RouteSheetSerializer(
-        #     instance.trip_route_sheets, many=True).data if instance.trip_route_sheets else None
 
         # Check reverse FK: trip_route_sheets
         try:
@@ -259,7 +255,7 @@ class TripSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
                   'km_departure', 'km_arrival', 'km_exit', 'km_entry', 'trip_number', 'date_trip', 'date_departure', 'date_arrival',
                   'trip_details', 'l_departure', 'l_arrival', 'trip_add_info', 'trip_comments', 'trip_histories', 'uf',
                   'rs_number',
-                  'drivers', 'trip_itemcosts',
+                  'drivers', 'trip_itemcosts', 'trip_loads',
                   # 👇 computed, read-only
                   'loading_points_count',
                   'unloading_points_count'

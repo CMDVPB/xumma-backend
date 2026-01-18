@@ -1,3 +1,4 @@
+import base64
 import os
 import uuid
 import re
@@ -431,9 +432,63 @@ def verify_signed_url(path: str, expires: int, signature: str) -> bool:
 
     payload = f"{path}:{expires}"
     expected = hmac.new(
-        settings.SIGNED_URL_SECRET.encode(),
+        settings.ENCRYPTION_KEY.encode(),
         payload.encode(),
         hashlib.sha256
     ).hexdigest()
+
+    return hmac.compare_digest(expected, signature)
+
+
+def generate_signed_url_zip(token: str, expires_in: int = None):
+    expires_in = expires_in or settings.SIGNED_URL_TTL_SECONDS
+    expires = int(time.time()) + expires_in
+
+    payload = f"image-zip:{token}:{expires}"
+
+    signature = base64.urlsafe_b64encode(
+        hmac.new(
+            settings.ENCRYPTION_KEY.encode(),
+            payload.encode(),
+            hashlib.sha256
+        ).digest()
+    ).decode().rstrip("=")
+
+    # signature = hmac.new(
+    #     settings.ENCRYPTION_KEY.encode(),
+    #     payload.encode(),
+    #     hashlib.sha256
+    # ).hexdigest()
+
+    return f"/api/image-zip-signed/{token}/?expires={expires}&signature={signature}"
+
+
+def verify_signed_zip(token: str, expires: str, signature: str) -> bool:
+    try:
+        expires = int(expires)
+    except (TypeError, ValueError):
+        return False
+
+    if time.time() > expires:
+        return False
+
+    payload = f"image-zip:{token}:{expires}"
+
+    expected = base64.urlsafe_b64encode(
+        hmac.new(
+            settings.ENCRYPTION_KEY.encode(),
+            payload.encode(),
+            hashlib.sha256
+        ).digest()
+    ).decode().rstrip("=")
+
+    # expected = hmac.new(
+    #     settings.ENCRYPTION_KEY.encode(),
+    #     payload.encode(),
+    #     hashlib.sha256
+    # ).hexdigest()
+
+    print("EXPECTED:", expected)
+    print("RECEIVED:", signature)
 
     return hmac.compare_digest(expected, signature)

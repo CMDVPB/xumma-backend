@@ -12,9 +12,39 @@ from abb.models import Currency
 from abb.serializers import CurrencySerializer
 from abb.serializers_drf_writable import CustomWritableNestedModelSerializer, CustomUniqueFieldsMixin
 from abb.utils import get_user_company
+from app.models import TypeCost
 from ayy.models import Document, ItemCost, ItemForItemCost, PhoneNumber
 
 User = get_user_model()
+
+
+class TypeCostFKSerializer(serializers.ModelSerializer):
+
+    def create(self, validated_data):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            if not validated_data.get('is_system'):
+                user_company = getattr(request.user, 'company', None)
+                if user_company:
+                    validated_data['company'] = user_company
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        if instance.is_system:
+            raise serializers.ValidationError(
+                "System TypeCost entries cannot be modified."
+            )
+        return super().update(instance, validated_data)
+
+    class Meta:
+        model = TypeCost
+        fields = ('serial_number', 'code', 'label', 'is_system', 'uf',
+                  'company',
+                  )
+        read_only_fields = (
+            'uf',
+            'is_system',
+        )
 
 
 class ItemForItemCostSerializer(CustomWritableNestedModelSerializer):
@@ -22,26 +52,30 @@ class ItemForItemCostSerializer(CustomWritableNestedModelSerializer):
     def to_internal_value(self, data):
         data_copy = data.copy()
 
-        if 'description' in data_copy and data_copy['description'] == '':
+        if data_copy.get('description') == '':
             data_copy['description'] = None
-        if 'vat' in data_copy and data_copy['vat'] == '':
+
+        if data_copy.get('vat') == '':
             data_copy['vat'] = None
-        if 'code' in data_copy and data_copy['code'] == '':
+
+        if data_copy.get('code') == '':
             data_copy['code'] = None
 
-        ### Add company if present or not present in the data ###
-        if 'company' in data_copy:
-            if isinstance(data_copy['company'], int):
-                data_copy['company'] = data_copy['company']
-            else:
+        # Handle company safely
+        if 'company' in data_copy and data_copy['company']:
+            if not isinstance(data_copy['company'], int):
                 data_copy['company'] = data_copy['company'].id
-        elif 'company' not in data_copy or not data_copy['company']:
-            request = self.context.get('request')
-            if request and request.user.is_authenticated:
-                user = request.user
-                user_company = get_user_company(user)
-                data_copy['company'] = user_company.id
-        return super(ItemForItemCostSerializer, self).to_internal_value(data_copy)
+
+        else:
+            # ⛔ do NOT assign company for system items
+            if not data_copy.get('is_system'):
+                request = self.context.get('request')
+                if request and request.user.is_authenticated:
+                    user_company = get_user_company(request.user)
+                    if user_company:
+                        data_copy['company'] = user_company.id
+
+        return super().to_internal_value(data_copy)
 
     class Meta:
         model = ItemForItemCost
@@ -59,6 +93,23 @@ class ItemCostSerializer(WritableNestedModelSerializer):
 
     currency = serializers.SlugRelatedField(
         allow_null=True, slug_field='currency_code', queryset=Currency.objects.all())
+
+    created_by = serializers.SlugRelatedField(
+        slug_field='uf',
+        read_only=True)
+
+    type = serializers.SlugRelatedField(
+        slug_field='uf',
+        queryset=TypeCost.objects.all(),
+        allow_null=True
+    )
+
+    # def validate_type(self, value):
+    #     if value and value.is_system:
+    #         raise serializers.ValidationError(
+    #             "System TypeCost entries cannot be assigned."
+    #         )
+    #     return value
 
     def to_internal_value(self, data):
         if 'quantity' in data and type(data['quantity']) == str:
@@ -113,13 +164,28 @@ class ItemCostSerializer(WritableNestedModelSerializer):
         # print('4850', kwargs)
 
         uf_value = self.validated_data.get('uf')
-        if uf_value:  # Fetch instance by 'uf' if exists
+        if uf_value:
             instance = self.Meta.model.objects.filter(uf=uf_value).first()
+
             if instance:
+                # 🔒 UPDATE — do NOT touch created_by
+                self.validated_data.pop('created_by', None)
                 return self.update(instance, self.validated_data)
+
             else:
+                # 🆕 CREATE
+                request = self.context.get('request')
+                if request and request.user.is_authenticated:
+                    self.validated_data['created_by'] = request.user
+
                 return self.create(self.validated_data)
+
         else:
+            # 🆕 CREATE (no uf)
+            request = self.context.get('request')
+            if request and request.user.is_authenticated:
+                self.validated_data['created_by'] = request.user
+
             return self.create(self.validated_data)
 
     def create(self, validated_data):
@@ -152,8 +218,8 @@ class ItemCostSerializer(WritableNestedModelSerializer):
 
     class Meta:
         model = ItemCost
-        fields = ('quantity', 'amount', 'vat', 'discount', 'uf',
-                  'currency', 'item_for_item_cost',
+        fields = ('date', 'type', 'quantity', 'amount', 'vat', 'discount', 'uf',
+                  'currency', 'item_for_item_cost', 'created_by',
                   )
 
 

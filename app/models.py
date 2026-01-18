@@ -578,3 +578,22 @@ class TypeCost(models.Model):
         verbose_name = "Type Cost"
         verbose_name_plural = "Types Cost"
         ordering = ['serial_number']
+
+
+class UnavailabilityReason(models.Model):
+    uf = models.CharField(max_length=36, default=hex_uuid,
+                          db_index=True, unique=True)
+    company = models.ForeignKey(
+        Company, on_delete=models.CASCADE, null=True, blank=True, related_name='company_unavailability_reasons')
+
+    serial_number = models.SmallIntegerField(unique=True)
+    code = models.CharField(max_length=30, unique=True)
+    label = models.CharField(max_length=100)
+
+    for_vehicle = models.BooleanField(default=True)
+    for_driver = models.BooleanField(default=True)
+
+    is_system = models.BooleanField(default=False)
+
+    def __str__(self):
+        return self.label

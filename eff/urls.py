@@ -1,7 +1,7 @@
 from django.urls import path
 from rest_framework.urlpatterns import format_suffix_patterns
 
-from eff.views import CompanyDetail, ContactSuggestionAPIView, DamageReportCreateView, DamageReportDetailView, DamageReportListView, ImageGenerateSignedUrlView, SignedImageView, TargetGroupDetail, TargetGroupListCreate
+from eff.views import CompanyDetail, ContactSuggestionAPIView, DamageReportCreateView, DamageReportDetailView, DamageReportListView, ImageGenerateSignedUrlListView, ImageGenerateZipUrlView, SignedImageView, SignedImageZipView, TargetGroupDetail, TargetGroupListCreate, TypeCostListView
 
 urlpatterns = [
     path('companies/me/', CompanyDetail.as_view(), name='company_detail'),
@@ -21,8 +21,16 @@ urlpatterns = [
     path('damage-reports/<str:uf>/', DamageReportDetailView.as_view(),
          name='damage_report_detail'),
 
-    path("api/image-generate/<str:uf>/", ImageGenerateSignedUrlView.as_view()),
-    path("api/image-signed/<uuid:token>/", SignedImageView.as_view()),
+    #     path("api/image-generate/<str:uf>/", ImageGenerateSignedUrlView.as_view()),
+    path("image-generate/", ImageGenerateSignedUrlListView.as_view()),
+    path("image-signed/<str:uf>/", SignedImageView.as_view()),
+
+
+    path("image-zip-generate/", ImageGenerateZipUrlView.as_view()),
+    path("image-zip-signed/<str:token>/", SignedImageZipView.as_view()),
+
+
+    path('type-costs/', TypeCostListView.as_view(), name='type-cost-list'),
 
 ]
 

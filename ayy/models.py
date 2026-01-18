@@ -1,4 +1,7 @@
+from django.conf import settings
 import os
+from django.utils import timezone
+from datetime import datetime, timedelta
 from django.db import models
 from django.contrib.auth import get_user_model
 from django.contrib.postgres.fields import ArrayField
@@ -189,6 +192,28 @@ class ImageUpload(models.Model):
 
     def __str__(self):
         return str(self.file_obj) or ''
+
+
+class ImageZipToken(models.Model):
+    token = models.CharField(
+        max_length=36,
+        default=hex_uuid,
+        unique=True,
+        db_index=True
+    )
+    image_ufs = models.JSONField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+
+    def save(self, *args, **kwargs):
+        if not self.expires_at:
+            self.expires_at = timezone.now() + timedelta(hours=1)
+        super().save(*args, **kwargs)
+
+    def is_expired(self):
+        return timezone.now() > self.created_at + timedelta(
+            seconds=settings.SIGNED_URL_TTL_SECONDS
+        )
 
 
 class RouteSheet(models.Model):
@@ -460,9 +485,10 @@ class ItemCost(models.Model):
         ItemForItemCost, on_delete=models.RESTRICT, null=True, blank=True, related_name='item_for_item_cost_itemcosts')
     currency = models.ForeignKey(
         Currency, on_delete=models.RESTRICT, null=True, blank=True, related_name='currency_itemcosts')
-
     trip = models.ForeignKey(
         Trip, on_delete=models.CASCADE, null=True, blank=True, related_name='trip_itemcosts')
+    created_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name='created_by_itemcosts')
 
     class Meta:
         verbose_name = "Item cost"

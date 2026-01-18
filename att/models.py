@@ -11,7 +11,7 @@ from abb.custom_exceptions import CustomApiException
 from abb.utils import hex_uuid, get_contact_type_default
 from abb.mixins import ProtectedDeleteMixin
 from abb.constants import APP_LANGS_TUPLE, DOCUMENT_STATUS_CHOICES, VEHICLE_TYPES
-from app.models import CategoryGeneral, Company, TypeGeneral
+from app.models import CategoryGeneral, Company, TypeGeneral, UnavailabilityReason
 
 logger = logging.getLogger(__name__)
 
@@ -464,6 +464,49 @@ class Vehicle(ProtectedDeleteMixin, models.Model):
         return self.reg_number or ''
 
 
+class VehicleUnavailability(models.Model):
+    uf = models.CharField(max_length=36, default=hex_uuid,
+                          db_index=True, unique=True)
+    company = models.ForeignKey(
+        Company, on_delete=models.CASCADE, null=True, blank=True, related_name='company_vehicle_unavailabilities')
+
+    vehicle = models.ForeignKey(
+        Vehicle, on_delete=models.CASCADE, related_name='vehicle_unavailabilities')
+
+    start_date = models.DateField()
+    end_date = models.DateField()
+
+    reason = models.ForeignKey(
+        UnavailabilityReason,
+        on_delete=models.PROTECT,
+        related_name='reason_vehicle_unavailabilities'
+    )
+
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-start_date']
+        indexes = [
+            models.Index(fields=['vehicle', 'start_date', 'end_date']),
+        ]
+
+    def clean(self):
+        qs = (VehicleUnavailability.objects
+              .filter(
+                  vehicle=self.vehicle,
+                  start_date__lte=self.end_date,
+                  end_date__gte=self.start_date,
+              )
+              .exclude(pk=self.pk))
+
+        if qs.exists():
+            raise ValidationError('Overlapping unavailability period vehicle')
+
+    def __str__(self):
+        return f'{self.vehicle} unavailable ({self.reason}) {self.start_date} → {self.end_date}'
+
+
 class VehicleKmRate(models.Model):
     vehicle = models.ForeignKey(
         Vehicle, on_delete=models.CASCADE, related_name="vehicle_km_rates")
@@ -628,6 +671,50 @@ class UserUnloadingPointRate(models.Model):
 
     def __str__(self):
         return f"{self.user} – {self.amount_per_point} {self.currency} / unloading point"
+
+
+class DriverUnavailability(models.Model):
+    uf = models.CharField(max_length=36, default=hex_uuid,
+                          db_index=True, unique=True)
+    company = models.ForeignKey(
+        Company, on_delete=models.CASCADE, null=True, blank=True, related_name='company_driver_unavailabilities')
+
+    driver = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='driver_unavailabilities')
+
+    start_date = models.DateField()
+    end_date = models.DateField()
+
+    reason = models.ForeignKey(
+        UnavailabilityReason,
+        on_delete=models.PROTECT,
+        related_name='reason_driver_unavailabilities'
+    )
+
+    notes = models.TextField(blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-start_date']
+        indexes = [
+            models.Index(fields=['driver', 'start_date', 'end_date']),
+        ]
+
+    def clean(self):
+        qs = (DriverUnavailability.objects
+              .filter(
+                  driver=self.driver,
+                  start_date__lte=self.end_date,
+                  end_date__gte=self.start_date,
+              )
+              .exclude(pk=self.pk))
+
+        if qs.exists():
+            raise ValidationError('Overlapping unavailability period driver')
+
+    def __str__(self):
+        return f'{self.driver} unavailable ({self.reason}) {self.start_date} → {self.end_date}'
 
 
 class VehicleUnit(ProtectedDeleteMixin, models.Model):

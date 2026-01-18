@@ -1,3 +1,6 @@
+import zipfile
+import io
+import mimetypes
 import logging
 from datetime import datetime, timedelta
 from smtplib import SMTPException
@@ -13,6 +16,8 @@ from django.views.decorators.cache import cache_page
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.http import HttpResponse, HttpResponseForbidden
+from django.utils.text import get_valid_filename
+from exceptiongroup import catch
 from rest_framework import status, exceptions
 from rest_framework.views import APIView
 from rest_framework.generics import CreateAPIView, ListAPIView, ListCreateAPIView, CreateAPIView, \
@@ -24,10 +29,10 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import ValidationError
 
 from abb.permissions import IsSubscriptionActiveOrReadOnly
-from abb.utils import generate_signed_url, get_user_company, verify_signed_url
-from app.models import Company
+from abb.utils import generate_signed_url, generate_signed_url_zip, get_user_company, verify_signed_url, verify_signed_zip
+from app.models import Company, TypeCost
 from att.models import TargetGroup
-from ayy.models import DamageReport, ImageUpload
+from ayy.models import DamageReport, ImageUpload, ImageZipToken
 from dff.serializers.serializers_company import CompanySerializer
 from dff.serializers.serializers_other import TargetGroupSerializer  # used for FBV
 
@@ -37,6 +42,7 @@ from urllib3.util.retry import Retry
 from urllib.parse import quote
 
 from dtt.serializers import DamageReportSerializer
+from eff.serializers import TypeCostListSerializer
 request_session = requests.Session()
 retries = Retry(total=3, backoff_factor=5)
 adapter = HTTPAdapter(max_retries=retries)
@@ -329,24 +335,67 @@ class DamageReportDetailView(RetrieveUpdateDestroyAPIView):
             return DamageReport.objects.none()
 
 
-class ImageGenerateSignedUrlView(APIView):
+# class ImageGenerateSignedUrlView(APIView):
+#     permission_classes = [IsAuthenticated]
+
+#     def get(self, request, uf):
+#         image = get_object_or_404(ImageUpload, uf=uf)
+
+#         signed_path = generate_signed_url(
+#             f"/api/image-signed/{image.token}/",
+#             expires_in=3600
+#         )
+
+#         return Response({
+#             "signed_url": f"{settings.BACKEND_URL}{signed_path}"
+#         })
+
+class ImageGenerateSignedUrlListView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def get(self, request, uf):
-        image = get_object_or_404(ImageUpload, uf=uf)
+    def post(self, request):
+        ufs = request.data.get("ufs", [])
 
-        signed_path = generate_signed_url(
-            f"/api/image-signed/{image.token}/",
-            expires_in=3600
+        # print('3430', ufs)
+
+        if not isinstance(ufs, list) or not ufs:
+            return Response(
+                {"detail": "ufs must be a non-empty list"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        images = ImageUpload.objects.filter(
+            uf__in=ufs,
+            company=get_user_company(request.user)
         )
 
-        return Response({
-            "signed_url": f"{settings.BACKEND_URL}{signed_path}"
-        })
+        found_ufs = set(images.values_list("uf", flat=True))
+        missing_ufs = [uf for uf in ufs if uf not in found_ufs]
+
+        results = []
+
+        for image in images:
+            signed_path = generate_signed_url(
+                f"/api/image-signed/{image.uf}/",
+                expires_in=settings.SIGNED_URL_TTL_SECONDS,
+            )
+
+            results.append({
+                "uf": image.uf,
+                "signed_url": f"{settings.BACKEND_URL}{signed_path}",
+            })
+
+        return Response(
+            {
+                "results": results,
+                "missing": missing_ufs,
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 class SignedImageView(View):
-    def get(self, request, token):
+    def get(self, request, uf):
         expires = request.GET.get("expires")
         signature = request.GET.get("signature")
 
@@ -358,13 +407,85 @@ class SignedImageView(View):
         if not verify_signed_url(path, expires, signature):
             return HttpResponseForbidden("Invalid or expired URL")
 
-        image = get_object_or_404(ImageUpload, token=token)
+        image = get_object_or_404(ImageUpload, uf=uf)
+
+        # ✅ determine mime type
+        mime_type, _ = mimetypes.guess_type(image.file_name)
+        mime_type = mime_type or "application/octet-stream"
 
         response = HttpResponse(
             image.file_obj.read(),
-            content_type=image.mime_type
+            content_type=mime_type,
         )
         response["Cache-Control"] = "public, max-age=3600"
         response["X-Robots-Tag"] = "noindex, nofollow"
 
         return response
+
+
+class ImageGenerateZipUrlView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        ufs = request.data.get("ufs", [])
+
+        if not isinstance(ufs, list) or not ufs:
+            return Response({"detail": "ufs required"}, status=400)
+
+        zip_token = ImageZipToken.objects.create(image_ufs=ufs)
+
+        signed_path = generate_signed_url_zip(zip_token.token)
+
+        return Response({
+            "zip_url": f"{settings.BACKEND_URL}{signed_path}"
+        })
+
+
+class SignedImageZipView(View):
+    def get(self, request, token):
+        expires = request.GET.get("expires")
+        signature = request.GET.get("signature")
+
+        if not expires or not signature:
+            return HttpResponseForbidden("Missing signature")
+
+        # ✅ VERIFY USING TOKEN (same thing used when signing)
+        if not verify_signed_zip(token, expires, signature):
+            return HttpResponseForbidden("Invalid or expired URL")
+
+        zip_token = get_object_or_404(ImageZipToken, token=token)
+
+        if zip_token.is_expired():
+            return HttpResponseForbidden("ZIP expired")
+
+        images = ImageUpload.objects.filter(uf__in=zip_token.image_ufs)
+
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zipf:
+            for img in images:
+                with img.file_obj.open("rb") as f:
+                    zipf.writestr(img.file_name or img.uf, f.read())
+
+        buffer.seek(0)
+
+        response = HttpResponse(
+            buffer.getvalue(), content_type="application/zip")
+        response["Content-Disposition"] = 'attachment; filename="attachments.zip"'
+        response["Cache-Control"] = "no-store"
+        response["X-Robots-Tag"] = "noindex, nofollow"
+        return response
+
+
+class TypeCostListView(ListAPIView):
+    serializer_class = TypeCostListSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        request = self.request
+        user = request.user
+        company = get_user_company(user)
+
+        return TypeCost.objects.filter(
+            Q(is_system=True) |
+            Q(company=company)
+        ).order_by('serial_number')

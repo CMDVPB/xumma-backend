@@ -81,10 +81,10 @@ class ImageUploadAdmin(admin.ModelAdmin):
 
 @admin.register(ItemCost)
 class ItemCostAdmin(admin.ModelAdmin):
-    list_display = ('id', 'company',
+    list_display = ('id', 'company', 'created_by',
                     )
 
-    search_fields = ('company__company_name',
+    search_fields = ('company__company_name', 'created_by__email'
                      )
 
 

@@ -19,7 +19,7 @@ from abb.permissions import AssignedUserManagerOrReadOnlyIfLocked, HasGroupPermi
 from abb.utils import check_not_unique_num, get_user_company, is_valid_queryparam
 from app.utils import is_user_member_group
 from axx.models import Exp, Load, Tor, Trip
-from ayy.models import Comment, Entry, ItemInv, RouteSheet
+from ayy.models import Comment, Entry, ItemCost, ItemInv, RouteSheet
 from dff.serializers.serializers_trip import TripListSerializer, TripSerializer, TripTruckSerializer
 
 logger = logging.getLogger(__name__)
@@ -83,7 +83,7 @@ class TripListView(ListAPIView):
             myitems = self.request.query_params.get('myitems', None)
             text_query = self.request.query_params.get('textQuery', None)
 
-            print('2030',)
+            # print('2030',)
 
             if is_valid_queryparam(myitems) and myitems == 'myitems':
                 queryset = queryset.filter(
@@ -137,7 +137,7 @@ class TripListView(ListAPIView):
                 endDate = self.request.query_params.get(
                     'endDate', None)
 
-                print('3040', opened_closed_all)
+                # print('3040', opened_closed_all)
 
                 if is_valid_queryparam(own_external_all_index):
                     if own_external_all_index == '0':
@@ -302,72 +302,44 @@ class TripDetailView(RetrieveUpdateDestroyAPIView):
     lookup_field = 'uf'
 
     def get_serializer_class(self):
-        # if self.request.method in ['PATCH', 'PUT']:
-        #     return TripCreateUpdateSerializer
         return TripSerializer
 
     def get_queryset(self):
         user_company = get_user_company(self.request.user)
+
         queryset = Trip.objects.filter(company_id=user_company.id)
 
         queryset = queryset.select_related(
-            'carrier', 'carrier__country_code_post').select_related('mode').select_related('bt').\
-            select_related('currency').select_related('status').select_related(
-                'vehicle_tractor').select_related('vehicle_trailer')
-
-        trip_comments = Comment.objects.all()
-
-        # trip_loads = Load.objects.select_related(
-        #     'bill_to', 'bill_to__country_code_post').select_related(
-        #     'status').select_related('mode').select_related('bt').select_related('currency').\
-        #     select_related('incoterm').select_related(
-        #     'assigned_user').filter(company__id=user_company.id)
-
-        # load_comments = Comment.objects.all()
-
-        # load_entries = Entry.objects.select_related(
-        #     'shipper', 'shipper__company', 'shipper__country_code_site', 'shipper__country_code_site').prefetch_related('entry_details').all()
-
-        # itemInvs = ItemInv.objects.select_related(
-        #     'item_for_item_inv').select_related('item_for_item_cost').all()
-
-        # load_tors = Tor.objects.filter(company__id=user_company.id).select_related(
-        #     'carrier')
-
-        # load_tors = load_tors.prefetch_related(
-        #     Prefetch('tor_iteminvs', queryset=itemInvs))
-
-        # load_exps = Exp.objects.filter(company__id=user_company.id).select_related(
-        #     'supplier', 'supplier__country_code_post')
-
-        # trip_loads = trip_loads.prefetch_related(
-        #     Prefetch('load_comments', queryset=load_comments)).prefetch_related(
-        #     Prefetch('entry_loads', queryset=load_entries)).prefetch_related(
-        #     Prefetch('load_iteminvs', queryset=itemInvs)).prefetch_related(
-        #     Prefetch('load_tors', queryset=load_tors)).prefetch_related(Prefetch('load_exps', queryset=load_exps))
-
-        # route_sheet_qs = RouteSheet.objects.filter(company_id=user_company.id).select_related(
-        #     'company',
-        #     'assigned_user',
-        #     'trip',
-        #     'start_location',
-        #     'end_location',
-        #     'vehicle_tractor',
-        #     'vehicle_trailer',
-        #     'currency',
-        # ).prefetch_related('drivers')
-
-        drivers_qs = user_company.user.all()
-
-        queryset = queryset.prefetch_related(
-            Prefetch('trip_comments', queryset=trip_comments),
-            # Prefetch('trip_loads', queryset=trip_loads),
-            # Prefetch('trip_route_sheets', queryset=route_sheet_qs),
-            Prefetch('drivers', queryset=drivers_qs),
-
+            'mode',
+            'bt',
+            'currency',
+            'status',
+            'carrier',
+            'carrier__country_code_post',
+            'vehicle_tractor',
+            'vehicle_trailer',
         )
 
-        # print('4436')
+        trip_comments_qs = Comment.objects.all()
+        drivers_qs = user_company.user.all()
+
+        itemcosts_qs = (
+            ItemCost.objects
+            .select_related(
+                'currency',
+                'type',
+                'item_for_item_cost',
+                'created_by',
+            )
+            .order_by('-date')
+        )
+
+        queryset = queryset.prefetch_related(
+            Prefetch('trip_comments', queryset=trip_comments_qs),
+            Prefetch('drivers', queryset=drivers_qs),
+            Prefetch('trip_itemcosts', queryset=itemcosts_qs),
+        )
+
         return queryset
 
     def update(self, request, *args, **kwargs):

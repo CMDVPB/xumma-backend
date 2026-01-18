@@ -217,9 +217,10 @@ class UserCompleteView(RetrieveUpdateDestroyAPIView):
                         'user_vehicle_km_rate_overrides__vehicle',
                     ))
 
-        request_user_id = self.request.user.id
+        request_user_email = self.request.user.email
 
-        logger.info(f"A4600 {request_user_id, len(queryset)}")
+        logger.info(
+            f"A4600 Request User email:{request_user_email}. ComUsers length: {len(queryset)} ")
 
         return queryset
 
