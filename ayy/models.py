@@ -485,10 +485,11 @@ class ItemCost(models.Model):
         ItemForItemCost, on_delete=models.RESTRICT, null=True, blank=True, related_name='item_for_item_cost_itemcosts')
     currency = models.ForeignKey(
         Currency, on_delete=models.RESTRICT, null=True, blank=True, related_name='currency_itemcosts')
-    trip = models.ForeignKey(
-        Trip, on_delete=models.CASCADE, null=True, blank=True, related_name='trip_itemcosts')
     created_by = models.ForeignKey(
         User, on_delete=models.SET_NULL, null=True, blank=True, related_name='created_by_itemcosts')
+
+    trip = models.ForeignKey(
+        Trip, on_delete=models.CASCADE, null=True, blank=True, related_name='trip_itemcosts')
 
     class Meta:
         verbose_name = "Item cost"

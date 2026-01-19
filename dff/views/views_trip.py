@@ -137,7 +137,7 @@ class TripListView(ListAPIView):
                 endDate = self.request.query_params.get(
                     'endDate', None)
 
-                # print('3040', opened_closed_all)
+                print('3040', vehicleQuery)
 
                 if is_valid_queryparam(own_external_all_index):
                     if own_external_all_index == '0':
@@ -221,8 +221,8 @@ class TripListView(ListAPIView):
                         trip_comments__comment__icontains=commentQuery)
 
                 if is_valid_queryparam(vehicleQuery):
-                    queryset = queryset.filter(Q(vehicle_tractor__reg_number__icontains=vehicleQuery)
-                                               | Q(vehicle_trailer__reg_number__icontains=vehicleQuery)
+                    queryset = queryset.filter(Q(vehicle_tractor__uf=vehicleQuery)
+                                               | Q(vehicle_trailer__uf=vehicleQuery)
                                                )
 
                 if is_valid_queryparam(startDate):

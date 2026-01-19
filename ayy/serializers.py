@@ -8,7 +8,7 @@ from rest_framework import serializers
 from drf_writable_nested.serializers import WritableNestedModelSerializer
 from drf_writable_nested.mixins import UniqueFieldsMixin, NestedCreateMixin, NestedUpdateMixin
 
-from abb.models import Currency
+from abb.models import Country, Currency
 from abb.serializers import CurrencySerializer
 from abb.serializers_drf_writable import CustomWritableNestedModelSerializer, CustomUniqueFieldsMixin
 from abb.utils import get_user_company
@@ -90,6 +90,9 @@ class ItemForItemCostSerializer(CustomWritableNestedModelSerializer):
 class ItemCostSerializer(WritableNestedModelSerializer):
     item_for_item_cost = ItemForItemCostSerializer(
         allow_null=True, context={'request': 'request'})
+
+    country = serializers.SlugRelatedField(
+        allow_null=True, slug_field='label', queryset=Country.objects.all())
 
     currency = serializers.SlugRelatedField(
         allow_null=True, slug_field='currency_code', queryset=Currency.objects.all())
@@ -219,7 +222,7 @@ class ItemCostSerializer(WritableNestedModelSerializer):
     class Meta:
         model = ItemCost
         fields = ('date', 'type', 'quantity', 'amount', 'vat', 'discount', 'uf',
-                  'currency', 'item_for_item_cost', 'created_by',
+                  'country', 'currency', 'item_for_item_cost', 'created_by',
                   )
 
 

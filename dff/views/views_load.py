@@ -259,7 +259,7 @@ class LoadListView(ListAPIView):
                     else:
                         pass
 
-                # print('2040', button_index_30)
+                print('2040', vehicleQuery)
 
                 if is_valid_queryparam(sortByQuery):
                     if sortByQuery == '0':
@@ -352,8 +352,8 @@ class LoadListView(ListAPIView):
                         assigned_user__email=assignedUserQuery)
 
                 if is_valid_queryparam(vehicleQuery):
-                    queryset = queryset.filter(Q(trip__vehicle_tractor__reg_number__icontains=vehicleQuery)
-                                               | Q(trip__vehicle_trailer__reg_number__icontains=vehicleQuery)
+                    queryset = queryset.filter(Q(trip__vehicle_tractor__uf=vehicleQuery)
+                                               | Q(trip__vehicle_trailer__uf=vehicleQuery)
                                                )
 
                 if is_valid_queryparam(startDate):
