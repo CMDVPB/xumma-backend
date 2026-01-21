@@ -1,4 +1,7 @@
-import tempfile
+import os
+import uuid
+from pathlib import Path
+from django.conf import settings
 from django.shortcuts import get_object_or_404
 from .serializers import ImportBatchDetailSerializer
 from rest_framework.generics import RetrieveAPIView
@@ -71,19 +74,48 @@ class CostImportCreateView(APIView):
             created_by=request.user,
         )
 
+        # file_paths = []
+        # for f in files:
+        #     tmp_file = tempfile.NamedTemporaryFile(
+        #         delete=False,
+        #         suffix=f"_{f.name}"
+        #     )
+
+        #     for chunk in f.chunks():
+        #         tmp_file.write(chunk)
+
+        #     tmp_file.close()
+
+        #     file_paths.append(tmp_file.name)
+
+        # UPLOAD_DIR = "/uploads"
+
+        # file_paths = []
+
+        # for f in files:
+        #     filename = f"{uuid.uuid4()}_{f.name}"
+        #     path = os.path.join(UPLOAD_DIR, filename)
+
+        #     with open(path, "wb+") as dest:
+        #         for chunk in f.chunks():
+        #             dest.write(chunk)
+
+        #     file_paths.append(path)
+
+        upload_dir = Path(settings.MEDIA_ROOT) / "uploads"
+        upload_dir.mkdir(parents=True, exist_ok=True)
+
         file_paths = []
+
         for f in files:
-            tmp_file = tempfile.NamedTemporaryFile(
-                delete=False,
-                suffix=f"_{f.name}"
-            )
+            filename = f"{uuid.uuid4()}_{f.name}"
+            path = upload_dir / filename
 
-            for chunk in f.chunks():
-                tmp_file.write(chunk)
+            with open(path, "wb+") as dest:
+                for chunk in f.chunks():
+                    dest.write(chunk)
 
-            tmp_file.close()
-
-            file_paths.append(tmp_file.name)
+            file_paths.append(str(path))
 
         process_import_batch.delay(
             batch_id=batch.id,

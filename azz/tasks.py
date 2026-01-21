@@ -66,8 +66,8 @@ def _match_row_to_trip(row: ImportRow):
         total_amount is None,
     ]
 
-    print('3580', row,  truck_number, date_from,
-          total_amount, date_from, date_to, )
+    # print('3580', row,  truck_number, date_from,
+    #       total_amount, date_from, date_to, )
 
     if any(required_missing):
         raise ValueError("Missing normalized data")
@@ -90,7 +90,7 @@ def _match_row_to_trip(row: ImportRow):
         .first()
     )
 
-    print('3584', trip, normalized_truck)
+    # print('3584', date_to, date_from)
 
     if not trip:
         return "unmatched", None
@@ -299,85 +299,6 @@ def process_import_batch(self, batch_id, supplier_format_id, file_paths):
                     )
 
                     rows_imported += 1
-
-                # for idx, row in df.iterrows():
-                #     rows_total += 1
-                #     raw = {k: json_safe(v) for k, v in row.to_dict().items()}
-
-                #     # ---- extract required fields ----
-                #     truck_number = raw.get(truck_col)
-                #     amount = raw.get(amount_col)
-                #     date_from = raw.get(date_from_col)
-                #     date_to = raw.get(date_to_col)
-                #     country_code = raw.get(country_col)
-                #     currency = raw.get(currency_col)
-                #     supplier_row_id = supplier_row_id = raw.get(supplier_row_id_col) or raw.get("ID") or raw.get(
-                #         "Id") or raw.get("Transaction ID")
-
-                #     article_code = supplier_format.column_mapping.get(
-                #         'article_code')
-                #     cost_type = supplier_format.column_mapping.get(
-                #         'cost_type')
-
-                #     # ---- normalize truck number / dates----
-                #     if truck_number:
-                #         truck_number = str(truck_number).replace(
-                #             " ", "").upper()
-                #     tz = timezone.get_current_timezone()
-                #     normalized_date_from = normalize_excel_datetime(
-                #         date_from, tz)
-                #     normalized_date_to = normalize_excel_datetime(
-                #         date_to or date_from, tz)
-
-                #     print('3580', truck_number, amount, date_from)
-
-                #     # ---- validation / create error ----
-                #     if not truck_number or amount in ("", None) or not date_from:
-                #         ImportRow.objects.create(
-                #             batch=batch,
-                #             source_file=filename,
-                #             row_number=idx + 1,
-                #             raw_data=raw,
-                #             status=ImportRow.STATUS_ERROR,
-                #             error_message="Missing truck number, amount, or date",
-                #         )
-                #         rows_skipped += 1
-                #         continue
-
-                #     print('3588', supplier_row_id)
-
-                #     # ---- Skip duplicates safely Before creating ImportRow ----
-                #     if supplier_row_id and ImportRow.objects.filter(
-                #         supplier_row_id=str(supplier_row_id),
-                #         batch__company=batch.company,
-                #     ).exists():
-                #         rows_skipped += 1
-                #         continue
-
-                #     # ---- store row ----
-                #     ImportRow.objects.create(
-                #         batch=batch,
-                #         supplier_row_id=str(supplier_row_id),
-                #         source_file=filename,
-                #         row_number=idx + 1,
-                #         raw_data={
-                #             **raw,
-                #             "_normalized": {
-                #                 "article_code": article_code,
-                #                 "cost_type": cost_type,
-                #                 "truck_number": truck_number,
-                #                 "date_from": normalized_date_from,
-                #                 "date_to": normalized_date_to,
-                #                 "amount": float(amount),
-                #                 "currency_code": (
-                #                     currency or supplier_format.currency).strip().upper(),
-                #                 "country_label": (
-                #                     country_code or supplier_format.country).strip().upper(),
-                #             },
-                #         },
-                #         status=ImportRow.STATUS_IMPORTED,
-                #     )
-                #     rows_imported += 1
 
         # ---- success ----
         batch.status = ImportBatch.STATUS_DONE
