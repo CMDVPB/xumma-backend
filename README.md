@@ -25,3 +25,21 @@
 - add Groups: level_manager, level_leader, level_dispatcher, level_finance, level_driver, level_employee
 - add Groups: type_shipper, type_forwarder, type_carrier
 - add Memberships: basic, pro, premium
+
+### Import countries, currencies
+
+expected currencies input:
+currency_code
+currency_name
+currency_symbol
+currency_numeric
+
+# Example CSV:
+
+currency_code,currency_name,currency_symbol,currency_numeric
+EUR,Euro,€,978
+USD,US Dollar,$,840
+MDL,Moldovan Leu,L,498
+RON,Romanian Leu,lei,946
+
+command: python manage.py import_currencies xumma_data/currencies.csv

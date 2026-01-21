@@ -1,0 +1,250 @@
+serial_number,label,value,value_iso3,value_numeric
+100,MD,Moldova,MDA,498
+200,RO,Romania,ROU,642
+300,UA,Ukraine,UKR,804
+320,PL,Poland,POL,616
+340,BY,Belarus,BLR,112
+360,TR,Turkey,TUR,792
+380,RU,Russian Federation,RUS,643
+400,AF,Afghanistan,AFG,4
+410,AX,Aland Islands,ALA,248
+420,AL,Albania,ALB,8
+430,DZ,Algeria,DZA,12
+440,AS,American Samoa,ASM,16
+450,AD,Andorra,AND,20
+460,AO,Angola,AGO,24
+470,AI,Anguilla,AIA,660
+480,AQ,Antarctica,ATA,10
+490,AG,Antigua and Barbuda,ATG,28
+500,AR,Argentina,ARG,32
+510,AM,Armenia,ARM,51
+520,AW,Aruba,ABW,533
+530,AU,Australia,AUS,36
+540,AT,Austria,AUT,40
+550,AZ,Azerbaijan,AZE,31
+560,BS,Bahamas,BHS,44
+570,BH,Bahrain,BHR,48
+580,BD,Bangladesh,BGD,50
+590,BB,Barbados,BRB,52
+610,BE,Belgium,BEL,56
+620,BZ,Belize,BLZ,84
+630,BJ,Benin,BEN,204
+640,BM,Bermuda,BMU,60
+650,BT,Bhutan,BTN,64
+660,BO,Bolivia (Plurinational State of),BOL,68
+670,BQ,"Bonaire, Sint Eustatius and Saba",BES,535
+680,BA,Bosnia and Herzegovina,BIH,70
+690,BW,Botswana,BWA,72
+700,BV,Bouvet Island,BVT,74
+710,BR,Brazil,BRA,76
+720,IO,British Indian Ocean Territory,IOT,86
+730,BN,Brunei Darussalam,BRN,96
+740,BG,Bulgaria,BGR,100
+750,BF,Burkina Faso,BFA,854
+760,BI,Burundi,BDI,108
+770,CV,Cabo Verde,CPV,132
+780,KH,Cambodia,KHM,116
+790,CM,Cameroon,CMR,120
+800,CA,Canada,CAN,124
+810,KY,Cayman Islands,CYM,136
+820,CF,Central African Republic,CAF,140
+830,TD,Chad,TCD,148
+840,CL,Chile,CHL,152
+850,CN,China,CHN,156
+860,CX,Christmas Island,CXR,162
+870,CC,Cocos (Keeling) Islands,CCK,166
+880,CO,Colombia,COL,170
+890,KM,Comoros,COM,174
+900,CG,Congo,COG,178
+910,CD,"Congo, Democratic Republic of the",COD,180
+920,CK,Cook Islands,COK,184
+930,CR,Costa Rica,CRI,188
+940,CI,Cote d'Ivoire,CIV,384
+950,HR,Croatia,HRV,191
+960,CU,Cuba,CUB,192
+970,CW,Curacao,CUW,531
+980,CY,Cyprus,CYP,196
+990,CZ,Czechia,CZE,203
+1000,DK,Denmark,DNK,208
+1010,DJ,Djibouti,DJI,262
+1020,DM,Dominica,DMA,212
+1030,DO,Dominican Republic,DOM,214
+1040,EC,Ecuador,ECU,218
+1050,EG,Egypt,EGY,818
+1060,SV,El Salvador,SLV,222
+1070,GQ,Equatorial Guinea,GNQ,226
+1080,ER,Eritrea,ERI,232
+1090,EE,Estonia,EST,233
+1100,SZ,Eswatini,SWZ,748
+1110,ET,Ethiopia,ETH,231
+1120,FK,Falkland Islands (Malvinas),FLK,238
+1130,FO,Faroe Islands,FRO,234
+1140,FJ,Fiji,FJI,242
+1150,FI,Finland,FIN,246
+1160,FR,France,FRA,250
+1170,GF,French Guiana,GUF,254
+1180,PF,French Polynesia,PYF,258
+1190,TF,French Southern Territories,ATF,260
+1200,GA,Gabon,GAB,266
+1210,GM,Gambia,GMB,270
+1220,GE,Georgia,GEO,268
+1230,DE,Germany,DEU,276
+1240,GH,Ghana,GHA,288
+1250,GI,Gibraltar,GIB,292
+1260,GR,Greece,GRC,300
+1270,GL,Greenland,GRL,304
+1280,GD,Grenada,GRD,308
+1290,GP,Guadeloupe,GLP,312
+1300,GU,Guam,GUM,316
+1310,GT,Guatemala,GTM,320
+1320,GG,Guernsey,GGY,831
+1330,GN,Guinea,GIN,324
+1340,GW,Guinea-Bissau,GNB,624
+1350,GY,Guyana,GUY,328
+1360,HT,Haiti,HTI,332
+1370,HM,Heard Island and McDonald Islands,HMD,334
+1380,VA,Holy See,VAT,336
+1390,HN,Honduras,HND,340
+1400,HK,Hong Kong,HKG,344
+1410,HU,Hungary,HUN,348
+1420,IS,Iceland,ISL,352
+1430,IN,India,IND,356
+1440,ID,Indonesia,IDN,360
+1450,IR,Iran (Islamic Republic of),IRN,364
+1460,IQ,Iraq,IRQ,368
+1470,IE,Ireland,IRL,372
+1480,IM,Isle of Man,IMN,833
+1490,IL,Israel,ISR,376
+1500,IT,Italy,ITA,380
+1510,JM,Jamaica,JAM,388
+1520,JP,Japan,JPN,392
+1530,JE,Jersey,JEY,832
+1540,JO,Jordan,JOR,400
+1550,KZ,Kazakhstan,KAZ,398
+1560,KE,Kenya,KEN,404
+1570,KI,Kiribati,KIR,296
+1580,KP,Korea (Democratic People's Republic of),PRK,408
+1590,KR,Korea,KOR,410
+1600,KW,Kuwait,KWT,414
+1610,KG,Kyrgyzstan,KGZ,417
+1620,LA,Lao People's Democratic Republic,LAO,418
+1630,LV,Latvia,LVA,428
+1640,LB,Lebanon,LBN,422
+1650,LS,Lesotho,LSO,426
+1660,LR,Liberia,LBR,430
+1670,LY,Libya,LBY,434
+1680,LI,Liechtenstein,LIE,438
+1690,LT,Lithuania,LTU,440
+1700,LU,Luxembourg,LUX,442
+1710,MO,Macao,MAC,446
+1720,MG,Madagascar,MDG,450
+1730,MW,Malawi,MWI,454
+1740,MY,Malaysia,MYS,458
+1750,MV,Maldives,MDV,462
+1760,ML,Mali,MLI,466
+1770,MT,Malta,MLT,470
+1780,MH,Marshall Islands,MHL,584
+1790,MQ,Martinique,MTQ,474
+1800,MR,Mauritania,MRT,478
+1810,MU,Mauritius,MUS,480
+1820,YT,Mayotte,MYT,175
+1830,MX,Mexico,MEX,484
+1840,FM,Micronesia (Federated States of),FSM,583
+1850,MC,Monaco,MCO,492
+1860,MN,Mongolia,MNG,496
+1870,ME,Montenegro,MNE,499
+1880,MS,Montserrat,MSR,500
+1890,MA,Morocco,MAR,504
+1900,MZ,Mozambique,MOZ,508
+1910,MM,Myanmar,MMR,104
+1920,NA,Namibia,NAM,516
+1930,NR,Nauru,NRU,520
+1940,NP,Nepal,NPL,524
+1950,NL,Netherlands (Holland),NLD,528
+1960,NC,New Caledonia,NCL,540
+1970,NZ,New Zealand,NZL,554
+1980,NI,Nicaragua,NIC,558
+1990,NE,Niger,NER,562
+2000,NG,Nigeria,NGA,566
+2010,NU,Niue,NIU,570
+2020,NF,Norfolk Island,NFK,574
+2030,MK,North Macedonia,MKD,807
+2040,MP,Northern Mariana Islands,MNP,580
+2050,NO,Norway,NOR,578
+2060,OM,Oman,OMN,512
+2070,PK,Pakistan,PAK,586
+2080,PW,Palau,PLW,585
+2090,PS,"Palestine, State of",PSE,275
+2100,PA,Panama,PAN,591
+2110,PG,Papua New Guinea,PNG,598
+2120,PY,Paraguay,PRY,600
+2130,PE,Peru,PER,604
+2140,PH,Philippines,PHL,608
+2150,PN,Pitcairn,PCN,612
+2170,PT,Portugal,PRT,620
+2180,PR,Puerto Rico,PRI,630
+2190,QA,Qatar,QAT,634
+2200,RE,Reunion,REU,638
+2220,RW,Rwanda,RWA,646
+2230,BL,Saint Barthelemy,BLM,652
+2240,SH,"Saint Helena, Ascension and Tristan da Cunha",SHN,654
+2250,KN,Saint Kitts and Nevis,KNA,659
+2260,LC,Saint Lucia,LCA,662
+2270,MF,Saint Martin (French part),MAF,663
+2280,PM,Saint Pierre and Miquelon,SPM,666
+2290,VC,Saint Vincent and the Grenadines,VCT,670
+2300,WS,Samoa,WSM,882
+2310,SM,San Marino,SMR,674
+2320,ST,Sao Tome and Principe,STP,678
+2330,SA,Saudi Arabia,SAU,682
+2340,SN,Senegal,SEN,686
+2350,RS,Serbia,SRB,688
+2360,SC,Seychelles,SYC,690
+2370,SL,Sierra Leone,SLE,694
+2380,SG,Singapore,SGP,702
+2390,SX,Sint Maarten (Dutch part),SXM,534
+2400,SK,Slovakia,SVK,703
+2410,SI,Slovenia,SVN,705
+2420,SB,Solomon Islands,SLB,90
+2430,SO,Somalia,SOM,706
+2440,ZA,South Africa,ZAF,710
+2450,GS,South Georgia and the South Sandwich Islands,SGS,239
+2460,SS,South Sudan,SSD,728
+2470,ES,Spain,ESP,724
+2480,LK,Sri Lanka,LKA,144
+2490,SD,Sudan,SDN,729
+2500,SR,Suriname,SUR,740
+2510,SJ,Svalbard and Jan Mayen,SJM,744
+2520,SE,Sweden,SWE,752
+2530,CH,Switzerland,CHE,756
+2540,SY,Syrian Arab Republic,SYR,760
+2550,TW,"Taiwan, Province of China",TWN,158
+2560,TJ,Tajikistan,TJK,762
+2570,TZ,"Tanzania, United Republic of",TZA,834
+2580,TH,Thailand,THA,764
+2590,TL,Timor-Leste,TLS,626
+2600,TG,Togo,TGO,768
+2610,TK,Tokelau,TKL,772
+2620,TO,Tonga,TON,776
+2630,TT,Trinidad and Tobago,TTO,780
+2640,TN,Tunisia,TUN,788
+2660,TM,Turkmenistan,TKM,795
+2670,TC,Turks and Caicos Islands,TCA,796
+2680,TV,Tuvalu,TUV,798
+2690,UG,Uganda,UGA,800
+2700,AE,United Arab Emirates (UAE),ARE,784
+2710,GB,United Kingdom of Great Britain and Northern Ireland (UK-England),GBR,826
+2720,US,United States of America (USA),USA,840
+2730,UM,United States Minor Outlying Islands,UMI,581
+2740,UY,Uruguay,URY,858
+2750,UZ,Uzbekistan,UZB,860
+2760,VU,Vanuatu,VUT,548
+2770,VE,Venezuela (Bolivarian Republic of),VEN,862
+2780,VN,Viet Nam,VNM,704
+2790,VG,Virgin Islands (British),VGB,92
+2800,VI,Virgin Islands (U.S.),VIR,850
+2810,WF,Wallis and Futuna,WLF,876
+2820,EH,Western Sahara,ESH,732
+2830,YE,Yemen,YEM,887
+2840,ZM,Zambia,ZMB,894
+2850,ZW,Zimbabwe,ZWE,716

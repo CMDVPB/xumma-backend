@@ -7,9 +7,10 @@ from .utils import hex_uuid
 class Country(models.Model):
     uf = models.CharField(max_length=36, default=hex_uuid, unique=True)
     serial_number = models.PositiveSmallIntegerField(unique=True)
-    label = models.CharField(max_length=2, blank=False, null=False)
+    label = models.CharField(max_length=2, blank=False,
+                             null=False, unique=True)
     value = models.CharField(
-        max_length=120, blank=False, null=False, unique=True)
+        max_length=128, blank=False, null=False, unique=True)
     value_iso3 = models.CharField(max_length=3, blank=False, null=False)
     value_numeric = models.CharField(max_length=3, blank=False, null=False)
 

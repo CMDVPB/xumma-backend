@@ -8,7 +8,7 @@ from django.core.exceptions import ValidationError
 
 from abb.models import Currency, Country, BodyType
 from abb.custom_exceptions import CustomApiException
-from abb.utils import hex_uuid, get_contact_type_default
+from abb.utils import hex_uuid, get_contact_type_default, normalize_reg_number
 from abb.mixins import ProtectedDeleteMixin
 from abb.constants import APP_LANGS_TUPLE, DOCUMENT_STATUS_CHOICES, VEHICLE_TYPES
 from app.models import CategoryGeneral, Company, TypeGeneral, UnavailabilityReason
@@ -396,6 +396,7 @@ class Vehicle(ProtectedDeleteMixin, models.Model):
         Contact, on_delete=models.CASCADE, null=True, blank=True, related_name='contact_vehicles')
 
     reg_number = models.CharField(max_length=50)
+    normalized_reg_number = models.CharField(max_length=50)
     vin = models.CharField(max_length=50, null=True, blank=True)
     vehicle_type = models.CharField(
         choices=VEHICLE_TYPES, max_length=10, null=True, blank=True)
@@ -455,6 +456,7 @@ class Vehicle(ProtectedDeleteMixin, models.Model):
 
     def save(self, *args, **kwargs):
         try:
+            self.normalized_reg_number = normalize_reg_number(self.reg_number)
             super(Vehicle, self).save(*args, **kwargs)
         except IntegrityError as e:
             logger.error(f'ERRORLOG951 class CompanyVehicle. save. Error: {e}')

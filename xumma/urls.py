@@ -20,6 +20,7 @@ urlpatterns = [
     path('api/', include('att.urls')),
     path('api/', include('axx.urls')),
     path('api/', include('ayy.urls')),
+    path('api/', include('azz.urls')),
     path('api/', include('bch.urls')),
     path('api/', include('dff.urls')),
     path('api/', include('dtt.urls')),

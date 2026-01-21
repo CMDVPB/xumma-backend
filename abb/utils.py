@@ -1,3 +1,6 @@
+from datetime import datetime
+import pandas as pd
+from django.utils.timezone import make_aware
 import base64
 import os
 import uuid
@@ -492,3 +495,48 @@ def verify_signed_zip(token: str, expires: str, signature: str) -> bool:
     print("RECEIVED:", signature)
 
     return hmac.compare_digest(expected, signature)
+
+
+def normalize_reg_number(value: str) -> str:
+    if not value:
+        return ""
+    return (
+        str(value)
+        .upper()
+        .replace(" ", "")
+        .replace("-", "")
+    )
+
+
+def normalize_excel_datetime(value, tz=None):
+    """
+    Accepts:
+    - pandas.Timestamp
+    - datetime
+    - string like '1/16/2026 14:23:19'
+    Returns:
+    - ISO 8601 string with timezone
+    """
+
+    if value in ("", None):
+        return None
+
+    # pandas Timestamp
+    if isinstance(value, pd.Timestamp):
+        dt = value.to_pydatetime()
+
+    # python datetime
+    elif isinstance(value, datetime):
+        dt = value
+
+    # string
+    else:
+        try:
+            dt = pd.to_datetime(value, dayfirst=False).to_pydatetime()
+        except Exception:
+            return None
+
+    if dt.tzinfo is None:
+        dt = make_aware(dt, timezone=tz)
+
+    return dt.isoformat()
