@@ -184,84 +184,200 @@ def process_import_batch(self, batch_id, supplier_format_id, file_paths):
                 else:
                     continue
 
+                aggregated = {}
+
                 for idx, row in df.iterrows():
                     rows_total += 1
                     raw = {k: json_safe(v) for k, v in row.to_dict().items()}
 
-                    # ---- extract required fields ----
                     truck_number = raw.get(truck_col)
                     amount = raw.get(amount_col)
                     date_from = raw.get(date_from_col)
                     date_to = raw.get(date_to_col)
                     country_code = raw.get(country_col)
                     currency = raw.get(currency_col)
-                    supplier_row_id = supplier_row_id = raw.get(supplier_row_id_col) or raw.get("ID") or raw.get(
-                        "Id") or raw.get("Transaction ID")
+                    supplier_row_id = (
+                        raw.get(supplier_row_id_col)
+                        or raw.get("ID")
+                        or raw.get("Id")
+                        or raw.get("Transaction ID")
+                    )
 
                     article_code = supplier_format.column_mapping.get(
                         'article_code')
                     cost_type = supplier_format.column_mapping.get(
                         'cost_type')
 
-                    # ---- normalize truck number / dates----
-                    if truck_number:
-                        truck_number = str(truck_number).replace(
-                            " ", "").upper()
-                    tz = timezone.get_current_timezone()
-                    normalized_date_from = normalize_excel_datetime(
-                        date_from, tz)
-                    normalized_date_to = normalize_excel_datetime(
-                        date_to or date_from, tz)
-
-                    print('3580', truck_number, amount, date_from)
-
-                    # ---- validation / create error ----
                     if not truck_number or amount in ("", None) or not date_from:
-                        ImportRow.objects.create(
-                            batch=batch,
-                            source_file=filename,
-                            row_number=idx + 1,
-                            raw_data=raw,
-                            status=ImportRow.STATUS_ERROR,
-                            error_message="Missing truck number, amount, or date",
-                        )
                         rows_skipped += 1
                         continue
 
-                    print('3588', supplier_row_id)
+                    truck_number = normalize_reg_number(str(truck_number))
+                    tz = timezone.get_current_timezone()
+                    normalized_date_from = normalize_excel_datetime(
+                        date_from, tz)
 
-                    # ---- Skip duplicates safely Before creating ImportRow ----
-                    if supplier_row_id and ImportRow.objects.filter(
-                        supplier_row_id=str(supplier_row_id),
+                    if isinstance(normalized_date_from, str):
+                        normalized_date_from = parse_datetime(
+                            normalized_date_from)
+
+                    if normalized_date_from and is_naive(normalized_date_from):
+                        normalized_date_from = make_aware(normalized_date_from)
+
+                    normalized_date_to = normalize_excel_datetime(
+                        date_from, tz)
+
+                    if isinstance(normalized_date_to, str):
+                        normalized_date_to = parse_datetime(normalized_date_to)
+
+                    if normalized_date_to and is_naive(normalized_date_to):
+                        normalized_date_to = make_aware(normalized_date_to)
+
+                    if not normalized_date_from:
+                        rows_skipped += 1
+                        continue
+
+                    key = (truck_number, normalized_date_from.date())
+
+                    if key not in aggregated:
+                        aggregated[key] = {
+                            "truck_number": truck_number,
+                            "date_from": normalized_date_from,
+                            "date_to": normalized_date_to,
+                            "amount": float(amount),
+                            "rows": [raw],
+                            "supplier_row_ids": {str(supplier_row_id)} if supplier_row_id else set(),
+                            "country_code": country_code,
+                            "currency": currency,
+                        }
+                    else:
+                        aggregated[key]["amount"] += float(amount)
+                        aggregated[key]["rows"].append(raw)
+                        if supplier_row_id:
+                            aggregated[key]["supplier_row_ids"].add(
+                                str(supplier_row_id))
+
+                for (_, _), data in aggregated.items():
+
+                    if data["supplier_row_ids"] and ImportRow.objects.filter(
+                        supplier_row_id__in=data["supplier_row_ids"],
                         batch__company=batch.company,
                     ).exists():
                         rows_skipped += 1
                         continue
 
-                    # ---- store row ----
                     ImportRow.objects.create(
                         batch=batch,
-                        supplier_row_id=str(supplier_row_id),
                         source_file=filename,
-                        row_number=idx + 1,
+                        row_number=0,
+                        supplier_row_id=",".join(
+                            sorted(data["supplier_row_ids"]))[:100],
                         raw_data={
-                            **raw,
+                            "_aggregated_rows": data["rows"],
                             "_normalized": {
                                 "article_code": article_code,
                                 "cost_type": cost_type,
-                                "truck_number": truck_number,
-                                "date_from": normalized_date_from,
-                                "date_to": normalized_date_to,
-                                "amount": float(amount),
-                                "currency": (
-                                    currency or supplier_format.currency).strip().upper(),
+                                "truck_number": data["truck_number"],
+                                "date_from": (
+                                    data["date_from"].isoformat()
+                                    if data["date_from"] else None
+                                ),
+                                "date_to": (
+                                    data["date_to"].isoformat()
+                                    if data["date_to"] else None
+                                ),
+                                "amount": data["amount"],
+                                "currency_code": (
+                                    data["currency"] or supplier_format.currency
+                                ).strip().upper(),
                                 "country_label": (
-                                    country_code or supplier_format.country).strip().upper(),
+                                    data["country_code"] or supplier_format.country
+                                ).strip().upper(),
                             },
                         },
                         status=ImportRow.STATUS_IMPORTED,
                     )
+
                     rows_imported += 1
+
+                # for idx, row in df.iterrows():
+                #     rows_total += 1
+                #     raw = {k: json_safe(v) for k, v in row.to_dict().items()}
+
+                #     # ---- extract required fields ----
+                #     truck_number = raw.get(truck_col)
+                #     amount = raw.get(amount_col)
+                #     date_from = raw.get(date_from_col)
+                #     date_to = raw.get(date_to_col)
+                #     country_code = raw.get(country_col)
+                #     currency = raw.get(currency_col)
+                #     supplier_row_id = supplier_row_id = raw.get(supplier_row_id_col) or raw.get("ID") or raw.get(
+                #         "Id") or raw.get("Transaction ID")
+
+                #     article_code = supplier_format.column_mapping.get(
+                #         'article_code')
+                #     cost_type = supplier_format.column_mapping.get(
+                #         'cost_type')
+
+                #     # ---- normalize truck number / dates----
+                #     if truck_number:
+                #         truck_number = str(truck_number).replace(
+                #             " ", "").upper()
+                #     tz = timezone.get_current_timezone()
+                #     normalized_date_from = normalize_excel_datetime(
+                #         date_from, tz)
+                #     normalized_date_to = normalize_excel_datetime(
+                #         date_to or date_from, tz)
+
+                #     print('3580', truck_number, amount, date_from)
+
+                #     # ---- validation / create error ----
+                #     if not truck_number or amount in ("", None) or not date_from:
+                #         ImportRow.objects.create(
+                #             batch=batch,
+                #             source_file=filename,
+                #             row_number=idx + 1,
+                #             raw_data=raw,
+                #             status=ImportRow.STATUS_ERROR,
+                #             error_message="Missing truck number, amount, or date",
+                #         )
+                #         rows_skipped += 1
+                #         continue
+
+                #     print('3588', supplier_row_id)
+
+                #     # ---- Skip duplicates safely Before creating ImportRow ----
+                #     if supplier_row_id and ImportRow.objects.filter(
+                #         supplier_row_id=str(supplier_row_id),
+                #         batch__company=batch.company,
+                #     ).exists():
+                #         rows_skipped += 1
+                #         continue
+
+                #     # ---- store row ----
+                #     ImportRow.objects.create(
+                #         batch=batch,
+                #         supplier_row_id=str(supplier_row_id),
+                #         source_file=filename,
+                #         row_number=idx + 1,
+                #         raw_data={
+                #             **raw,
+                #             "_normalized": {
+                #                 "article_code": article_code,
+                #                 "cost_type": cost_type,
+                #                 "truck_number": truck_number,
+                #                 "date_from": normalized_date_from,
+                #                 "date_to": normalized_date_to,
+                #                 "amount": float(amount),
+                #                 "currency_code": (
+                #                     currency or supplier_format.currency).strip().upper(),
+                #                 "country_label": (
+                #                     country_code or supplier_format.country).strip().upper(),
+                #             },
+                #         },
+                #         status=ImportRow.STATUS_IMPORTED,
+                #     )
+                #     rows_imported += 1
 
         # ---- success ----
         batch.status = ImportBatch.STATUS_DONE
@@ -403,7 +519,7 @@ def match_unmatched_import_rows_all_companies(self, days_back=30, limit_per_comp
 
         matched = skipped = errors = 0
 
-        for row in qs:
+        for row in qs.iterator(chunk_size=500):
             try:
                 result, trip = _match_row_to_trip(row)
 
@@ -422,19 +538,21 @@ def match_unmatched_import_rows_all_companies(self, days_back=30, limit_per_comp
                 row.save(update_fields=["status", "error_message"])
                 errors += 1
 
-        # Optional logging / monitoring
         print(
             f"[MATCHING] Company {company.id}: "
             f"matched={matched}, skipped={skipped}, errors={errors}, "
             f"days_back={days_back}"
         )
 
-        for batch in ImportBatch.objects.filter(
+        # Recompute only batches that actually have affected rows
+        affected_batches = ImportBatch.objects.filter(
             company=company,
-            importrow__status__in=[
+            rows__status__in=[
                 ImportRow.STATUS_MATCHED,
                 ImportRow.STATUS_UNMATCHED,
                 ImportRow.STATUS_ERROR,
             ],
-        ).distinct():
+        ).distinct()
+
+        for batch in affected_batches.iterator():
             recompute_batch_totals(batch)

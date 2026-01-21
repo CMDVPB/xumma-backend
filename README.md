@@ -9,8 +9,8 @@
 ### Celery
 
 - start in development:
-  - %h automatically adds the hostname
-    celery -A xumma.celery:app worker --loglevel=INFO --concurrency=1 -P solo -E -Q celery -n celery@%h ////// (for all other tasks)
+  - %h automatically adds the hostname ////// (for all other tasks)
+    celery -A xumma.celery:app worker --loglevel=INFO --concurrency=1 -P solo -E -Q celery -n celery@%h
     \*\*\* -P solo = one task at a time, fine for development on windows
 
 ### Celery beat

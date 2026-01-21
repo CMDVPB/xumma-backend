@@ -138,8 +138,7 @@ class ImportRow(models.Model):
     STATUS_UNMATCHED = "unmatched"
 
     batch = models.ForeignKey(
-        ImportBatch, related_name="rows", on_delete=models.CASCADE
-    )
+        ImportBatch,  on_delete=models.CASCADE, related_name="rows")
 
     source_file = models.CharField(max_length=255)
     row_number = models.PositiveIntegerField()

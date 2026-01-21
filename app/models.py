@@ -579,6 +579,9 @@ class TypeCost(models.Model):
         verbose_name_plural = "Types Cost"
         ordering = ['serial_number']
 
+    def __str__(self):
+        return self.label + ' / ' + self.code
+
 
 class UnavailabilityReason(models.Model):
     uf = models.CharField(max_length=36, default=hex_uuid,
