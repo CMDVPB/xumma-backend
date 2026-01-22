@@ -21,7 +21,7 @@ from exceptiongroup import catch
 from rest_framework import status, exceptions
 from rest_framework.views import APIView
 from rest_framework.generics import CreateAPIView, ListAPIView, ListCreateAPIView, CreateAPIView, \
-    RetrieveUpdateDestroyAPIView, DestroyAPIView
+    RetrieveUpdateDestroyAPIView, DestroyAPIView, RetrieveUpdateAPIView
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser  # JSONParser
 from rest_framework.decorators import authentication_classes, api_view, permission_classes
@@ -33,7 +33,7 @@ from abb.utils import generate_signed_url, generate_signed_url_zip, get_user_com
 from app.models import Company, TypeCost
 from att.models import TargetGroup
 from ayy.models import DamageReport, ImageUpload, ImageZipToken
-from dff.serializers.serializers_company import CompanySerializer
+from dff.serializers.serializers_company import CompanySerializer, CompanySettingsSerializer
 from dff.serializers.serializers_other import TargetGroupSerializer  # used for FBV
 
 import requests
@@ -145,6 +145,15 @@ class CompanyDetail(RetrieveUpdateDestroyAPIView):
         company = self.get_object(pk)
         company.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class CompanySettingsView(RetrieveUpdateAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = CompanySettingsSerializer
+
+    def get_object(self):
+        user_company = get_user_company(self.request.user)
+        return user_company.company_settings
 
 
 class ContactSuggestionAPIView(APIView):

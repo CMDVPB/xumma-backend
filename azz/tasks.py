@@ -1,3 +1,4 @@
+import logging
 import os
 import pandas as pd
 from datetime import timedelta
@@ -8,7 +9,7 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 
-from abb.models import Country, Currency
+from abb.models import Currency
 from abb.utils import normalize_excel_datetime, normalize_reg_number
 from app.models import Company, TypeCost
 from axx.models import Trip
@@ -17,6 +18,9 @@ from azz.utils import json_safe, recompute_batch_totals, resolve_country
 
 from .models import ImportBatch, ImportRow, SupplierFormat
 from .models import ImportBatch, ImportRow, SupplierFormat
+
+
+logger = logging.getLogger(__name__)
 
 
 def _match_row_to_trip(row: ImportRow):
@@ -153,6 +157,12 @@ def process_import_batch(self, batch_id, supplier_format_id, file_paths):
         batch.save(update_fields=["status", "finished_at", "totals"])
         return
 
+    article_code_override = supplier_format.column_mapping.get("article_code")
+    article_code_column = supplier_format.column_mapping.get(
+        "article_code_column")
+    article_code_map = supplier_format.column_mapping.get(
+        "article_code_map", {})
+
     truck_col = mapping["truck_number"]
     amount_col = mapping["amount"]
     date_from_col = mapping["date_from"]
@@ -203,10 +213,37 @@ def process_import_batch(self, batch_id, supplier_format_id, file_paths):
                         or raw.get("Transaction ID")
                     )
 
-                    article_code = supplier_format.column_mapping.get(
-                        'article_code')
                     cost_type = supplier_format.column_mapping.get(
                         'cost_type')
+
+                    def resolve_article_code(raw):
+                        if article_code_override:
+                            return article_code_override
+
+                        if not article_code_column:
+                            return None
+
+                        supplier_code = raw.get(article_code_column)
+                        if not supplier_code:
+                            return None
+
+                        supplier_code = str(
+                            supplier_code).upper().replace(" ", "").strip()
+
+                        if supplier_code not in article_code_map:
+                            logger.warning(
+                                "Unmapped article code %s for supplier %s",
+                                supplier_code,
+                                supplier_format.id
+                            )
+
+                        return article_code_map.get(supplier_code)
+
+                    article_code = resolve_article_code(raw)
+
+                    if not article_code:
+                        rows_skipped += 1
+                        continue
 
                     if not truck_number or amount in ("", None) or not date_from:
                         rows_skipped += 1
@@ -237,7 +274,7 @@ def process_import_batch(self, batch_id, supplier_format_id, file_paths):
                         rows_skipped += 1
                         continue
 
-                    key = (truck_number, normalized_date_from.date())
+                    key = (truck_number, normalized_date_from.date(),  article_code)
 
                     if key not in aggregated:
                         aggregated[key] = {
@@ -249,6 +286,7 @@ def process_import_batch(self, batch_id, supplier_format_id, file_paths):
                             "supplier_row_ids": {str(supplier_row_id)} if supplier_row_id else set(),
                             "country_code": country_code,
                             "currency": currency,
+                            "article_code": article_code,
                         }
                     else:
                         aggregated[key]["amount"] += float(amount)
@@ -257,7 +295,7 @@ def process_import_batch(self, batch_id, supplier_format_id, file_paths):
                             aggregated[key]["supplier_row_ids"].add(
                                 str(supplier_row_id))
 
-                for (_, _), data in aggregated.items():
+                for key, data in aggregated.items():
 
                     if data["supplier_row_ids"] and ImportRow.objects.filter(
                         supplier_row_id__in=data["supplier_row_ids"],
@@ -275,7 +313,7 @@ def process_import_batch(self, batch_id, supplier_format_id, file_paths):
                         raw_data={
                             "_aggregated_rows": data["rows"],
                             "_normalized": {
-                                "article_code": article_code,
+                                "article_code": data["article_code"],
                                 "cost_type": cost_type,
                                 "truck_number": data["truck_number"],
                                 "date_from": (
@@ -379,44 +417,53 @@ def match_unmatched_import_rows(self, company_id=None):
     if company_id:
         qs = qs.filter(batch__company_id=company_id)
 
-    touched_batches = set()
+    qs = qs.select_related("batch")
 
+    touched_batches = set()
     matched = skipped = errors = 0
 
     for row in qs:
         try:
-            result, trip = _match_row_to_trip(row)
+            # 🔒 isolate EACH ROW
+            with transaction.atomic():
+                result, trip = _match_row_to_trip(row)
 
-            if result == "unmatched":
-                skipped += 1
-                continue
+                if result != "matched":
+                    skipped += 1
+                    continue
 
-            row.matched_trip_id = trip.id
-            row.status = ImportRow.STATUS_MATCHED
-            row.save(update_fields=["matched_trip_id", "status"])
-            matched += 1
+                row.matched_trip_id = trip.id
+                row.status = ImportRow.STATUS_MATCHED
+                row.error_message = ''
+                row.save(update_fields=[
+                         "matched_trip_id", "status", "error_message"])
 
-            touched_batches.add(row.batch_id)
+                matched += 1
+                touched_batches.add(row.batch_id)
 
         except Exception as exc:
+            # ✅ safe OUTSIDE atomic
             row.status = ImportRow.STATUS_ERROR
             row.error_message = str(exc)
             row.save(update_fields=["status", "error_message"])
-            errors += 1
 
+            errors += 1
             touched_batches.add(row.batch_id)
 
     print(
         f"[MATCH_UNMATCHED] matched={matched}, skipped={skipped}, errors={errors}"
     )
 
-    # 🔁 recompute totals ONLY for affected batches
     for batch_id in touched_batches:
         recompute_batch_totals(ImportBatch.objects.get(id=batch_id))
 
 
 @shared_task(bind=True)
-def match_unmatched_import_rows_all_companies(self, days_back=30, limit_per_company=None):
+def match_unmatched_import_rows_all_companies(
+    self,
+    days_back=30,
+    limit_per_company=None,
+):
     """
     Re-run trip matching for UNMATCHED ImportRows
     across all companies, limited to last `days_back` days.
@@ -425,7 +472,6 @@ def match_unmatched_import_rows_all_companies(self, days_back=30, limit_per_comp
     """
 
     cutoff_date = timezone.now() - timedelta(days=days_back)
-
     companies = Company.objects.all()
 
     for company in companies:
@@ -439,25 +485,39 @@ def match_unmatched_import_rows_all_companies(self, days_back=30, limit_per_comp
             qs = qs[:limit_per_company]
 
         matched = skipped = errors = 0
+        touched_batches = set()
 
         for row in qs.iterator(chunk_size=500):
             try:
-                result, trip = _match_row_to_trip(row)
+                # 🔒 isolate each row
+                with transaction.atomic():
+                    result, trip = _match_row_to_trip(row)
 
-                if result == "unmatched":
-                    skipped += 1
-                    continue
+                    if result != "matched":
+                        skipped += 1
+                        continue
 
-                row.matched_trip_id = trip.id
-                row.status = ImportRow.STATUS_MATCHED
-                row.save(update_fields=["matched_trip_id", "status"])
-                matched += 1
+                    row.matched_trip_id = trip.id
+                    row.status = ImportRow.STATUS_MATCHED
+                    row.error_message = ""  # ✅ NOT NULL SAFE
+                    row.save(
+                        update_fields=[
+                            "matched_trip_id",
+                            "status",
+                            "error_message",
+                        ]
+                    )
+
+                    matched += 1
+                    touched_batches.add(row.batch_id)
 
             except Exception as exc:
                 row.status = ImportRow.STATUS_ERROR
                 row.error_message = str(exc)
                 row.save(update_fields=["status", "error_message"])
+
                 errors += 1
+                touched_batches.add(row.batch_id)
 
         print(
             f"[MATCHING] Company {company.id}: "
@@ -465,15 +525,8 @@ def match_unmatched_import_rows_all_companies(self, days_back=30, limit_per_comp
             f"days_back={days_back}"
         )
 
-        # Recompute only batches that actually have affected rows
-        affected_batches = ImportBatch.objects.filter(
-            company=company,
-            rows__status__in=[
-                ImportRow.STATUS_MATCHED,
-                ImportRow.STATUS_UNMATCHED,
-                ImportRow.STATUS_ERROR,
-            ],
-        ).distinct()
-
-        for batch in affected_batches.iterator():
-            recompute_batch_totals(batch)
+        # 🔁 recompute ONLY affected batches
+        for batch_id in touched_batches:
+            recompute_batch_totals(
+                ImportBatch.objects.get(id=batch_id)
+            )

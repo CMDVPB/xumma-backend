@@ -65,7 +65,7 @@ class TripListView(ListAPIView):
                 Prefetch('drivers', queryset=drivers)
             )
 
-            # print('2828')
+            print('2828', len(queryset))
 
             return queryset.distinct()
 
@@ -77,7 +77,7 @@ class TripListView(ListAPIView):
         queryset = super().filter_queryset(queryset=queryset, **kwargs)
         order_by = 'date_order'
 
-        # print("2010")
+        print("2010", len(queryset))
 
         try:
             myitems = self.request.query_params.get('myitems', None)
@@ -96,153 +96,159 @@ class TripListView(ListAPIView):
                                            | Q(trip_loads__sn__icontains=text_query)
                                            | Q(vehicle_tractor__reg_number__icontains=text_query)
                                            | Q(vehicle_trailer__reg_number__icontains=text_query)
+                                           | Q(driver_links__driver__first_name__icontains=text_query)
+                                           | Q(driver_links__driver__last_name__icontains=text_query)
+                                           | Q(driver_links__driver__email__icontains=text_query)
                                            )
 
-            else:
-                own_external_all_index = self.request.query_params.get(
-                    'buttonIndex', None)
-                opened_closed_all = self.request.query_params.get(
-                    'buttonIndexSecond', None)
-                sortByQuery = self.request.query_params.get(
-                    'sortByQuery', None)
-                billtoQuery = self.request.query_params.get(
-                    'billtoQuery', None)
-                shipperQuery = self.request.query_params.get(
-                    'shipperQuery', None)
-                clientDriverQuery = self.request.query_params.get(
-                    'clientDriverQuery', None)
-                tractorQuery = self.request.query_params.get(
-                    'tractorQuery', None)
-                trailerQuery = self.request.query_params.get(
-                    'trailerQuery', None)
-                dateMinQuery = self.request.query_params.get(
-                    'dateMinQuery', None)
-                dateMaxQuery = self.request.query_params.get(
-                    'dateMaxQuery', None)
-                numMinQuery = self.request.query_params.get(
-                    'numMinQuery', None)
-                numMaxQuery = self.request.query_params.get(
-                    'numMaxQuery', None)
-                relDocNumQuery = self.request.query_params.get(
-                    'relDocNumQuery', None)
-                modeQuery = self.request.query_params.get('modeQuery', None)
-                statusQuery = self.request.query_params.get(
-                    'statusQuery', None)
-                commentQuery = self.request.query_params.get(
-                    'commentQuery', None)
-                vehicleQuery = self.request.query_params.get(
-                    'vehicleQuery', None)
-                startDate = self.request.query_params.get(
-                    'startDate', None)
-                endDate = self.request.query_params.get(
-                    'endDate', None)
+                # print('2038', len(queryset))
 
-                print('3040', vehicleQuery)
+            own_external_all_index = self.request.query_params.get(
+                'buttonIndex', None)
+            opened_closed_all = self.request.query_params.get(
+                'buttonIndexSecond', None)
+            sortByQuery = self.request.query_params.get(
+                'sortByQuery', None)
+            billtoQuery = self.request.query_params.get(
+                'billtoQuery', None)
+            shipperQuery = self.request.query_params.get(
+                'shipperQuery', None)
+            clientDriverQuery = self.request.query_params.get(
+                'clientDriverQuery', None)
+            tractorQuery = self.request.query_params.get(
+                'tractorQuery', None)
+            trailerQuery = self.request.query_params.get(
+                'trailerQuery', None)
+            dateMinQuery = self.request.query_params.get(
+                'dateMinQuery', None)
+            dateMaxQuery = self.request.query_params.get(
+                'dateMaxQuery', None)
+            numMinQuery = self.request.query_params.get(
+                'numMinQuery', None)
+            numMaxQuery = self.request.query_params.get(
+                'numMaxQuery', None)
+            relDocNumQuery = self.request.query_params.get(
+                'relDocNumQuery', None)
+            modeQuery = self.request.query_params.get('modeQuery', None)
+            statusQuery = self.request.query_params.get(
+                'statusQuery', None)
+            commentQuery = self.request.query_params.get(
+                'commentQuery', None)
+            vehicleQuery = self.request.query_params.get(
+                'vehicleQuery', None)
+            startDate = self.request.query_params.get(
+                'startDate', None)
+            endDate = self.request.query_params.get(
+                'endDate', None)
 
-                if is_valid_queryparam(own_external_all_index):
-                    if own_external_all_index == '0':
-                        queryset = queryset.filter(trip_type=LOAD_TYPES[0][0])
-                    elif own_external_all_index == '1':
-                        queryset = queryset.filter(trip_type=LOAD_TYPES[1][0])
+            # print('3040', len(queryset))
+
+            if is_valid_queryparam(own_external_all_index):
+                if own_external_all_index == '0':
+                    queryset = queryset.filter(trip_type=LOAD_TYPES[0][0])
+                elif own_external_all_index == '1':
+                    queryset = queryset.filter(trip_type=LOAD_TYPES[1][0])
+                else:
+                    pass
+
+            if is_valid_queryparam(opened_closed_all):
+                if opened_closed_all == '4':
+                    queryset = queryset.filter(status__serial_number=1000)
+                elif opened_closed_all == '5':
+                    queryset = queryset.filter(status__serial_number=1010)
+                else:
+                    pass
+
+            # print('2040',)
+
+            if is_valid_queryparam(sortByQuery):
+                if sortByQuery is not None:
+                    if sortByQuery == '0':
+                        order_by = 'rn'
+                    elif sortByQuery == '1':
+                        order_by = 'date_order'
+                    elif sortByQuery == '2':
+                        order_by = 'status__order_number'
                     else:
-                        pass
+                        order_by = 'date_order'
 
-                if is_valid_queryparam(opened_closed_all):
-                    if opened_closed_all == '4':
-                        queryset = queryset.filter(status__serial_number=1000)
-                    elif opened_closed_all == '5':
-                        queryset = queryset.filter(status__serial_number=1010)
-                    else:
-                        pass
+            if is_valid_queryparam(billtoQuery):
+                queryset = queryset.filter(carrier__uf=billtoQuery)
 
-                # print('2040',)
+            if is_valid_queryparam(shipperQuery):
+                queryset = queryset.filter(
+                    trip_loads__entry_loads__shipper__uf=shipperQuery)
 
-                if is_valid_queryparam(sortByQuery):
-                    if sortByQuery is not None:
-                        if sortByQuery == '0':
-                            order_by = 'rn'
-                        elif sortByQuery == '1':
-                            order_by = 'date_order'
-                        elif sortByQuery == '2':
-                            order_by = 'status__order_number'
-                        else:
-                            order_by = 'date_order'
+            if is_valid_queryparam(clientDriverQuery):
+                queryset = queryset.filter(
+                    trip_loads__bill_to__uf=clientDriverQuery)
 
-                if is_valid_queryparam(billtoQuery):
-                    queryset = queryset.filter(carrier__uf=billtoQuery)
+            if is_valid_queryparam(tractorQuery):
+                queryset = queryset.filter(
+                    vehicle_tractor__uf=tractorQuery)
 
-                if is_valid_queryparam(shipperQuery):
+            if is_valid_queryparam(trailerQuery):
+                queryset = queryset.filter(
+                    vehicle_trailer__uf=trailerQuery)
+
+            if is_valid_queryparam(modeQuery):
+                queryset = queryset.filter(mode__serial_number=modeQuery)
+
+            if is_valid_queryparam(dateMinQuery):
+                queryset = queryset.filter(date_order__gte=dateMinQuery)
+
+            if is_valid_queryparam(dateMaxQuery):
+                queryset = queryset.filter(date_order__lte=dateMaxQuery)
+
+            if is_valid_queryparam(numMinQuery):
+                queryset = queryset.filter(rn__gte=numMinQuery)
+
+            if is_valid_queryparam(numMaxQuery):
+                queryset = queryset.filter(rn__lte=numMaxQuery)
+
+            if is_valid_queryparam(numMinQuery):
+                queryset = queryset.filter(rn__gte=numMinQuery)
+
+            if is_valid_queryparam(numMaxQuery):
+                queryset = queryset.filter(rn__lte=numMaxQuery)
+
+            if is_valid_queryparam(relDocNumQuery):
+                queryset = queryset.filter(
+                    Q(rn__icontains=relDocNumQuery) | Q(trip_loads__sn__icontains=relDocNumQuery) | Q(trip_number__icontains=relDocNumQuery))
+
+            if is_valid_queryparam(statusQuery):
+                queryset = queryset.filter(
+                    status__serial_number=statusQuery)
+
+            if is_valid_queryparam(commentQuery):
+                queryset = queryset.filter(
+                    trip_comments__comment__icontains=commentQuery)
+
+            if is_valid_queryparam(vehicleQuery):
+                queryset = queryset.filter(Q(vehicle_tractor__uf=vehicleQuery)
+                                           | Q(vehicle_trailer__uf=vehicleQuery)
+                                           )
+
+            if is_valid_queryparam(startDate):
+                dts = parse_datetime(startDate)
+                if dts:
+                    if timezone.is_naive(dts):
+                        dts = timezone.make_aware(dts)
                     queryset = queryset.filter(
-                        trip_loads__entry_loads__shipper__uf=shipperQuery)
+                        date_order__gt=dts)
 
-                if is_valid_queryparam(clientDriverQuery):
+            if is_valid_queryparam(endDate):
+                dte = parse_datetime(endDate)
+                if dte:
+                    if timezone.is_naive(dte):
+                        dte = timezone.make_aware(dte)
+
                     queryset = queryset.filter(
-                        trip_loads__bill_to__uf=clientDriverQuery)
+                        date_order__lt=dte + timedelta(days=1))
 
-                if is_valid_queryparam(tractorQuery):
-                    queryset = queryset.filter(
-                        vehicle_tractor__uf=tractorQuery)
+            print('3048', len(queryset))
 
-                if is_valid_queryparam(trailerQuery):
-                    queryset = queryset.filter(
-                        vehicle_trailer__uf=trailerQuery)
-
-                if is_valid_queryparam(modeQuery):
-                    queryset = queryset.filter(mode__serial_number=modeQuery)
-
-                if is_valid_queryparam(dateMinQuery):
-                    queryset = queryset.filter(date_order__gte=dateMinQuery)
-
-                if is_valid_queryparam(dateMaxQuery):
-                    queryset = queryset.filter(date_order__lte=dateMaxQuery)
-
-                if is_valid_queryparam(numMinQuery):
-                    queryset = queryset.filter(rn__gte=numMinQuery)
-
-                if is_valid_queryparam(numMaxQuery):
-                    queryset = queryset.filter(rn__lte=numMaxQuery)
-
-                if is_valid_queryparam(numMinQuery):
-                    queryset = queryset.filter(rn__gte=numMinQuery)
-
-                if is_valid_queryparam(numMaxQuery):
-                    queryset = queryset.filter(rn__lte=numMaxQuery)
-
-                if is_valid_queryparam(relDocNumQuery):
-                    queryset = queryset.filter(
-                        Q(rn__icontains=relDocNumQuery) | Q(trip_loads__sn__icontains=relDocNumQuery) | Q(trip_number__icontains=relDocNumQuery))
-
-                if is_valid_queryparam(statusQuery):
-                    queryset = queryset.filter(
-                        status__serial_number=statusQuery)
-
-                if is_valid_queryparam(commentQuery):
-                    queryset = queryset.filter(
-                        trip_comments__comment__icontains=commentQuery)
-
-                if is_valid_queryparam(vehicleQuery):
-                    queryset = queryset.filter(Q(vehicle_tractor__uf=vehicleQuery)
-                                               | Q(vehicle_trailer__uf=vehicleQuery)
-                                               )
-
-                if is_valid_queryparam(startDate):
-                    dts = parse_datetime(startDate)
-                    if dts:
-                        if timezone.is_naive(dts):
-                            dts = timezone.make_aware(dts)
-                        queryset = queryset.filter(
-                            date_order__gt=dts)
-
-                if is_valid_queryparam(endDate):
-                    dte = parse_datetime(endDate)
-                    if dte:
-                        if timezone.is_naive(dte):
-                            dte = timezone.make_aware(dte)
-
-                        queryset = queryset.filter(
-                            date_order__lt=dte + timedelta(days=1))
-
-                return queryset.order_by(F(order_by).desc(nulls_first=True), '-date_order')
+            return queryset.order_by(F(order_by).desc(nulls_first=True), '-date_order')
 
         except Exception as e:
             logger.error(

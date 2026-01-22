@@ -203,7 +203,7 @@ class VehicleSerializer(WritableNestedModelSerializer):
         model = Vehicle
         fields = ('id', 'reg_number', 'vin', 'vehicle_type', 'date_registered', 'is_available', 'is_archived', 'is_service', 'uf',
                   'length', 'width', 'height', 'weight_capacity', 'volume_capacity',
-                  'tank_volume', 'change_oil_interval', 'consumption_summer', 'consumption_winter', 'buy_price', 'sell_price', 'km_initial',
+                  'tank_volume', 'adblue_tank_volume', 'change_oil_interval', 'consumption_summer', 'consumption_winter', 'buy_price', 'sell_price', 'km_initial',
                   'interval_taho', 'last_date_unload_taho', 'comment',
                   'brand', 'vehicle_category', 'vehicle_category_type', 'vehicle_body', 'emission_class',
                   'contact',

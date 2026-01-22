@@ -3,10 +3,14 @@ from django.utils import timezone
 from django.contrib.auth import get_user_model
 from django.db import models, transaction
 from django.db.models import Max
+from django.core.validators import MinValueValidator
+from django.db.models import Sum
+from django.core.exceptions import ValidationError
+from decimal import Decimal
 
 from abb.utils import hex_uuid
 from app.models import Company
-from att.models import Contact
+from att.models import Contact, Person, Vehicle, VehicleUnit
 
 User = get_user_model()
 
@@ -164,3 +168,133 @@ class ImportRow(models.Model):
         indexes = [
             models.Index(fields=["batch", "status"]),
         ]
+
+
+###### Start Fuel & AdBlue ######
+
+class FuelTank(models.Model):
+    FUEL_DIESEL = "diesel"
+    FUEL_ADBLUE = "adblue"
+
+    FUEL_TYPE_CHOICES = (
+        (FUEL_DIESEL, "Diesel"),
+        (FUEL_ADBLUE, "AdBlue"),
+    )
+
+    uf = models.CharField(max_length=36, default=hex_uuid, db_index=True)
+    company = models.ForeignKey(
+        Company,
+        on_delete=models.CASCADE,
+        related_name="company_fuel_tanks"
+    )
+
+    fuel_type = models.CharField(
+        max_length=10,
+        choices=FUEL_TYPE_CHOICES
+    )
+
+    capacity_l = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        validators=[MinValueValidator(0)]
+    )
+
+    class Meta:
+        unique_together = ("company", "fuel_type")
+
+    def get_current_fuel_stock(self, *, using_actual=True):
+        refill_field = "actual_quantity_l" if using_actual else "quantity_l"
+
+        refilled = self.tank_refills.aggregate(
+            total=Sum(refill_field)
+        )["total"] or Decimal("0")
+
+        fueled = self.tank_truck_fuelings.aggregate(
+            total=Sum("quantity_l")
+        )["total"] or Decimal("0")
+
+        return refilled - fueled
+
+
+class TankRefill(models.Model):
+    uf = models.CharField(max_length=36, default=hex_uuid, db_index=True)
+    tank = models.ForeignKey(
+        FuelTank, on_delete=models.CASCADE, related_name="tank_refills")
+
+    supplier = models.ForeignKey(
+        Contact, on_delete=models.RESTRICT, blank=True, null=True, related_name='supplier_tank_refills')
+
+    vehicle = models.ForeignKey(
+        VehicleUnit, on_delete=models.SET_NULL, blank=True, null=True, related_name='vehicle_tank_refills')
+    person = models.ForeignKey(
+        Person, on_delete=models.SET_NULL, blank=True, null=True, related_name='person_tank_refills')
+
+    date = models.DateTimeField()
+
+    quantity_l = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        validators=[MinValueValidator(0)]
+    )
+
+    actual_quantity_l = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        validators=[MinValueValidator(0)]
+    )
+
+    price_l = models.DecimalField(
+        max_digits=10,
+        decimal_places=4,
+        validators=[MinValueValidator(0)]
+    )
+
+    comments = models.TextField(
+        max_length=100,
+        blank=True
+    )
+
+    class Meta:
+        ordering = ["-date"]
+        indexes = [models.Index(fields=["tank", "-date"])]
+
+    def clean(self):
+        current_stock = self.tank.get_current_fuel_stock()
+        if current_stock + self.actual_quantity_l > self.tank.capacity_l:
+            raise ValidationError("Tank capacity exceeded")
+
+
+class TruckFueling(models.Model):
+    uf = models.CharField(max_length=36, default=hex_uuid, db_index=True)
+    tank = models.ForeignKey(
+        FuelTank, on_delete=models.PROTECT, related_name="tank_truck_fuelings")
+
+    vehicle = models.ForeignKey(
+        Vehicle, on_delete=models.PROTECT, related_name="vehicle_truck_fuelings")
+
+    driver = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="driver_truck_fuelings"
+    )
+
+    quantity_l = models.DecimalField(
+        max_digits=8,
+        decimal_places=2
+    )
+
+    fueled_at = models.DateTimeField()
+
+    class Meta:
+        ordering = ["-fueled_at"]
+        indexes = [models.Index(fields=["tank", "-fueled_at"])]
+
+    def clean(self):
+        current_stock = self.tank.get_current_fuel_stock()
+        if self.quantity_l > current_stock:
+            raise ValidationError("Not enough fuel in tank")
+
+
+###### End Fuel & AdBlue ######

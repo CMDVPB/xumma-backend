@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import CategoryGeneral, Company, TypeCost, TypeGeneral, User, DocumentSeries, Membership, Subscription, SMTPSettings, UserSettings
+from .models import CategoryGeneral, Company, CompanySettings, TypeCost, TypeGeneral, User, DocumentSeries, Membership, Subscription, SMTPSettings, UserSettings
 from .admin_utils import DocumentSeriesNumberRangeFilter
 
 
@@ -53,6 +53,15 @@ class CompanyAdmin(admin.ModelAdmin):
     list_display = ('id', 'company_name', 'company_users',)
 
     search_fields = ("company_name", 'uf')
+
+
+@admin.register(CompanySettings)
+class CompanySettingsAdmin(admin.ModelAdmin):
+
+    list_display = ('id', 'company', 'diesel_tank_volume_l',
+                    'adblue_tank_volume_l',)
+
+    search_fields = ("company__company_name", 'company__uf', 'uf')
 
 
 @admin.register(DocumentSeries)

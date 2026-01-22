@@ -415,6 +415,7 @@ class Vehicle(ProtectedDeleteMixin, models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     date_registered = models.DateField(null=True, blank=True)
     tank_volume = models.PositiveIntegerField(null=True, blank=True)
+    adblue_tank_volume = models.PositiveIntegerField(null=True, blank=True)
     consumption_summer = models.PositiveIntegerField(null=True, blank=True)
     consumption_winter = models.PositiveIntegerField(null=True, blank=True)
     add_consumption_with_load = models.PositiveIntegerField(
@@ -424,11 +425,16 @@ class Vehicle(ProtectedDeleteMixin, models.Model):
     sell_price = models.PositiveIntegerField(null=True, blank=True)
     km_initial = models.PositiveIntegerField(null=True, blank=True)
 
-    length = models.PositiveIntegerField(null=True, blank=True)
-    width = models.PositiveIntegerField(null=True, blank=True)
-    height = models.PositiveIntegerField(null=True, blank=True)
-    weight_capacity = models.PositiveIntegerField(null=True, blank=True)
-    volume_capacity = models.PositiveIntegerField(null=True, blank=True)
+    length = models.DecimalField(
+        max_digits=6, decimal_places=2, null=True, blank=True)
+    width = models.DecimalField(
+        max_digits=6, decimal_places=2, null=True, blank=True)
+    height = models.DecimalField(
+        max_digits=6, decimal_places=2, null=True, blank=True)
+    weight_capacity = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True)
+    volume_capacity = models.DecimalField(
+        max_digits=6, decimal_places=2, null=True, blank=True)
 
     interval_taho = models.PositiveIntegerField(null=True, blank=True)
     last_date_unload_taho = models.DateField(null=True, blank=True)

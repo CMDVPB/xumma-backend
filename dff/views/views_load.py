@@ -158,226 +158,225 @@ class LoadListView(ListAPIView):
                     Q(load_exps__xn__icontains=text_query)
                 )
 
-            else:
-                button_index = self.request.query_params.get(
-                    'buttonIndex', None)
-                button_index_30 = self.request.query_params.get(
-                    'buttonIndex30', None)
-                type_loading_query = self.request.query_params.get(
-                    'typeLoadingQuery', None)
-                sortByQuery = self.request.query_params.get(
-                    'sortByQuery', None)
-                billtoQuery = self.request.query_params.get(
-                    'billtoQuery', None)
-                shipperQuery = self.request.query_params.get(
-                    'shipperQuery', None)
-                carrierQuery = self.request.query_params.get(
-                    'carrierQuery', None)
-                hbMbNumQuery = self.request.query_params.get(
-                    'hbMbNumQuery', None)
-                load_detailQuery = self.request.query_params.get(
-                    "load_detailQuery", None)
-                load_addressQuery = self.request.query_params.get(
-                    'load_addressQuery', None)
-                unload_addressQuery = self.request.query_params.get(
-                    'unload_addressQuery', None)
-                tractorQuery = self.request.query_params.get(
-                    'tractorQuery', None)
-                trailerQuery = self.request.query_params.get(
-                    'trailerQuery', None)
-                countryLoadQuery = self.request.query_params.get(
-                    'countryLoadQuery', None)
-                countryUnloadQuery = self.request.query_params.get(
-                    'countryUnloadQuery', None)
-                dateMinQuery = self.request.query_params.get(
-                    'dateMinQuery', None)
-                dateMaxQuery = self.request.query_params.get(
-                    'dateMaxQuery', None)
-                numMinQuery = self.request.query_params.get(
-                    'numMinQuery', None)
-                numMaxQuery = self.request.query_params.get(
-                    'numMaxQuery', None)
-                relDocNumQuery = self.request.query_params.get(
-                    'relDocNumQuery', None)
-                iteminvQuery = self.request.query_params.get(
-                    'iteminvQuery', None)
-                currencyQuery = self.request.query_params.get(
-                    'currencyQuery', None)
-                modeQuery = self.request.query_params.get('modeQuery', None)
-                statusQuery = self.request.query_params.get(
-                    'statusQuery', None)
-                commentQuery = self.request.query_params.get(
-                    'commentQuery', None)
-                assignedUserQuery = self.request.query_params.get(
-                    'assignedUserQuery', None)
-                vehicleQuery = self.request.query_params.get(
-                    'vehicleQuery', None)
-                startDate = self.request.query_params.get(
-                    'startDate', None)
-                endDate = self.request.query_params.get(
-                    'endDate', None)
-                is_cleared_query = self.request.query_params.get(
-                    'isClearedQuery', None)
+            button_index = self.request.query_params.get(
+                'buttonIndex', None)
+            button_index_30 = self.request.query_params.get(
+                'buttonIndex30', None)
+            type_loading_query = self.request.query_params.get(
+                'typeLoadingQuery', None)
+            sortByQuery = self.request.query_params.get(
+                'sortByQuery', None)
+            billtoQuery = self.request.query_params.get(
+                'billtoQuery', None)
+            shipperQuery = self.request.query_params.get(
+                'shipperQuery', None)
+            carrierQuery = self.request.query_params.get(
+                'carrierQuery', None)
+            hbMbNumQuery = self.request.query_params.get(
+                'hbMbNumQuery', None)
+            load_detailQuery = self.request.query_params.get(
+                "load_detailQuery", None)
+            load_addressQuery = self.request.query_params.get(
+                'load_addressQuery', None)
+            unload_addressQuery = self.request.query_params.get(
+                'unload_addressQuery', None)
+            tractorQuery = self.request.query_params.get(
+                'tractorQuery', None)
+            trailerQuery = self.request.query_params.get(
+                'trailerQuery', None)
+            countryLoadQuery = self.request.query_params.get(
+                'countryLoadQuery', None)
+            countryUnloadQuery = self.request.query_params.get(
+                'countryUnloadQuery', None)
+            dateMinQuery = self.request.query_params.get(
+                'dateMinQuery', None)
+            dateMaxQuery = self.request.query_params.get(
+                'dateMaxQuery', None)
+            numMinQuery = self.request.query_params.get(
+                'numMinQuery', None)
+            numMaxQuery = self.request.query_params.get(
+                'numMaxQuery', None)
+            relDocNumQuery = self.request.query_params.get(
+                'relDocNumQuery', None)
+            iteminvQuery = self.request.query_params.get(
+                'iteminvQuery', None)
+            currencyQuery = self.request.query_params.get(
+                'currencyQuery', None)
+            modeQuery = self.request.query_params.get('modeQuery', None)
+            statusQuery = self.request.query_params.get(
+                'statusQuery', None)
+            commentQuery = self.request.query_params.get(
+                'commentQuery', None)
+            assignedUserQuery = self.request.query_params.get(
+                'assignedUserQuery', None)
+            vehicleQuery = self.request.query_params.get(
+                'vehicleQuery', None)
+            startDate = self.request.query_params.get(
+                'startDate', None)
+            endDate = self.request.query_params.get(
+                'endDate', None)
+            is_cleared_query = self.request.query_params.get(
+                'isClearedQuery', None)
 
-                if is_valid_queryparam(button_index):
-                    if is_cleared_query != '1':
-                        if button_index == '0':
-                            queryset = (queryset
-                                        .filter(
-                                            Q(trip__isnull=True) &
-                                            Q(is_active=True))
-                                        )
-                        elif button_index == '1':
-                            queryset = (queryset
-                                        .filter(
-                                            Q(is_active=False)
-                                        ))
-                        elif button_index == '4':
-                            queryset = (queryset
-                                        .filter(
-                                            load_type=LOAD_TYPES[1][0])
-                                        )
-                        else:
-                            pass
-                    elif is_cleared_query == '1':
-                        if button_index == 'true':
-                            queryset = queryset.filter(is_paid=True)
-
-                if is_valid_queryparam(button_index_30):
-                    if button_index_30 == 'true':
-                        queryset = queryset.filter(load_type=LOAD_TYPES[1][0])
+            if is_valid_queryparam(button_index):
+                if is_cleared_query != '1':
+                    if button_index == '0':
+                        queryset = (queryset
+                                    .filter(
+                                        Q(trip__isnull=True) &
+                                        Q(is_active=True))
+                                    )
+                    elif button_index == '1':
+                        queryset = (queryset
+                                    .filter(
+                                        Q(is_active=False)
+                                    ))
+                    elif button_index == '4':
+                        queryset = (queryset
+                                    .filter(
+                                        load_type=LOAD_TYPES[1][0])
+                                    )
                     else:
                         pass
+                elif is_cleared_query == '1':
+                    if button_index == 'true':
+                        queryset = queryset.filter(is_paid=True)
 
-                if is_valid_queryparam(type_loading_query):
-                    if type_loading_query == 'ltl':
-                        queryset = queryset.filter(load_size=LOAD_SIZE[0][0])
-                    elif type_loading_query == 'ftl':
-                        queryset = queryset.filter(load_size=LOAD_SIZE[1][0])
-                    elif type_loading_query == 'xpr':
-                        queryset = queryset.filter(load_type=LOAD_SIZE[2][0])
-                    else:
-                        pass
+            if is_valid_queryparam(button_index_30):
+                if button_index_30 == 'true':
+                    queryset = queryset.filter(load_type=LOAD_TYPES[1][0])
+                else:
+                    pass
 
-                print('2040', vehicleQuery)
+            if is_valid_queryparam(type_loading_query):
+                if type_loading_query == 'ltl':
+                    queryset = queryset.filter(load_size=LOAD_SIZE[0][0])
+                elif type_loading_query == 'ftl':
+                    queryset = queryset.filter(load_size=LOAD_SIZE[1][0])
+                elif type_loading_query == 'xpr':
+                    queryset = queryset.filter(load_type=LOAD_SIZE[2][0])
+                else:
+                    pass
 
-                if is_valid_queryparam(sortByQuery):
-                    if sortByQuery == '0':
-                        order_by = 'sn'
-                    elif sortByQuery == '1':
-                        order_by = 'date_order'
-                    elif sortByQuery == '2':
-                        order_by = 'status__order_number'
-                    else:
-                        order_by = 'date_order'
+            # print('2040', vehicleQuery)
 
-                if is_valid_queryparam(billtoQuery):
-                    queryset = queryset.filter(bill_to__uf=billtoQuery)
+            if is_valid_queryparam(sortByQuery):
+                if sortByQuery == '0':
+                    order_by = 'sn'
+                elif sortByQuery == '1':
+                    order_by = 'date_order'
+                elif sortByQuery == '2':
+                    order_by = 'status__order_number'
+                else:
+                    order_by = 'date_order'
 
-                if is_valid_queryparam(shipperQuery):
+            if is_valid_queryparam(billtoQuery):
+                queryset = queryset.filter(bill_to__uf=billtoQuery)
+
+            if is_valid_queryparam(shipperQuery):
+                queryset = queryset.filter(
+                    entry_loads__shipper__uf=shipperQuery)
+
+            if is_valid_queryparam(carrierQuery):
+                queryset = queryset.filter(carrier__uf=carrierQuery)
+
+            if is_valid_queryparam(hbMbNumQuery):
+                queryset = queryset.filter(Q(hb__icontains=hbMbNumQuery) | Q(
+                    mb__icontains=hbMbNumQuery) | Q(booking_number__icontains=hbMbNumQuery))
+
+            if is_valid_queryparam(load_detailQuery):
+                queryset = queryset.filter(Q(customer_ref__icontains=load_detailQuery) | Q(
+                    customer_notes__icontains=load_detailQuery))
+
+            if is_valid_queryparam(load_addressQuery):
+                queryset = queryset.filter(
+                    load_address__icontains=load_addressQuery)
+
+            if is_valid_queryparam(unload_addressQuery):
+                queryset = queryset.filter(
+                    unload_address__icontains=unload_addressQuery)
+
+            if is_valid_queryparam(tractorQuery):
+                queryset = queryset.filter(
+                    vehicle_tractor__uf=tractorQuery)
+
+            if is_valid_queryparam(trailerQuery):
+                queryset = queryset.filter(
+                    vehicle_trailer__uf=trailerQuery)
+
+            if is_valid_queryparam(countryLoadQuery):
+                queryset = queryset.filter(Q(entry_loads__action='loading')
+                                           & Q(entry_loads__shipper__country_code_site__value=countryLoadQuery))
+
+            if is_valid_queryparam(countryUnloadQuery):
+                queryset = queryset.filter(Q(entry_loads__action='unloading')
+                                           & Q(entry_loads__shipper__country_code_site__value=countryUnloadQuery))
+
+            if is_valid_queryparam(currencyQuery):
+                queryset = queryset.filter(currency=currencyQuery)
+
+            if is_valid_queryparam(modeQuery):
+                queryset = queryset.filter(mode__serial_number=modeQuery)
+
+            if is_valid_queryparam(statusQuery):
+                queryset = queryset.filter(
+                    status__serial_number=statusQuery)
+
+            if is_valid_queryparam(dateMinQuery):
+                queryset = queryset.filter(date_order__gte=dateMinQuery)
+
+            if is_valid_queryparam(dateMaxQuery):
+                queryset = queryset.filter(date_order__lte=dateMaxQuery)
+
+            if is_valid_queryparam(numMinQuery):
+                queryset = queryset.filter(sn__gte=numMinQuery)
+
+            if is_valid_queryparam(numMaxQuery):
+                queryset = queryset.filter(sn__lte=numMaxQuery)
+
+            if is_valid_queryparam(relDocNumQuery):
+                queryset = queryset.filter(Q(sn__icontains=relDocNumQuery) | Q(trip__rn__icontains=relDocNumQuery) | Q(
+                    load_tors__tn__icontains=relDocNumQuery) | Q(load_ctrs__cn__icontains=relDocNumQuery) | Q(load_invs__qn__icontains=relDocNumQuery) | Q(load_invs__vn__icontains=relDocNumQuery) | Q(load_exps__xn__icontains=relDocNumQuery))
+
+            if is_valid_queryparam(iteminvQuery):
+                queryset = queryset.filter(
+                    load_iteminvs__item_for_item_inv=iteminvQuery)
+
+            if is_valid_queryparam(commentQuery):
+                queryset = queryset.filter(
+                    load_comments__comment__icontains=commentQuery)
+
+            if is_valid_queryparam(assignedUserQuery):
+                queryset = queryset.filter(
+                    assigned_user__email=assignedUserQuery)
+
+            if is_valid_queryparam(vehicleQuery):
+                queryset = queryset.filter(Q(trip__vehicle_tractor__uf=vehicleQuery)
+                                           | Q(trip__vehicle_trailer__uf=vehicleQuery)
+                                           )
+
+            if is_valid_queryparam(startDate):
+                dts = parse_datetime(startDate)
+                if dts:
+                    if timezone.is_naive(dts):
+                        dts = timezone.make_aware(dts)
                     queryset = queryset.filter(
-                        entry_loads__shipper__uf=shipperQuery)
+                        date_order__gt=dts - timedelta(days=1))
 
-                if is_valid_queryparam(carrierQuery):
-                    queryset = queryset.filter(carrier__uf=carrierQuery)
+            if is_valid_queryparam(endDate):
+                dte = parse_datetime(endDate)
+                if dte:
+                    if timezone.is_naive(dte):
+                        dte = timezone.make_aware(dte)
 
-                if is_valid_queryparam(hbMbNumQuery):
-                    queryset = queryset.filter(Q(hb__icontains=hbMbNumQuery) | Q(
-                        mb__icontains=hbMbNumQuery) | Q(booking_number__icontains=hbMbNumQuery))
-
-                if is_valid_queryparam(load_detailQuery):
-                    queryset = queryset.filter(Q(customer_ref__icontains=load_detailQuery) | Q(
-                        customer_notes__icontains=load_detailQuery))
-
-                if is_valid_queryparam(load_addressQuery):
                     queryset = queryset.filter(
-                        load_address__icontains=load_addressQuery)
+                        date_order__lt=dte + timedelta(days=1))
 
-                if is_valid_queryparam(unload_addressQuery):
-                    queryset = queryset.filter(
-                        unload_address__icontains=unload_addressQuery)
+            if is_valid_queryparam(is_cleared_query):
+                if is_cleared_query == '1':
+                    queryset = queryset.filter(is_cleared=True)
 
-                if is_valid_queryparam(tractorQuery):
-                    queryset = queryset.filter(
-                        vehicle_tractor__uf=tractorQuery)
-
-                if is_valid_queryparam(trailerQuery):
-                    queryset = queryset.filter(
-                        vehicle_trailer__uf=trailerQuery)
-
-                if is_valid_queryparam(countryLoadQuery):
-                    queryset = queryset.filter(Q(entry_loads__action='loading')
-                                               & Q(entry_loads__shipper__country_code_site__value=countryLoadQuery))
-
-                if is_valid_queryparam(countryUnloadQuery):
-                    queryset = queryset.filter(Q(entry_loads__action='unloading')
-                                               & Q(entry_loads__shipper__country_code_site__value=countryUnloadQuery))
-
-                if is_valid_queryparam(currencyQuery):
-                    queryset = queryset.filter(currency=currencyQuery)
-
-                if is_valid_queryparam(modeQuery):
-                    queryset = queryset.filter(mode__serial_number=modeQuery)
-
-                if is_valid_queryparam(statusQuery):
-                    queryset = queryset.filter(
-                        status__serial_number=statusQuery)
-
-                if is_valid_queryparam(dateMinQuery):
-                    queryset = queryset.filter(date_order__gte=dateMinQuery)
-
-                if is_valid_queryparam(dateMaxQuery):
-                    queryset = queryset.filter(date_order__lte=dateMaxQuery)
-
-                if is_valid_queryparam(numMinQuery):
-                    queryset = queryset.filter(sn__gte=numMinQuery)
-
-                if is_valid_queryparam(numMaxQuery):
-                    queryset = queryset.filter(sn__lte=numMaxQuery)
-
-                if is_valid_queryparam(relDocNumQuery):
-                    queryset = queryset.filter(Q(sn__icontains=relDocNumQuery) | Q(trip__rn__icontains=relDocNumQuery) | Q(
-                        load_tors__tn__icontains=relDocNumQuery) | Q(load_ctrs__cn__icontains=relDocNumQuery) | Q(load_invs__qn__icontains=relDocNumQuery) | Q(load_invs__vn__icontains=relDocNumQuery) | Q(load_exps__xn__icontains=relDocNumQuery))
-
-                if is_valid_queryparam(iteminvQuery):
-                    queryset = queryset.filter(
-                        load_iteminvs__item_for_item_inv=iteminvQuery)
-
-                if is_valid_queryparam(commentQuery):
-                    queryset = queryset.filter(
-                        load_comments__comment__icontains=commentQuery)
-
-                if is_valid_queryparam(assignedUserQuery):
-                    queryset = queryset.filter(
-                        assigned_user__email=assignedUserQuery)
-
-                if is_valid_queryparam(vehicleQuery):
-                    queryset = queryset.filter(Q(trip__vehicle_tractor__uf=vehicleQuery)
-                                               | Q(trip__vehicle_trailer__uf=vehicleQuery)
-                                               )
-
-                if is_valid_queryparam(startDate):
-                    dts = parse_datetime(startDate)
-                    if dts:
-                        if timezone.is_naive(dts):
-                            dts = timezone.make_aware(dts)
-                        queryset = queryset.filter(
-                            date_order__gt=dts - timedelta(days=1))
-
-                if is_valid_queryparam(endDate):
-                    dte = parse_datetime(endDate)
-                    if dte:
-                        if timezone.is_naive(dte):
-                            dte = timezone.make_aware(dte)
-
-                        queryset = queryset.filter(
-                            date_order__lt=dte + timedelta(days=1))
-
-                if is_valid_queryparam(is_cleared_query):
-                    if is_cleared_query == '1':
-                        queryset = queryset.filter(is_cleared=True)
-
-                # print('2260', queryset.count())
+            # print('2260', queryset.count())
 
             return queryset.distinct().order_by(F(order_by).desc(nulls_first=True),
                                                 '-date_created')

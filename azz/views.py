@@ -1,12 +1,13 @@
 import os
 import uuid
 from pathlib import Path
+from rest_framework import generics, permissions
 from django.conf import settings
 from django.shortcuts import get_object_or_404
-from .serializers import ImportBatchDetailSerializer
-from rest_framework.generics import RetrieveAPIView
+from django.db import transaction
+from rest_framework.exceptions import ValidationError
+from rest_framework.generics import ListAPIView, RetrieveAPIView, RetrieveUpdateDestroyAPIView
 from .serializers import ImportBatchListSerializer
-from rest_framework.generics import ListAPIView
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
@@ -14,9 +15,10 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 
 from abb.utils import get_user_company
-from .models import ImportBatch, SupplierFormat
-from .serializers import ImportCreateSerializer
 from .tasks import match_unmatched_import_rows_all_companies, process_import_batch
+from .models import ImportBatch, SupplierFormat, FuelTank, TankRefill, TruckFueling
+from .serializers import ImportCreateSerializer, ImportBatchDetailSerializer, FuelTankSerializer, TankRefillCreateSerializer, \
+    TankRefillListSerializer, TankRefillUpdateSerializer, TruckFuelingCreateSerializer
 
 
 class ImportSuppliersView(APIView):
@@ -184,3 +186,118 @@ class RerunCostMatchingView(APIView):
             },
             status=status.HTTP_202_ACCEPTED,
         )
+
+###### START FUEL & ADBLUE ######
+
+
+class FuelTankListView(generics.ListAPIView):
+    serializer_class = FuelTankSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user_company = get_user_company(self.request.user)
+        return FuelTank.objects.filter(
+            company=user_company
+        )
+
+
+class TankRefillCreateView(generics.CreateAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = TankRefillCreateSerializer
+
+
+class TruckFuelingCreateView(generics.CreateAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = TruckFuelingCreateSerializer
+
+
+class TankRefillListView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = TankRefillListSerializer
+
+    def get_queryset(self):
+        user_company = get_user_company(self.request.user)
+        return (
+            TankRefill.objects
+            .filter(tank__company=user_company)
+            .select_related(
+                "tank",
+                "supplier",
+                "vehicle",
+                "person"
+            )
+            .order_by("-date")
+        )
+
+
+class TankRefillDetailView(RetrieveUpdateDestroyAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = TankRefillUpdateSerializer
+    lookup_field = "uf"
+
+    def get_queryset(self):
+        return TankRefill.objects.filter(
+            tank__company=get_user_company(self.request.user)
+        )
+
+    def perform_update(self, serializer):
+        with transaction.atomic():
+            instance = self.get_object()
+            tank = (
+                FuelTank.objects
+                .select_for_update()
+                .get(id=instance.tank_id)
+            )
+
+            # simulate new values
+            old_qty = instance.actual_quantity_l
+            new_qty = serializer.validated_data.get(
+                "actual_quantity_l", old_qty
+            )
+
+            current_stock = tank.get_current_fuel_stock(using_actual=True)
+            delta = new_qty - old_qty
+
+            if delta > 0 and current_stock + delta > tank.capacity_l:
+                raise ValidationError("Tank capacity exceeded")
+
+            serializer.save()
+
+    def perform_destroy(self, instance):
+        with transaction.atomic():
+            tank = (
+                FuelTank.objects
+                .select_for_update()
+                .get(id=instance.tank_id)
+            )
+
+            current_stock = tank.get_current_fuel_stock(using_actual=True)
+
+            if instance.actual_quantity_l > current_stock:
+                raise ValidationError(
+                    "Cannot delete refill: fuel already used")
+
+            instance.delete()
+
+
+class TruckFuelingListView(generics.ListAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user_company = get_user_company(self.request.user)
+
+        qs = (TruckFueling.objects
+              .filter(tank__company=user_company)
+              .select_related(
+                  "tank",
+                  "vehicle",
+                  "driver"
+              )
+              .order_by(
+                  "-fueled_at")
+              )
+
+        return qs
+
+
+###### END FUEL & ADBLUE ######

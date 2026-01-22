@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from axx.models import Load, LoadEvent, Trip, TripDriver
+from axx.models import Inv, Load, LoadEvent, Trip, TripDriver
 
 
 @admin.register(Load)
@@ -22,3 +22,8 @@ class TripAdmin(admin.ModelAdmin):
 @admin.register(TripDriver)
 class TripDriverAdmin(admin.ModelAdmin):
     list_display = ('id', )
+
+
+@admin.register(Inv)
+class InvAdmin(admin.ModelAdmin):
+    list_display = ('id', 'company', 'bill_to')

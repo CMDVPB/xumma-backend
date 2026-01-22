@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480" viewBox="0 0 640 480">
-    <!-- White top stripe -->
-    <rect width="640" height="240" y="0" fill="#ffffff" />
-    <!-- Red bottom stripe -->
-    <rect width="640" height="240" y="240" fill="#d7141a" />
-    <!-- Blue triangle -->
-    <polygon points="0,0 300,240 0,480" fill="#11457e" />
-</svg>

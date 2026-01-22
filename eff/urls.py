@@ -1,10 +1,12 @@
 from django.urls import path
 from rest_framework.urlpatterns import format_suffix_patterns
 
-from eff.views import CompanyDetail, ContactSuggestionAPIView, DamageReportCreateView, DamageReportDetailView, DamageReportListView, ImageGenerateSignedUrlListView, ImageGenerateZipUrlView, SignedImageView, SignedImageZipView, TargetGroupDetail, TargetGroupListCreate, TypeCostListView
+from eff.views import CompanyDetail, CompanySettingsView, ContactSuggestionAPIView, DamageReportCreateView, DamageReportDetailView, DamageReportListView, ImageGenerateSignedUrlListView, ImageGenerateZipUrlView, SignedImageView, SignedImageZipView, TargetGroupDetail, TargetGroupListCreate, TypeCostListView
 
 urlpatterns = [
     path('companies/me/', CompanyDetail.as_view(), name='company_detail'),
+    path('company-settings/', CompanySettingsView.as_view(),
+         name='company_settings'),
 
     path('groups/', TargetGroupListCreate.as_view(), name='target_groups'),
     path('groups/<str:uf>/', TargetGroupDetail.as_view(),

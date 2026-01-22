@@ -280,6 +280,46 @@ class Company(models.Model):
         return self.company_name or str(self.id) or ''
 
 
+class CompanySettings(models.Model):
+    uf = models.CharField(max_length=36, default=hex_uuid,
+                          db_index=True, unique=True)
+    company = models.OneToOneField(
+        Company,
+        on_delete=models.CASCADE,
+        related_name="company_settings"
+    )
+
+    diesel_tank_volume_l = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+
+    )
+
+    adblue_tank_volume_l = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+
+    )
+
+    # # General
+    # currency = models.CharField(max_length=3, default="EUR")
+    # language = models.CharField(max_length=5, default="en")
+
+    # # Financial
+    # vat_rate = models.DecimalField(
+    #     max_digits=5,
+    #     decimal_places=2,
+    #     default=0
+    # )
+
+    # # System behavior
+    # timezone = models.CharField(max_length=50, default="Europe/Berlin")
+
+    updated_at = models.DateTimeField(auto_now=True)
+
+
 class Team(models.Model):
     uf = models.CharField(max_length=36, default=hex_uuid,
                           db_index=True, unique=True)

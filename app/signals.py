@@ -8,7 +8,7 @@ from djoser.signals import user_registered, user_activated
 
 from abb.constants import INITIAL_VALIDITY_OF_SUBSCRIPTION_DAYS
 from abb.utils import get_user_company
-from app.models import Company, Subscription, UserCompensationSettings, UserSettings
+from app.models import Company, CompanySettings, Subscription, UserCompensationSettings, UserSettings
 from app.utils import is_user_member_group
 
 import logging
@@ -146,3 +146,9 @@ def clear_user_companies_relations_if_user_is_manager_signal(sender, instance, *
 
     except:
         raise ValueError('Company could not be deleted')
+
+
+@receiver(post_save, sender=Company)
+def create_company_settings(sender, instance, created, **kwargs):
+    if created:
+        CompanySettings.objects.create(company=instance)

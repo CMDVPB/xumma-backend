@@ -3,7 +3,17 @@ from drf_writable_nested.mixins import UniqueFieldsMixin, NestedCreateMixin, Nes
 
 
 from abb.serializers import CountrySerializer
-from app.models import Company
+from app.models import Company, CompanySettings
+
+
+class CompanySettingsSerializer(WritableNestedModelSerializer):
+    class Meta:
+        model = CompanySettings
+        fields = (
+            "diesel_tank_volume_l",
+            "adblue_tank_volume_l",
+            'uf',
+        )
 
 
 class CompanySerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
