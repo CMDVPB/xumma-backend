@@ -325,6 +325,15 @@ class Person(ProtectedDeleteMixin, models.Model):
     target_group = models.ManyToManyField(
         TargetGroup, related_name="target_group_persons")
 
+    def get_full_name(self):
+        return " ".join(
+            part for part in [self.first_name, self.last_name] if part
+        )
+
+    @property
+    def full_name(self):
+        return self.get_full_name()
+
     def __str__(self):
         return (self.first_name + ' ' + (self.last_name or '')) or ''
 

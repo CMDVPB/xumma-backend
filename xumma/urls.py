@@ -18,6 +18,7 @@ urlpatterns = [
     path('api/', include('abb.urls')),
     path('api/', include('app.urls')),
     path('api/', include('att.urls')),
+    path('api/', include('avv.urls')),
     path('api/', include('axx.urls')),
     path('api/', include('ayy.urls')),
     path('api/', include('azz.urls')),

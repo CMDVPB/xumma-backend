@@ -14,6 +14,8 @@ from abb.serializers_drf_writable import CustomWritableNestedModelSerializer, Cu
 from abb.utils import get_user_company
 from app.models import TypeCost
 from ayy.models import Document, ItemCost, ItemForItemCost, PhoneNumber
+from ayy.services.fuel_sync import sync_fueling_from_item_cost
+
 
 User = get_user_model()
 
@@ -107,13 +109,6 @@ class ItemCostSerializer(WritableNestedModelSerializer):
         allow_null=True
     )
 
-    # def validate_type(self, value):
-    #     if value and value.is_system:
-    #         raise serializers.ValidationError(
-    #             "System TypeCost entries cannot be assigned."
-    #         )
-    #     return value
-
     def to_internal_value(self, data):
         if 'quantity' in data and type(data['quantity']) == str:
             data['quantity'] = float(data['quantity']) if len(
@@ -202,6 +197,8 @@ class ItemCostSerializer(WritableNestedModelSerializer):
             self.update_or_create_reverse_relations(
                 instance, reverse_relations)
 
+        sync_fueling_from_item_cost(instance)
+
         return instance
 
     def update(self, instance, validated_data):
@@ -216,6 +213,8 @@ class ItemCostSerializer(WritableNestedModelSerializer):
                 instance, reverse_relations)
             self.delete_reverse_relations_if_need(instance, reverse_relations)
             instance.refresh_from_db()
+
+            sync_fueling_from_item_cost(instance)
 
         return instance
 

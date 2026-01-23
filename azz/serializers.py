@@ -1,12 +1,12 @@
-
-from abb.utils import get_user_company
-from att.models import Contact
-from .models import FuelTank, TruckFueling, Vehicle
-from .models import FuelTank, TankRefill
 from decimal import Decimal
 from django.utils import timezone
 from django.db import transaction
 from rest_framework import serializers
+
+from abb.utils import get_user_company
+from att.models import Contact, Person
+from .models import FuelTank, TruckFueling, Vehicle
+from .models import FuelTank, TankRefill
 from .models import ImportBatch, ImportRow
 
 
@@ -81,8 +81,30 @@ class FuelTankSerializer(serializers.ModelSerializer):
         return obj.get_current_fuel_stock()
 
 
+class FuelTankUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FuelTank
+        fields = ("capacity_l",)
+
+
+class FuelPreviewSerializer(serializers.Serializer):
+    fuel_code = serializers.CharField()
+    quantity_l = serializers.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        min_value=Decimal("0.01"),
+    )
+
+
 class TankRefillCreateSerializer(serializers.ModelSerializer):
     tank_uf = serializers.CharField(write_only=True)
+
+    supplier = serializers.SlugRelatedField(
+        allow_null=True, slug_field='uf', queryset=Contact.objects.all(),  write_only=True)
+    person = serializers.SlugRelatedField(
+        allow_null=True, slug_field='uf', queryset=Person.objects.all(),  write_only=True)
+    vehicle = serializers.SlugRelatedField(
+        allow_null=True, slug_field='uf', queryset=Vehicle.objects.all(),  write_only=True)
 
     class Meta:
         model = TankRefill
@@ -140,13 +162,17 @@ class TankRefillCreateSerializer(serializers.ModelSerializer):
 class TankRefillUpdateSerializer(serializers.ModelSerializer):
     supplier = serializers.SlugRelatedField(
         allow_null=True, slug_field='uf', queryset=Contact.objects.all(),  write_only=True)
+    person = serializers.SlugRelatedField(
+        allow_null=True, slug_field='uf', queryset=Person.objects.all(),  write_only=True)
+    vehicle = serializers.SlugRelatedField(
+        allow_null=True, slug_field='uf', queryset=Vehicle.objects.all(),  write_only=True)
 
     class Meta:
         model = TankRefill
         fields = (
             "supplier",
-            "vehicle",
             "person",
+            "vehicle",
             "date",
             "quantity_l",
             "actual_quantity_l",
@@ -216,9 +242,50 @@ class TruckFuelingCreateSerializer(serializers.ModelSerializer):
             return fueling
 
 
+class ContactVehicleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Vehicle
+        fields = (
+            "id",
+            "reg_number",
+            "vehicle_type",
+            "uf",
+        )
+
+
+class ContactPersonSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Person
+        fields = (
+            "id",
+            "last_name",
+            "first_name",
+            "phone",
+            "mobile",
+            "uf",
+        )
+
+
+class SupplierSerializer(serializers.ModelSerializer):
+    contact_persons = ContactPersonSerializer(many=True, read_only=True)
+    contact_vehicles = ContactVehicleSerializer(
+        many=True, read_only=True)
+
+    class Meta:
+        model = Contact
+        fields = (
+            "id",
+            "company_name",
+            "contact_persons",
+            "contact_vehicles",
+            "uf",
+        )
+
+
 class TankRefillListSerializer(serializers.ModelSerializer):
     tank = serializers.SerializerMethodField()
-    supplier = serializers.SerializerMethodField()
+    supplier = SupplierSerializer(read_only=True)
     vehicle = serializers.SerializerMethodField()
     person = serializers.SerializerMethodField()
 
@@ -237,15 +304,6 @@ class TankRefillListSerializer(serializers.ModelSerializer):
             "person",
         )
 
-    def _simple_obj(self, obj, label_field="name"):
-        if not obj:
-            return None
-        return {
-            "id": obj.id,
-            "uf": getattr(obj, "uf", None),
-            "company_name": getattr(obj, label_field, str(obj)),
-        }
-
     def get_tank(self, obj):
         return {
             "uf": obj.tank.uf,
@@ -253,15 +311,22 @@ class TankRefillListSerializer(serializers.ModelSerializer):
             "capacity_l": obj.tank.capacity_l,
         }
 
-    def get_supplier(self, obj):
-        # Contact model – adapt label field if needed
-        return self._simple_obj(obj.supplier, "name")
-
     def get_vehicle(self, obj):
-        # VehicleUnit model – adapt label field if needed
-        return self._simple_obj(obj.vehicle, "registration_number")
+        if not obj.vehicle:
+            return None
+        return {
+            "id": obj.vehicle.id,
+            "uf": obj.vehicle.uf,
+            "reg_number": obj.vehicle.reg_number,
+        }
 
     def get_person(self, obj):
-        # Person model – adapt label field if needed
-        return self._simple_obj(obj.person, "full_name")
+        if not obj.person:
+            return None
+        return {
+            "id": obj.person.id,
+            "uf": obj.person.uf,
+            "full_name": obj.person.full_name,
+        }
+
 ###### End Fuel & AdBlue ######

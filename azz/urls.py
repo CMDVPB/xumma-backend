@@ -3,6 +3,8 @@ from .views import (
     CostImportCreateView,
     CostImportListView,
     CostImportDetailView,
+    FuelPreviewView,
+    FuelTankDetailView,
     FuelTankListView,
     ImportSuppliersView,
     RerunCostMatchingView,
@@ -22,6 +24,9 @@ urlpatterns = [
          name="rerun-cost-matching",),
 
     path("fuel/tanks/", FuelTankListView.as_view()),
+    path("fuel/tanks/<str:uf>/", FuelTankDetailView.as_view()),
+    path("fuel/preview/", FuelPreviewView.as_view(), name="fuel-preview"),
+
 
     path("fuel/refills/", TankRefillListView.as_view()),
     path("fuel/refills/create/", TankRefillCreateView.as_view()),

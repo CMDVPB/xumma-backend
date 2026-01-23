@@ -1,9 +1,9 @@
 from django.apps import AppConfig
 
 
-class DffConfig(AppConfig):
+class AvvConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
-    name = 'dff'
+    name = 'avv'
 
     def ready(self):
-        import dff.signals
+        import avv.signals

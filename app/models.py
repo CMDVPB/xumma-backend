@@ -289,22 +289,9 @@ class CompanySettings(models.Model):
         related_name="company_settings"
     )
 
-    diesel_tank_volume_l = models.DecimalField(
-        max_digits=10,
-        decimal_places=2,
-        default=0,
-
-    )
-
-    adblue_tank_volume_l = models.DecimalField(
-        max_digits=10,
-        decimal_places=2,
-        default=0,
-
-    )
-
     # # General
-    # currency = models.CharField(max_length=3, default="EUR")
+    currency = models.ForeignKey(
+        Currency, on_delete=models.SET_NULL, blank=True, null=True, related_name='currency_company_settings')
     # language = models.CharField(max_length=5, default="en")
 
     # # Financial

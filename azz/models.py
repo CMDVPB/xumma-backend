@@ -10,9 +10,12 @@ from decimal import Decimal
 
 from abb.utils import hex_uuid
 from app.models import Company
-from att.models import Contact, Person, Vehicle, VehicleUnit
+from att.models import Contact, Person, Vehicle
+from ayy.models import ItemCost
 
 User = get_user_model()
+
+###### START SUPPLIERS (ROMPETROL, HUGO, EUROWAG, ETC) ######
 
 
 class SupplierFormat(models.Model):
@@ -169,8 +172,10 @@ class ImportRow(models.Model):
             models.Index(fields=["batch", "status"]),
         ]
 
+###### END SUPPLIERS (ROMPETROL, HUGO, EUROWAG, ETC) ######
 
-###### Start Fuel & AdBlue ######
+###### START FUEL & ADBLUE ######
+
 
 class FuelTank(models.Model):
     FUEL_DIESEL = "diesel"
@@ -223,9 +228,8 @@ class TankRefill(models.Model):
 
     supplier = models.ForeignKey(
         Contact, on_delete=models.RESTRICT, blank=True, null=True, related_name='supplier_tank_refills')
-
     vehicle = models.ForeignKey(
-        VehicleUnit, on_delete=models.SET_NULL, blank=True, null=True, related_name='vehicle_tank_refills')
+        Vehicle, on_delete=models.SET_NULL, blank=True, null=True, related_name='vehicle_tank_refills')
     person = models.ForeignKey(
         Person, on_delete=models.SET_NULL, blank=True, null=True, related_name='person_tank_refills')
 
@@ -272,6 +276,14 @@ class TruckFueling(models.Model):
     vehicle = models.ForeignKey(
         Vehicle, on_delete=models.PROTECT, related_name="vehicle_truck_fuelings")
 
+    item_cost = models.OneToOneField(
+        ItemCost,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="fueling_event"
+    )
+
     driver = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,
@@ -297,4 +309,10 @@ class TruckFueling(models.Model):
             raise ValidationError("Not enough fuel in tank")
 
 
-###### End Fuel & AdBlue ######
+###### END FUEL & ADBLUE ######
+
+
+###### START WAREHOUSE & SPARE PARTS ######
+
+
+###### END WAREHOUSE & SPARE PARTS ######

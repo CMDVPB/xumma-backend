@@ -423,6 +423,7 @@ class ItemForItemCost(models.Model):
     class Meta:
         verbose_name = "Item for itemcost"
         verbose_name_plural = "Items for itemcost"
+        ordering = ['-is_system', 'serial_number', 'company', '-id']
 
     def __str__(self):
         return self.description or ''
@@ -494,6 +495,13 @@ class ItemCost(models.Model):
     class Meta:
         verbose_name = "Item cost"
         verbose_name_plural = "Items cost"
+
+    @property
+    def total(self):
+        if self.quantity is None or self.amount is None:
+            return None
+        vat = self.vat or 0
+        return round(self.quantity * self.amount * (1 + vat / 100), 2)
 
     def __str__(self):
         return str(self.id) or ''

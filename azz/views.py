@@ -3,11 +3,14 @@ import uuid
 from pathlib import Path
 from rest_framework import generics, permissions
 from django.conf import settings
+from django.utils.dateparse import parse_date, parse_datetime
 from django.shortcuts import get_object_or_404
 from django.db import transaction
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import ListAPIView, RetrieveAPIView, RetrieveUpdateDestroyAPIView
-from .serializers import ImportBatchListSerializer
+
+from ayy.services.fuel_sync import fifo_price_preview
+from .serializers import FuelPreviewSerializer, FuelTankUpdateSerializer, ImportBatchListSerializer
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
@@ -201,6 +204,94 @@ class FuelTankListView(generics.ListAPIView):
         )
 
 
+class FuelTankDetailView(generics.UpdateAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = FuelTankUpdateSerializer
+    lookup_field = "uf"
+
+    def get_queryset(self):
+        return FuelTank.objects.filter(
+            company=get_user_company(self.request.user)
+        )
+
+    def perform_update(self, serializer):
+        tank = self.get_object()
+
+        new_capacity = serializer.validated_data["capacity_l"]
+        current_stock = tank.get_current_fuel_stock()
+
+        if new_capacity < current_stock:
+            raise ValidationError(
+                "Capacity cannot be lower than current fuel stock"
+            )
+
+        serializer.save()
+
+
+FUEL_CODE_TO_TYPE = {
+    "adblue_tanc": FuelTank.FUEL_ADBLUE,
+    "dt_tanc": FuelTank.FUEL_DIESEL,
+}
+
+
+class FuelPreviewView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = FuelPreviewSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        fuel_code = serializer.validated_data["fuel_code"]
+        quantity_l = serializer.validated_data["quantity_l"]
+
+        fuel_type = FUEL_CODE_TO_TYPE.get(fuel_code)
+        if not fuel_type:
+            return Response(
+                {"detail": "Invalid fuel code"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        company = get_user_company(request.user)
+
+        try:
+            tank = FuelTank.objects.get(
+                company=company,
+                fuel_type=fuel_type,
+            )
+        except FuelTank.DoesNotExist:
+            return Response(
+                {"detail": "Fuel tank not configured"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            result = fifo_price_preview(
+                tank=tank,
+                quantity_l=quantity_l,
+            )
+        except ValidationError:
+            return Response(
+                {"detail": "Not enough fuel in tank"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        currency_code = None
+
+        company = tank.company
+
+        if hasattr(company, "company_settings") and company.company_settings.currency:
+            currency_code = company.company_settings.currency.currency_code
+
+        return Response(
+            {
+                "price_per_l": result["price_per_l"],
+                "total_cost": result["total_cost"],
+                "currency": currency_code,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
 class TankRefillCreateView(generics.CreateAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = TankRefillCreateSerializer
@@ -216,8 +307,27 @@ class TankRefillListView(generics.ListAPIView):
     serializer_class = TankRefillListSerializer
 
     def get_queryset(self):
+        start_date_raw = self.request.query_params.get("start_date")
+        end_date_raw = self.request.query_params.get("end_date")
+
+        start_date = None
+        end_date = None
+
+        if start_date_raw:
+            start_date = (
+                parse_date(start_date_raw)
+                or parse_datetime(start_date_raw).date()
+            )
+
+        if end_date_raw:
+            end_date = (
+                parse_date(end_date_raw)
+                or parse_datetime(end_date_raw).date()
+            )
+
         user_company = get_user_company(self.request.user)
-        return (
+
+        qs = (
             TankRefill.objects
             .filter(tank__company=user_company)
             .select_related(
@@ -226,8 +336,19 @@ class TankRefillListView(generics.ListAPIView):
                 "vehicle",
                 "person"
             )
-            .order_by("-date")
+            .prefetch_related(
+                "supplier__contact_vehicle_units",
+                "supplier__contact_persons",
+            )
         )
+
+        if start_date:
+            qs = qs.filter(date__date__gte=start_date)
+
+        if end_date:
+            qs = qs.filter(date__date__lte=end_date)
+
+        return qs.order_by("-date")
 
 
 class TankRefillDetailView(RetrieveUpdateDestroyAPIView):

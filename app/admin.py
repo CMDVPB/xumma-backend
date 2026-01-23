@@ -58,8 +58,7 @@ class CompanyAdmin(admin.ModelAdmin):
 @admin.register(CompanySettings)
 class CompanySettingsAdmin(admin.ModelAdmin):
 
-    list_display = ('id', 'company', 'diesel_tank_volume_l',
-                    'adblue_tank_volume_l',)
+    list_display = ('id', 'company', 'currency',)
 
     search_fields = ("company__company_name", 'company__uf', 'uf')
 
