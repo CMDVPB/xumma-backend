@@ -73,6 +73,8 @@ class Part(TimeStampedModel):
     reorder_qty = models.DecimalField(
         max_digits=14, decimal_places=3, default=Decimal("0"))
 
+    is_active = models.BooleanField(default=True)
+
     def __str__(self) -> str:
         return f"{self.sku} - {self.name}"
 
@@ -96,9 +98,12 @@ class StockBalance(TimeStampedModel):
     Fast read model; source of truth remains StockMovement ledger.
     We lock rows here for reserve/issue.
     """
-    part = models.ForeignKey(Part, on_delete=models.PROTECT)
-    location = models.ForeignKey(Location, on_delete=models.PROTECT)
-    lot = models.ForeignKey(StockLot, on_delete=models.PROTECT)
+    part = models.ForeignKey(
+        Part, on_delete=models.PROTECT, related_name="part_stock_balances")
+    location = models.ForeignKey(
+        Location, on_delete=models.PROTECT, related_name="location_stock_balances")
+    lot = models.ForeignKey(
+        StockLot, on_delete=models.PROTECT, related_name="lot_stock_balances")
 
     qty_on_hand = models.DecimalField(
         max_digits=14, decimal_places=3, default=Decimal("0"))

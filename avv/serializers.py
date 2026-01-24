@@ -1,11 +1,17 @@
+from django.contrib.auth import get_user_model
+from abb.utils import get_user_company
+from att.models import Vehicle
+from .models import Part, Warehouse, Location
 from decimal import Decimal
 from rest_framework import serializers
 
 from .models import (
     Part, Location, StockBalance,
     PartRequest, PartRequestLine,
-    IssueDocument, IssueLine
+    IssueDocument, IssueLine, StockMovement, Warehouse
 )
+
+User = get_user_model()
 
 
 class PartSerializer(serializers.ModelSerializer):
@@ -13,17 +19,49 @@ class PartSerializer(serializers.ModelSerializer):
         model = Part
         fields = [
             "id", "sku", "name", "uom", "barcode",
-            "min_level", "reorder_level", "reorder_qty",
+            "min_level", "reorder_level", "reorder_qty", "uf"
+        ]
+        read_only_fields = ["id", "is_active", "uf"]
+
+
+class PartStockSerializer(serializers.ModelSerializer):
+    stock = serializers.DecimalField(
+        max_digits=14,
+        decimal_places=3,
+        read_only=True
+    )
+    unit = serializers.CharField(source="uom")
+    min_stock = serializers.DecimalField(
+        source="min_level",
+        max_digits=14,
+        decimal_places=3,
+    )
+
+    class Meta:
+        model = Part
+        fields = [
+            "id",
+            "sku",
+            "name",
+            "unit",
+            "stock",
+            "min_stock",
         ]
 
 
 class LocationSerializer(serializers.ModelSerializer):
-    warehouse_code = serializers.CharField(
-        source="warehouse.code", read_only=True)
+    warehouse = serializers.SerializerMethodField()
 
     class Meta:
         model = Location
-        fields = ["id", "warehouse_code", "code", "name"]
+        fields = ["id", "code", "name", "warehouse"]
+
+    def get_warehouse(self, obj):
+        return {
+            "id": obj.warehouse_id,
+            "code": obj.warehouse.code,
+            "name": obj.warehouse.name,
+        }
 
 
 class StockBalanceSerializer(serializers.ModelSerializer):
@@ -44,12 +82,6 @@ class StockBalanceSerializer(serializers.ModelSerializer):
         ]
 
 
-class PartRequestLineWriteSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = PartRequestLine
-        fields = ["part", "qty_requested"]
-
-
 class PartRequestLineReadSerializer(serializers.ModelSerializer):
     part = PartSerializer(read_only=True)
 
@@ -64,8 +96,21 @@ class PartRequestLineReadSerializer(serializers.ModelSerializer):
         ]
 
 
+class PartRequestLineWriteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PartRequestLine
+        fields = ["part", "qty_requested"]
+
+
 class PartRequestCreateSerializer(serializers.ModelSerializer):
-    lines = PartRequestLineWriteSerializer(many=True)
+    mechanic = serializers.SlugRelatedField(
+        allow_null=True, slug_field='uf', queryset=User.objects.all(), write_only=True)
+    driver = serializers.SlugRelatedField(
+        allow_null=True, slug_field='uf', queryset=User.objects.all(), write_only=True)
+    vehicle = serializers.SlugRelatedField(
+        allow_null=True, slug_field='uf', queryset=Vehicle.objects.all(), write_only=True)
+
+    lines = PartRequestLineWriteSerializer(many=True, write_only=True)
 
     class Meta:
         model = PartRequest
@@ -77,17 +122,33 @@ class PartRequestCreateSerializer(serializers.ModelSerializer):
             "needed_at",
             "note",
             "lines",
+            "uf",
         ]
 
     def create(self, validated_data):
+        request = self.context["request"]
+        user = request.user
+        company = get_user_company(user)
         lines_data = validated_data.pop("lines")
         req = PartRequest.objects.create(
-            **validated_data,
+            company=company,
+            created_by=user,
             status=PartRequest.Status.SUBMITTED,
-            created_by=self.context["request"].user,
+            **validated_data,
         )
-        for line in lines_data:
-            PartRequestLine.objects.create(request=req, **line)
+
+        PartRequestLine.objects.bulk_create(
+            [
+                PartRequestLine(
+                    request=req,
+                    company=company,
+                    created_by=user,
+                    **line,
+                )
+                for line in lines_data
+            ]
+        )
+
         return req
 
 
@@ -128,42 +189,106 @@ class PartRequestLineSerializer(serializers.ModelSerializer):
         )
         read_only_fields = ('qty_reserved', 'qty_issued')
 
-# Single PartRequestSerializer (LIST + CREATE + DETAIL)
+
+class PartRequestLineCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PartRequestLine
+        fields = ["part", "qty_requested"]
 
 
 class PartRequestSerializer(serializers.ModelSerializer):
-    lines = PartRequestLineSerializer(many=True)
+    mechanic = serializers.SlugRelatedField(
+        allow_null=True, slug_field='uf', queryset=User.objects.all(), write_only=True)
+    driver = serializers.SlugRelatedField(
+        allow_null=True, slug_field='uf', queryset=User.objects.all(), write_only=True)
+    vehicle = serializers.SlugRelatedField(
+        allow_null=True, slug_field='uf', queryset=Vehicle.objects.all(), write_only=True)
 
-    vehicle_registration = serializers.CharField(
-        source='vehicle.registration_number', read_only=True
+    lines = PartRequestLineCreateSerializer(many=True, write_only=True)
+
+    class Meta:
+        model = PartRequest
+        fields = [
+            "id",
+            "status",
+            "mechanic",
+            "vehicle",
+            "driver",
+            "needed_at",
+            "note",
+            "lines",
+            "uf",
+        ]
+
+    def create(self, validated_data):
+        request_user = self.context["request"].user
+        company = get_user_company(request_user)
+
+        lines_data = validated_data.pop("lines", [])
+
+        request = PartRequest.objects.create(company=company,
+                                             created_by=request_user,
+                                             **validated_data)
+
+        PartRequestLine.objects.bulk_create(
+            [
+                PartRequestLine(
+                    company=company,
+                    created_by=request_user,
+                    request=request,
+                    part=line["part"],
+                    qty_requested=line["qty_requested"],
+                )
+                for line in lines_data
+            ]
+        )
+
+        return request
+
+
+class PartRequestListSerializer(serializers.ModelSerializer):
+    lines = PartRequestLineSerializer(
+        many=True,
+        source="request_part_request_lines",
+        read_only=True,
     )
-    mechanic_name = serializers.CharField(
-        source='mechanic.get_full_name', read_only=True
-    )
-    driver_name = serializers.CharField(
-        source='driver.get_full_name', read_only=True
-    )
+
+    vehicle_reg_number = serializers.SerializerMethodField()
+    mechanic_name = serializers.SerializerMethodField()
+    driver_name = serializers.SerializerMethodField()
 
     class Meta:
         model = PartRequest
         fields = (
-            'id',
-            'status',
-            'vehicle',
-            'vehicle_registration',
-            'mechanic',
-            'mechanic_name',
-            'driver',
-            'driver_name',
-            'needed_at',
-            'note',
-            'created_at',
-            'lines',
-            'uf',)
-        read_only_fields = ('status', 'created_at')
+            "id",
+            "status",
+            "vehicle_reg_number",
+            "mechanic_name",
+            "driver_name",
+            "needed_at",
+            "note",
+            "created_at",
+            "lines",
+            "uf",
+        )
+        read_only_fields = ("status", "created_at")
 
+    # -------------------------
+    # Computed fields
+    # -------------------------
+
+    def get_vehicle_reg_number(self, obj):
+        return obj.vehicle.reg_number if obj.vehicle else None
+
+    def get_mechanic_name(self, obj):
+        return obj.mechanic.get_full_name() if obj.mechanic else None
+
+    def get_driver_name(self, obj):
+        return obj.driver.get_full_name() if obj.driver else None
 
 ###### START READ-ONLY FOR UI ######
+
+
 class IssueLineSerializer(serializers.ModelSerializer):
     part_sku = serializers.CharField(source="part.sku", read_only=True)
     part_name = serializers.CharField(source="part.name", read_only=True)
@@ -196,3 +321,102 @@ class IssueDocumentSerializer(serializers.ModelSerializer):
             "lines",
         ]
 ###### END READ-ONLY FOR UI ######
+
+
+class StockReceiveSerializer(serializers.Serializer):
+    part = serializers.PrimaryKeyRelatedField(
+        queryset=Part.objects.all()
+    )
+    warehouse = serializers.PrimaryKeyRelatedField(
+        queryset=Warehouse.objects.all()
+    )
+    location = serializers.PrimaryKeyRelatedField(
+        queryset=Location.objects.all()
+    )
+    qty = serializers.DecimalField(
+        max_digits=14, decimal_places=3, min_value=Decimal("0.001")
+    )
+    unit_cost = serializers.DecimalField(
+        max_digits=14, decimal_places=4, required=False, default=Decimal("0")
+    )
+    currency = serializers.CharField(max_length=8, default="EUR")
+    supplier_name = serializers.CharField(
+        max_length=120, required=False, allow_blank=True
+    )
+    received_at = serializers.DateTimeField(required=False)
+
+    def validate(self, data):
+        location = data["location"]
+        warehouse = data["warehouse"]
+
+        if location.warehouse_id != warehouse.id:
+            raise serializers.ValidationError(
+                "Location does not belong to selected warehouse."
+            )
+
+        return data
+
+
+class StockMovementSerializer(serializers.ModelSerializer):
+    part_name = serializers.CharField(source="part.name", read_only=True)
+    part_sku = serializers.CharField(source="part.sku", read_only=True)
+
+    from_warehouse = serializers.SerializerMethodField()
+    to_warehouse = serializers.SerializerMethodField()
+
+    from_location_code = serializers.CharField(
+        source="from_location.code", read_only=True
+    )
+    to_location_code = serializers.CharField(
+        source="to_location.code", read_only=True
+    )
+
+    class Meta:
+        model = StockMovement
+        fields = (
+            "id",
+            "type",
+            "qty",
+            "currency",
+            "unit_cost_snapshot",
+            "created_at",
+
+            # part
+            "part",
+            "part_name",
+            "part_sku",
+
+            # locations
+            "from_location",
+            "from_location_code",
+            "from_warehouse",
+
+            "to_location",
+            "to_location_code",
+            "to_warehouse",
+
+            # reference
+            "ref_type",
+            "ref_id",
+        )
+
+    def get_from_warehouse(self, obj):
+        if obj.from_location:
+            return obj.from_location.warehouse.name
+        return None
+
+    def get_to_warehouse(self, obj):
+        if obj.to_location:
+            return obj.to_location.warehouse.name
+        return None
+
+
+class WarehouseSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Warehouse
+        fields = [
+            "id",
+            "code",
+            "name",
+            "uf",
+        ]

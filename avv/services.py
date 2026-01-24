@@ -8,9 +8,11 @@ from django.db import transaction
 from django.db.models import F, Q
 from django.utils import timezone
 
+from abb.utils import get_user_company
+
 from .models import (
-    PartRequest, PartRequestLine, Reservation,
-    StockBalance, StockMovement, IssueDocument, IssueLine
+    Location, Part, PartRequest, PartRequestLine, Reservation,
+    StockBalance, StockLot, StockMovement, IssueDocument, IssueLine
 )
 
 
@@ -245,3 +247,70 @@ def issue_request(
     req.save(update_fields=["status"])
 
     return doc
+
+
+class InventoryError(Exception):
+    pass
+
+
+@transaction.atomic
+def receive_stock(*, data, user):
+    if data["qty"] <= 0:
+        raise InventoryError("Quantity must be greater than zero")
+
+    company = get_user_company(user)
+
+    part = Part.objects.select_for_update().get(
+        id=data["part"].id,
+        company=company,
+        is_active=True,
+    )
+
+    location = Location.objects.select_related("warehouse").get(
+        id=data["location"].id,
+        company=company,
+    )
+
+    # 1️⃣ Create lot
+    lot = StockLot.objects.create(
+        company=company,
+        part=part,
+        supplier_name=data.get("supplier_name", ""),
+        unit_cost=data.get("unit_cost", Decimal("0")),
+        received_at=timezone.now(),
+        expiry_date=data.get("expiry_date"),
+        created_by=user,
+    )
+
+    # 2️⃣ Ledger movement
+    StockMovement.objects.create(
+        company=company,
+        type=StockMovement.Type.RECEIPT,
+        part=part,
+        lot=lot,
+        to_location=location,
+        qty=data["qty"],
+        unit_cost_snapshot=lot.unit_cost,
+        currency=lot.currency,
+        ref_type="RECEIPT",
+        ref_id=str(lot.id),
+        created_by=user,
+    )
+
+    # 3️⃣ Balance (upsert)
+    balance, _ = StockBalance.objects.select_for_update().get_or_create(
+        company=company,
+        part=part,
+        location=location,
+        lot=lot,
+        defaults={
+            "qty_on_hand": Decimal("0"),
+            "qty_reserved": Decimal("0"),
+            "created_by": user,
+        },
+    )
+
+    balance.qty_on_hand += data["qty"]
+    balance.save(update_fields=["qty_on_hand"])
+
+    return balance

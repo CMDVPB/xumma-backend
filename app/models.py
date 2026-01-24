@@ -107,6 +107,18 @@ class User(AbstractUser):
     def save(self, *args, **kwargs):
         super(User, self).save(*args, **kwargs)
 
+    def get_full_name(self) -> str:
+        """
+        Returns 'First Last' if available,
+        otherwise falls back to email.
+        """
+        first = (self.first_name or "").strip()
+        last = (self.last_name or "").strip()
+
+        full_name = f"{first} {last}".strip()
+
+        return full_name if full_name else self.email
+
     def __str__(self):
         return self.email
 
