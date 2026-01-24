@@ -8,6 +8,8 @@ from rest_framework_simplejwt.views import (
 from django.conf import settings
 from django.conf.urls.static import static
 
+from django.http import HttpResponse
+
 urlpatterns = [
     path('admin-liv-umma/', admin.site.urls),
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),

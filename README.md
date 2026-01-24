@@ -6,6 +6,11 @@
 - Redis
 - postgres
 
+### Start server
+
+- start in development: (-v 2 allows logging even of info logs)
+  - python -m daphne -v 2 xumma.asgi:application
+
 ### Celery
 
 - start in development:
