@@ -57,6 +57,7 @@ def reserve_request(
     Creates Reservation rows and increments qty_reserved in balances.
     """
     req = PartRequest.objects.select_for_update().get(id=request_id)
+    user_company = get_user_company(actor_user)
 
     if req.status not in [PartRequest.Status.SUBMITTED, PartRequest.Status.APPROVED]:
         raise InventoryError(
@@ -104,6 +105,7 @@ def reserve_request(
                 qty_reserved=F("qty_reserved") + take)
 
             Reservation.objects.create(
+                company=user_company,
                 line=line,
                 balance=bal,
                 qty=take,
@@ -128,123 +130,111 @@ def reserve_request(
 
 
 @transaction.atomic
-def issue_request(
-    *,
-    request_id: int,
-    actor_user,
-) -> IssueDocument:
-    """
-    Issues all reserved quantities:
-    - decreases qty_reserved and qty_on_hand on the same locked balance rows
-    - writes StockMovement ledger rows (ISSUE)
-    - creates IssueDocument + IssueLines
-    """
+@transaction.atomic
+def issue_request(*, request_id: int, actor_user) -> IssueDocument:
     req = PartRequest.objects.select_for_update().get(id=request_id)
+    user_company = get_user_company(actor_user)
 
     if req.status not in [PartRequest.Status.RESERVED, PartRequest.Status.PARTIAL]:
         raise InventoryError(
-            f"Request {req.id} must be RESERVED/PARTIAL to issue. Current: {req.status}")
+            f"Request {req.id} must be RESERVED/PARTIAL to issue. Current: {req.status}"
+        )
 
     doc = IssueDocument.objects.create(
+        company=user_company,
         request=req,
         mechanic=req.mechanic,
         vehicle=req.vehicle,
         driver=req.driver,
         created_by=actor_user,
-        created_at=timezone.now(),
     )
 
-    # Lock lines + reservations
-    lines = list(
-        PartRequestLine.objects.select_for_update()
+    lines = {
+        ln.id: ln
+        for ln in PartRequestLine.objects.select_for_update()
         .filter(request=req)
-        .select_related("part")
-    )
+    }
 
-    # Fetch reservations in a deterministic order; lock their balances
     reservations = (
         Reservation.objects
-        .select_related("balance", "balance__lot", "balance__location", "line", "line__part")
+        .select_for_update()
+        .select_related(
+            "balance",
+            "balance__lot",
+            "balance__location",
+            "line",
+        )
         .filter(line__request=req)
-        .select_for_update(of=("self",))
         .order_by("balance__lot__received_at", "id")
     )
 
-    # Lock related balances
-    balance_ids = list(reservations.values_list(
-        "balance_id", flat=True).distinct())
-    balances = {
-        b.id: b for b in StockBalance.objects.select_for_update().filter(id__in=balance_ids).select_related("lot", "location")
-    }
-
-    # Issue each reservation fully (simple skeleton). Extend to partial issue if needed.
     for r in reservations:
-        bal = balances[r.balance_id]
+        bal = r.balance
         qty = r.qty
 
         if qty <= 0:
             continue
 
-        # Validate availability + reserved integrity
         if bal.qty_reserved < qty:
             raise InventoryError(
-                f"Reserved mismatch on balance {bal.id}. reserved={bal.qty_reserved}, need={qty}")
+                f"Reserved mismatch on balance {bal.id}: "
+                f"reserved={bal.qty_reserved}, need={qty}"
+            )
+
         if bal.qty_on_hand < qty:
             raise InventoryError(
-                f"Stock mismatch on balance {bal.id}. on_hand={bal.qty_on_hand}, need={qty}")
+                f"Stock mismatch on balance {bal.id}: "
+                f"on_hand={bal.qty_on_hand}, need={qty}"
+            )
 
-        # Update balance
+        # update balance atomically
         StockBalance.objects.filter(id=bal.id).update(
             qty_reserved=F("qty_reserved") - qty,
             qty_on_hand=F("qty_on_hand") - qty,
         )
 
         IssueLine.objects.create(
+            company=user_company,
             doc=doc,
             part=bal.part,
             lot=bal.lot,
             from_location=bal.location,
             qty=qty,
             created_by=actor_user,
-            created_at=timezone.now(),
         )
 
         StockMovement.objects.create(
+            company=user_company,
             type=StockMovement.Type.ISSUE,
             part=bal.part,
             lot=bal.lot,
             from_location=bal.location,
-            to_location=None,
             qty=qty,
             unit_cost_snapshot=bal.lot.unit_cost,
             currency=bal.lot.currency,
             ref_type="IssueDocument",
             ref_id=str(doc.id),
             created_by=actor_user,
-            created_at=timezone.now(),
         )
 
-        # Update request line totals (issued)
-        line = next((ln for ln in lines if ln.id == r.line_id), None)
-        if line:
-            line.qty_issued = line.qty_issued + qty
-            # reserved qty on line is a derived summary; keep simple:
-            line.qty_reserved = max(Decimal("0"), line.qty_reserved - qty)
-            line.save(update_fields=["qty_issued", "qty_reserved"])
+        line = lines[r.line_id]
+        line.qty_issued += qty
+        line.qty_reserved = max(Decimal("0"), line.qty_reserved - qty)
+        line.save(update_fields=["qty_issued", "qty_reserved"])
 
-    # Clean up reservations after issuing
     Reservation.objects.filter(line__request=req).delete()
 
-    # Update request status
-    # If any line still needs qty, keep PARTIAL, else ISSUED
-    req.refresh_from_db()
     remaining = (
-        PartRequestLine.objects.filter(request=req)
+        PartRequestLine.objects
+        .filter(request=req)
         .annotate(rem=F("qty_requested") - F("qty_issued"))
         .filter(rem__gt=0)
         .exists()
     )
-    req.status = PartRequest.Status.PARTIAL if remaining else PartRequest.Status.ISSUED
+
+    req.status = (
+        PartRequest.Status.PARTIAL if remaining else PartRequest.Status.ISSUED
+    )
     req.save(update_fields=["status"])
 
     return doc

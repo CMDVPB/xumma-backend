@@ -143,8 +143,12 @@ class PartRequestListCreateView(ListCreateAPIView):
 
 
 class PartRequestDetailView(generics.RetrieveAPIView):
-    queryset = PartRequest.objects.prefetch_related("lines__part")
+    permission_classes = [IsAuthenticated]
     serializer_class = PartRequestReadSerializer
+    queryset = PartRequest.objects.select_related("vehicle", "mechanic", "driver").prefetch_related(
+        "request_part_request_lines",
+        "request_part_request_lines__part",
+    )
 
 
 class ReserveRequestView(APIView):

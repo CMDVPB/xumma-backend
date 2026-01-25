@@ -65,7 +65,9 @@ class PartStockSerializer(serializers.ModelSerializer):
             "unit",
             "stock",
             "min_stock",
+            "is_active",
         ]
+        read_only_fields = ["is_active"]
 
 
 class LocationSerializer(serializers.ModelSerializer):
@@ -172,16 +174,38 @@ class PartRequestCreateSerializer(serializers.ModelSerializer):
 
 
 class PartRequestReadSerializer(serializers.ModelSerializer):
-    lines = PartRequestLineReadSerializer(many=True, read_only=True)
+    lines = PartRequestLineReadSerializer(
+        many=True,
+        read_only=True,
+        source="request_part_request_lines",
+    )
+
+    vehicle_reg_number = serializers.CharField(
+        source="vehicle.reg_number",
+        read_only=True,
+    )
+
+    mechanic_name = serializers.CharField(
+        source="mechanic.get_full_name",
+        read_only=True,
+    )
+
+    driver_name = serializers.CharField(
+        source="driver.get_full_name",
+        read_only=True,
+    )
 
     class Meta:
         model = PartRequest
         fields = [
             "id",
             "status",
-            "mechanic",
             "vehicle",
+            "vehicle_reg_number",
+            "mechanic",
+            "mechanic_name",
             "driver",
+            "driver_name",
             "needed_at",
             "note",
             "created_at",
