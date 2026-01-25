@@ -8,22 +8,27 @@
 
 ### Start server
 
-- start in development: (-v 2 allows logging even of info logs)
-  - python -m daphne -v 2 xumma.asgi:application
+- start in development:
+  - python -m daphne -v 2 xumma.asgi:application \*\*\* -v 2 allows logging even of info logs, hot reload not supported \*\*\*
+  - uvicorn xumma.asgi:application --reload \*\*\* use uvicorn for hot reload \*\*\*
+- start in production:
+  docker compose (use file docker-compose.prod.yaml at root directory)
 
 ### Celery
 
 - start in development:
   - %h automatically adds the hostname ////// (for all other tasks)
     celery -A xumma.celery:app worker --loglevel=INFO --concurrency=1 -P solo -E -Q celery -n celery@%h
-    \*\*\* -P solo = one task at a time, fine for development on windows
+    \*\*\* -P solo = one task at a time, fine for development on windows \*\*\*
+- start in production:
+  docker compose (use file docker-compose.prod.yaml at root directory)
 
 ### Celery beat
 
 - start in development:
   celery -A xumma.celery:app beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
 - start in production:
-  docker compose
+  docker compose (use file docker-compose.prod.yaml at root directory)
 
 ### How to start (needs to be created in Admin)
 

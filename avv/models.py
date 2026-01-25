@@ -61,10 +61,49 @@ class Location(TimeStampedModel):
         return f"{self.warehouse.code}:{self.code}"
 
 
+class UnitOfMeasure(models.Model):
+    uf = models.UUIDField(
+        default=uuid.uuid4,
+        editable=False,
+        unique=True,
+        db_index=True
+    )
+    company = models.ForeignKey(
+        Company, on_delete=models.CASCADE, blank=True, null=True, related_name="company_units_of_measure"
+    )
+    created_at = models.DateTimeField(default=timezone.now, editable=False)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey(
+        User, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name="%(class)s_created"
+    )
+
+    code = models.CharField(max_length=16, unique=True)  # pcs, kg, l, m, etc.
+    name = models.CharField(max_length=64)  # Pieces, Kilograms, Liters
+    serial_number = models.PositiveSmallIntegerField(blank=True, null=True)
+
+    is_active = models.BooleanField(default=True)
+    is_system = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["is_system", "serial_number", "code"]
+
+    def __str__(self) -> str:
+        return f"{self.code} – {self.name}"
+
+
 class Part(TimeStampedModel):
     sku = models.CharField(max_length=64, unique=True)
     name = models.CharField(max_length=240)
-    uom = models.CharField(max_length=24, default="pcs")
+
+    uom = models.ForeignKey(
+        UnitOfMeasure,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="uom_parts",
+    )
+
     barcode = models.CharField(max_length=64, blank=True, default="")
     min_level = models.DecimalField(
         max_digits=14, decimal_places=3, default=Decimal("0"))
@@ -72,6 +111,8 @@ class Part(TimeStampedModel):
         max_digits=14, decimal_places=3, default=Decimal("0"))
     reorder_qty = models.DecimalField(
         max_digits=14, decimal_places=3, default=Decimal("0"))
+
+    note = models.TextField(null=True, blank=True)
 
     is_active = models.BooleanField(default=True)
 

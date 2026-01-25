@@ -1,7 +1,7 @@
 from django.contrib.auth import get_user_model
 from abb.utils import get_user_company
 from att.models import Vehicle
-from .models import Part, Warehouse, Location
+from .models import Part, UnitOfMeasure, Warehouse, Location
 from decimal import Decimal
 from rest_framework import serializers
 
@@ -14,12 +14,28 @@ from .models import (
 User = get_user_model()
 
 
+class UnitOfMeasureSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UnitOfMeasure
+        fields = ("id", "serial_number", "code", "name", "uf",
+                  )
+
+
 class PartSerializer(serializers.ModelSerializer):
+    uom_uf = serializers.SlugRelatedField(
+        allow_null=True,
+        source="uom",  # important
+        slug_field='uf',
+        queryset=UnitOfMeasure.objects.all(),
+        write_only=True
+    )
+    uom = UnitOfMeasureSerializer(read_only=True)
+
     class Meta:
         model = Part
         fields = [
-            "id", "sku", "name", "uom", "barcode",
-            "min_level", "reorder_level", "reorder_qty", "uf"
+            "id", "sku", "name", "uom_uf", "uom", "barcode",
+            "min_level", "reorder_level", "reorder_qty", "note", "uf"
         ]
         read_only_fields = ["id", "is_active", "uf"]
 
@@ -30,7 +46,10 @@ class PartStockSerializer(serializers.ModelSerializer):
         decimal_places=3,
         read_only=True
     )
-    unit = serializers.CharField(source="uom")
+    unit = serializers.CharField(
+        source="uom.name",
+        read_only=True
+    )
     min_stock = serializers.DecimalField(
         source="min_level",
         max_digits=14,
@@ -273,9 +292,7 @@ class PartRequestListSerializer(serializers.ModelSerializer):
         )
         read_only_fields = ("status", "created_at")
 
-    # -------------------------
-    # Computed fields
-    # -------------------------
+    # ------- Computed fields -------
 
     def get_vehicle_reg_number(self, obj):
         return obj.vehicle.reg_number if obj.vehicle else None
@@ -285,8 +302,6 @@ class PartRequestListSerializer(serializers.ModelSerializer):
 
     def get_driver_name(self, obj):
         return obj.driver.get_full_name() if obj.driver else None
-
-###### START READ-ONLY FOR UI ######
 
 
 class IssueLineSerializer(serializers.ModelSerializer):
@@ -320,7 +335,6 @@ class IssueDocumentSerializer(serializers.ModelSerializer):
             "created_at",
             "lines",
         ]
-###### END READ-ONLY FOR UI ######
 
 
 class StockReceiveSerializer(serializers.Serializer):
@@ -361,54 +375,36 @@ class StockMovementSerializer(serializers.ModelSerializer):
     part_name = serializers.CharField(source="part.name", read_only=True)
     part_sku = serializers.CharField(source="part.sku", read_only=True)
 
-    from_warehouse = serializers.SerializerMethodField()
-    to_warehouse = serializers.SerializerMethodField()
-
-    from_location_code = serializers.CharField(
-        source="from_location.code", read_only=True
-    )
-    to_location_code = serializers.CharField(
-        source="to_location.code", read_only=True
-    )
+    from_location = serializers.SerializerMethodField()
+    to_location = serializers.SerializerMethodField()
 
     class Meta:
         model = StockMovement
-        fields = (
+        fields = [
             "id",
             "type",
             "qty",
-            "currency",
-            "unit_cost_snapshot",
-            "created_at",
-
-            # part
-            "part",
             "part_name",
             "part_sku",
-
-            # locations
             "from_location",
-            "from_location_code",
-            "from_warehouse",
-
             "to_location",
-            "to_location_code",
-            "to_warehouse",
+            "created_at",
+        ]
 
-            # reference
-            "ref_type",
-            "ref_id",
-        )
+    def _loc(self, loc):
+        if not loc:
+            return None
+        return {
+            "id": loc.id,
+            "code": loc.code,
+            "warehouse": loc.warehouse.name,
+        }
 
-    def get_from_warehouse(self, obj):
-        if obj.from_location:
-            return obj.from_location.warehouse.name
-        return None
+    def get_from_location(self, obj):
+        return self._loc(obj.from_location)
 
-    def get_to_warehouse(self, obj):
-        if obj.to_location:
-            return obj.to_location.warehouse.name
-        return None
+    def get_to_location(self, obj):
+        return self._loc(obj.to_location)
 
 
 class WarehouseSerializer(serializers.ModelSerializer):

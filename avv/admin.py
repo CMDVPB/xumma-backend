@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from avv.models import Location, Part, PartRequest, Warehouse
+from avv.models import Location, Part, PartRequest, UnitOfMeasure, Warehouse
 
 
 @admin.register(Part)
@@ -31,3 +31,13 @@ class PartRequestAdmin(admin.ModelAdmin):
 
     search_fields = ("mechanic__first_name",
                      'vehicle__reg_number', 'driver_first_name', 'note')
+
+
+@admin.register(UnitOfMeasure)
+class UnitOfMeasureAdmin(admin.ModelAdmin):
+    list_display = ('id', 'company', 'serial_number', 'code', 'name', 'is_system', 'uf',
+                    )
+
+    search_fields = ("company__company_name",
+                     'code', 'name', 'uf'
+                     )

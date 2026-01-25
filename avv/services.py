@@ -7,6 +7,7 @@ from typing import Iterable, List, Optional
 from django.db import transaction
 from django.db.models import F, Q
 from django.utils import timezone
+from django.core.exceptions import ValidationError
 
 from abb.utils import get_user_company
 
@@ -314,3 +315,72 @@ def receive_stock(*, data, user):
     balance.save(update_fields=["qty_on_hand"])
 
     return balance
+
+
+def transfer_stock(
+    *,
+    balance_id: int,
+    to_location_id: int,
+    qty: Decimal,
+    company,
+    user,
+):
+    if qty <= 0:
+        raise ValidationError("Quantity must be greater than zero")
+
+    with transaction.atomic():
+        # lock source balance
+        balance = (
+            StockBalance.objects
+            .select_for_update()
+            .select_related("part", "lot", "location")
+            .get(id=balance_id, company=company)
+        )
+
+        if balance.qty_available < qty:
+            raise ValidationError("Insufficient available stock")
+
+        to_location = Location.objects.get(
+            id=to_location_id,
+            company=company,
+        )
+
+        # create / lock destination balance (same lot)
+        dest_balance, _ = StockBalance.objects.select_for_update().get_or_create(
+            company=company,
+            part=balance.part,
+            lot=balance.lot,
+            location=to_location,
+            defaults={
+                "qty_on_hand": Decimal("0"),
+                "qty_reserved": Decimal("0"),
+                "created_by": user,
+            },
+        )
+
+        # apply movement
+        balance.qty_on_hand -= qty
+        balance.save(update_fields=["qty_on_hand"])
+
+        dest_balance.qty_on_hand += qty
+        dest_balance.save(update_fields=["qty_on_hand"])
+
+        StockMovement.objects.create(
+            company=company,
+            created_by=user,
+            type=StockMovement.Type.TRANSFER,
+            part=balance.part,
+            lot=balance.lot,
+            from_location=balance.location,
+            to_location=to_location,
+            qty=qty,
+            unit_cost_snapshot=balance.lot.unit_cost,
+            ref_type="TRANSFER",
+            ref_id=str(balance.id),
+        )
+
+        return {
+            "from_balance": balance.id,
+            "to_balance": dest_balance.id,
+            "qty": qty,
+        }

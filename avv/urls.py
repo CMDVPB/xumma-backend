@@ -7,6 +7,8 @@ from .views import *
 
 
 urlpatterns = [
+    path("uoms/", UnitOfMeasureListView.as_view(), name="uom-list"),
+
     path('parts/', PartListView.as_view()),
     path("parts/create/", PartCreateView.as_view()),
     path("parts/<int:pk>/", PartDetailView.as_view()),
@@ -14,6 +16,8 @@ urlpatterns = [
     path("stock/", StockListView.as_view()),
     path("stock/balances/", StockBalanceListView.as_view()),
     path("stock/receive/", StockReceiveView.as_view(), name="stock-receive"),
+    path("stock/transfer/", StockTransferView.as_view(), name="stock-transfer"),
+    path("stock/movements/", StockMovementListView.as_view(), name="stock-movements"),
 
     path("requests/", PartRequestListCreateView.as_view()),
     path("requests/<int:pk>/", PartRequestDetailView.as_view()),

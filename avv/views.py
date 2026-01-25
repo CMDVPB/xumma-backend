@@ -1,16 +1,18 @@
+from decimal import Decimal
 from django.db import transaction
 from django.utils import timezone
 from django.db.models import Sum, F, Q
+from django.utils.dateparse import parse_date
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import generics, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.generics import ListAPIView, ListCreateAPIView, RetrieveAPIView
-from rest_framework.filters import SearchFilter
+from rest_framework.filters import SearchFilter, OrderingFilter
 
 from abb.utils import get_user_company
 
-from .models import Location, Part, PartRequest, StockBalance, StockLot, StockMovement, Warehouse
+from .models import Location, Part, PartRequest, StockBalance, StockLot, StockMovement, UnitOfMeasure, Warehouse
 from .serializers import (
     LocationSerializer,
     PartRequestCreateSerializer,
@@ -23,9 +25,25 @@ from .serializers import (
     IssueDocumentSerializer,
     StockMovementSerializer,
     StockReceiveSerializer,
+    UnitOfMeasureSerializer,
     WarehouseSerializer,
 )
-from .services import receive_stock, reserve_request, issue_request, InventoryError
+from .services import receive_stock, reserve_request, issue_request, InventoryError, transfer_stock
+
+
+class UnitOfMeasureListView(ListAPIView):
+    serializer_class = UnitOfMeasureSerializer
+
+    def get_queryset(self):
+        company = get_user_company(self.request.user)
+        qs = (UnitOfMeasure.objects
+              .filter(
+                  Q(company=company) |
+                  Q(is_system=True),
+                  is_active=True,
+              )
+              )
+        return qs
 
 
 class StockListView(generics.ListAPIView):
@@ -40,12 +58,12 @@ class StockListView(generics.ListAPIView):
             .annotate(
                 stock=Sum("part_stock_balances__qty_on_hand")
             )
-            .order_by("name")
+            .order_by("-updated_at")
         )
 
         # Optional low-stock filter
         if self.request.query_params.get("low"):
-            qs = qs.filter(stock__lte=F("min_stock"))
+            qs = qs.filter(stock__lte=F("min_level"))
 
         return qs
 
@@ -221,41 +239,37 @@ class StockReceiveView(APIView):
 
 class StockMovementListView(ListAPIView):
     serializer_class = StockMovementSerializer
+    filter_backends = [OrderingFilter]
+    ordering = ["-created_at"]
 
     def get_queryset(self):
         company = get_user_company(self.request.user)
-        qs = StockMovement.objects.filter(company=company)
-
-        part = self.request.query_params.get("part")
-        warehouse = self.request.query_params.get("warehouse")
-        mtype = self.request.query_params.get("type")
-        date_from = self.request.query_params.get("date_from")
-        date_to = self.request.query_params.get("date_to")
-
-        if part:
-            qs = qs.filter(part_id=part)
-
-        if warehouse:
-            qs = qs.filter(
-                Q(from_location__warehouse_id=warehouse) |
-                Q(to_location__warehouse_id=warehouse)
+        qs = (
+            StockMovement.objects
+            .select_related(
+                "part",
+                "lot",
+                "from_location__warehouse",
+                "to_location__warehouse",
             )
-
-        if mtype:
-            qs = qs.filter(type=mtype)
-
-        if date_from:
-            qs = qs.filter(created_at__date__gte=date_from)
-
-        if date_to:
-            qs = qs.filter(created_at__date__lte=date_to)
-
-        return qs.select_related(
-            "part",
-            "lot",
-            "from_location__warehouse",
-            "to_location__warehouse",
+            .filter(company=company)
         )
+
+        p = self.request.query_params
+
+        if p.get("part"):
+            qs = qs.filter(part_id=p["part"])
+
+        if p.get("type"):
+            qs = qs.filter(type=p["type"])
+
+        if p.get("date_from"):
+            qs = qs.filter(created_at__date__gte=parse_date(p["date_from"]))
+
+        if p.get("date_to"):
+            qs = qs.filter(created_at__date__lte=parse_date(p["date_to"]))
+
+        return qs
 
 
 class WarehouseListView(ListAPIView):
@@ -283,3 +297,32 @@ class LocationListView(ListAPIView):
             qs = qs.filter(warehouse_id=warehouse_id)
 
         return qs.order_by("code")
+
+
+class StockTransferView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        company = get_user_company(request.user)
+        data = request.data
+
+        try:
+            result = transfer_stock(
+                balance_id=int(data["balance_id"]),
+                to_location_id=int(data["to_location"]),
+                qty=Decimal(data["qty"]),
+                company=company,
+                user=request.user,
+            )
+        except KeyError:
+            return Response(
+                {"detail": "balance_id, to_location and qty are required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except Exception as e:
+            return Response(
+                {"detail": str(e)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response(result, status=status.HTTP_200_OK)
