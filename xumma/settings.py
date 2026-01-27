@@ -73,6 +73,7 @@ INSTALLED_APPS = [
     'abb',
     'app',
     'att',
+    'auu',
     'avv',
     'axx',
     'ayy',

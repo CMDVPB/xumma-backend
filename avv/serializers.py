@@ -1,14 +1,14 @@
-from django.contrib.auth import get_user_model
-from abb.utils import get_user_company
-from att.models import Vehicle
-from .models import Part, UnitOfMeasure, Warehouse, Location
 from decimal import Decimal
+from django.contrib.auth import get_user_model
+from django.db.models import Sum
 from rest_framework import serializers
 
+from abb.utils import get_user_company
+from att.models import Vehicle
 from .models import (
     Part, Location, StockBalance,
     PartRequest, PartRequestLine,
-    IssueDocument, IssueLine, StockMovement, Warehouse
+    IssueDocument, IssueLine, StockMovement, Warehouse, UnitOfMeasure
 )
 
 User = get_user_model()
@@ -195,6 +195,8 @@ class PartRequestReadSerializer(serializers.ModelSerializer):
         read_only=True,
     )
 
+    issue_document_id = serializers.SerializerMethodField()
+
     class Meta:
         model = PartRequest
         fields = [
@@ -210,8 +212,13 @@ class PartRequestReadSerializer(serializers.ModelSerializer):
             "note",
             "created_at",
             "lines",
+            "issue_document_id",
             "uf",
         ]
+
+    def get_issue_document_id(self, obj):
+        doc = obj.request_issue_documents.first()
+        return doc.id if doc else None
 
 
 class PartRequestLineSerializer(serializers.ModelSerializer):
@@ -438,5 +445,113 @@ class WarehouseSerializer(serializers.ModelSerializer):
             "id",
             "code",
             "name",
+            "uf",
+        ]
+
+
+class IssueDocumentListSerializer(serializers.ModelSerializer):
+    mechanic_name = serializers.CharField(
+        source="mechanic.get_full_name", read_only=True
+    )
+    driver_name = serializers.CharField(
+        source="driver.get_full_name", read_only=True
+    )
+    vehicle_reg_number = serializers.CharField(
+        source="vehicle.reg_number", read_only=True
+    )
+
+    total_qty = serializers.SerializerMethodField()
+
+    class Meta:
+        model = IssueDocument
+        fields = [
+            "id",
+            "uf",
+            "created_at",
+            "mechanic_name",
+            "driver_name",
+            "vehicle_reg_number",
+            "total_qty",
+            "status",
+            "uf",
+        ]
+
+    def get_total_qty(self, obj):
+        return (
+            obj.doc_issue_lines
+            .aggregate(total=Sum("qty"))
+            .get("total") or 0
+        )
+
+
+class IssueLineSerializer(serializers.ModelSerializer):
+    part_name = serializers.CharField(source="part.name", read_only=True)
+    part_sku = serializers.CharField(source="part.sku", read_only=True)
+    location_name = serializers.CharField(
+        source="from_location.name", read_only=True
+    )
+    warehouse_name = serializers.CharField(
+        source="from_location.warehouse.name", read_only=True
+    )
+
+    class Meta:
+        model = IssueLine
+        fields = [
+            "id",
+            "part",
+            "part_name",
+            "part_sku",
+            "lot",
+            "warehouse_name",
+            "location_name",
+            "qty",
+        ]
+
+
+class IssueDocumentDetailSerializer(serializers.ModelSerializer):
+    mechanic_name = serializers.CharField(
+        source="mechanic.get_full_name", read_only=True
+    )
+    mechanic_uf = serializers.CharField(
+        source="mechanic.uf", read_only=True
+    )
+    driver_name = serializers.CharField(
+        source="driver.get_full_name", read_only=True
+    )
+    vehicle_reg_number = serializers.CharField(
+        source="vehicle.reg_number", read_only=True
+    )
+
+    # request_status = serializers.CharField(
+    #     source="request.status", read_only=True
+    # )
+
+    lines = IssueLineSerializer(
+        source="doc_issue_lines",
+        many=True,
+        read_only=True,
+    )
+
+    confirmed_at = serializers.DateTimeField(read_only=True)
+    confirmed_by_name = serializers.CharField(
+        source="confirmed_by.get_full_name",
+        read_only=True,
+    )
+
+    class Meta:
+        model = IssueDocument
+        fields = [
+            "id",
+            "uf",
+            "created_at",
+            "note",
+            "mechanic_name",
+            "mechanic_uf",
+            "driver_name",
+            "vehicle_reg_number",
+            "status",
+            "lines",
+            "confirmed_at",
+            "confirmed_by_name",
             "uf",
         ]

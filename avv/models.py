@@ -223,6 +223,10 @@ class Reservation(TimeStampedModel):
 
 
 class IssueDocument(TimeStampedModel):
+    class Status(models.TextChoices):
+        ISSUED = "ISSUED"
+        CONFIRMED = "CONFIRMED"
+
     request = models.ForeignKey(
         PartRequest, on_delete=models.PROTECT, related_name="request_issue_documents")
     mechanic = models.ForeignKey(
@@ -232,6 +236,22 @@ class IssueDocument(TimeStampedModel):
     driver = models.ForeignKey(
         User, null=True, blank=True, on_delete=models.SET_NULL, related_name="driver_issue_documents")
     note = models.TextField(blank=True, default="")
+
+    # confirmation
+    confirmed_at = models.DateTimeField(null=True, blank=True)
+    confirmed_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="confirmed_issue_documents",
+    )
+
+    status = models.CharField(
+        max_length=16,
+        choices=Status.choices,
+        default=Status.ISSUED,
+    )
 
 
 class IssueLine(TimeStampedModel):

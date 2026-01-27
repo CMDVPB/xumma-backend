@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 from smtplib import SMTPException
+from webbrowser import get
 from django.utils import timezone
 from django.forms.models import model_to_dict
 from django.contrib.auth import get_user_model
@@ -11,6 +12,7 @@ from django.http import HttpResponse
 from rest_framework.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
 from rest_framework import status, exceptions
+from rest_framework.views import APIView
 from rest_framework.generics import CreateAPIView, ListAPIView, ListCreateAPIView, CreateAPIView, \
     RetrieveUpdateDestroyAPIView, DestroyAPIView
 from rest_framework.response import Response
@@ -21,6 +23,8 @@ from rest_framework.permissions import IsAuthenticated  # used for FBV
 from abb.permissions import IsSubscriptionActiveOrReadOnly
 from abb.utils import get_user_company
 from att.models import BankAccount, Contact, Contract, Person, VehicleUnit
+from axx.models import TripAdvancePayment
+from axx.serializers import TripAdvancePaymentChangeStatusSerializer, TripAdvancePaymentCreateSerializer, TripAdvancePaymentListSerializer
 from dff.serializers.serializers_other import ContactSerializer, ContractFKSerializer, ContractListSerializer
 
 import logging
@@ -153,3 +157,86 @@ class ContractListView(ListAPIView):
             logger.exception(
                 'ERRORLOG3007 ContractListView get_queryset')
             return Contract.objects.none()
+
+
+class TripAdvancePaymentListView(ListAPIView):
+    serializer_class = TripAdvancePaymentListSerializer
+
+    def get_queryset(self):
+        trip_uf = self.kwargs['trip_uf']
+        user_company = get_user_company(self.request.user)
+        return TripAdvancePayment.objects.filter(
+            company=user_company,
+            trip__uf=trip_uf
+        ).select_related(
+            'currency', 'payment_method', 'status', 'created_by'
+        )
+
+
+class TripAdvancePaymentCreateView(CreateAPIView):
+    serializer_class = TripAdvancePaymentCreateSerializer
+
+
+class TripAdvancePaymentChangeStatusView(APIView):
+    def post(self, request, uf):
+        user_company = get_user_company(request.user)
+        advance = get_object_or_404(
+            TripAdvancePayment,
+            uf=uf,
+            company=user_company
+        )
+
+        serializer = TripAdvancePaymentChangeStatusSerializer(
+            data=request.data
+        )
+        serializer.is_valid(raise_exception=True)
+
+        new_status = serializer.validated_data['status']
+
+        # enforce transitions
+        allowed = {
+            'requested': {'approved', 'rejected'},
+            'approved': {'paid', 'cancelled'},
+            'paid': set(),
+            'rejected': set(),
+        }
+
+        if new_status.code not in allowed.get(
+            advance.status.code, set()
+        ):
+            return Response(
+                {'detail': 'Invalid status transition'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        advance.status = new_status
+
+        if new_status.code == 'approved':
+            advance.approved_at = timezone.now()
+
+        if new_status.code == 'paid':
+            advance.paid_at = timezone.now()
+
+        advance.save()
+
+        return Response({'status': 'ok'})
+
+
+class TripAdvancePaymentDeleteView(DestroyAPIView):
+    permission_classes = [IsAuthenticated]
+    lookup_field = 'uf'
+
+    def get_queryset(self):
+        user_company = get_user_company(self.request.user)
+        return TripAdvancePayment.objects.filter(
+            company=user_company
+        )
+
+    def perform_destroy(self, instance):
+        if self.request.user.groups.filter(name='level_driver').exists():
+            raise ValidationError('Drivers cannot delete advances')
+
+        if instance.status.code != 'requested':
+            raise ValidationError('Only requested advances can be deleted')
+
+        instance.delete()

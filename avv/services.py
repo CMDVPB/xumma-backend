@@ -8,6 +8,7 @@ from django.db import transaction
 from django.db.models import F, Q
 from django.utils import timezone
 from django.core.exceptions import ValidationError
+from rest_framework.exceptions import PermissionDenied
 
 from abb.utils import get_user_company
 
@@ -374,3 +375,19 @@ def transfer_stock(
             "to_balance": dest_balance.id,
             "qty": qty,
         }
+
+
+@transaction.atomic
+def confirm_issue_document(*, doc_id: int, actor_user):
+    doc = IssueDocument.objects.select_for_update().get(id=doc_id)
+
+    if doc.mechanic_id != actor_user.id:
+        raise PermissionDenied("Only assigned mechanic can confirm")
+
+    if doc.status == IssueDocument.Status.CONFIRMED:
+        return doc
+
+    doc.status = IssueDocument.Status.CONFIRMED
+    doc.save(update_fields=["status"])
+
+    return doc

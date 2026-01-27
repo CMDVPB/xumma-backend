@@ -1,3 +1,4 @@
+
 from django.db import models
 from django.contrib.auth import get_user_model
 from django.contrib.postgres.fields import ArrayField
@@ -12,6 +13,8 @@ from app.models import CategoryGeneral, Company
 from att.models import Contact, Person, RouteSheetNumber, Term, Vehicle, VehicleUnit, PaymentTerm
 
 import logging
+
+from auu.models import PaymentMethod
 logger = logging.getLogger(__name__)
 
 User = get_user_model()
@@ -196,6 +199,80 @@ class TripDriver(models.Model):
 
     def __str__(self):
         return f"{self.driver} → Trip #{self.trip_id}"
+
+
+class TripAdvancePaymentStatus(models.Model):
+    uf = models.CharField(max_length=36, default=hex_uuid,
+                          db_index=True, unique=True)
+    company = models.ForeignKey(
+        Company, on_delete=models.CASCADE, null=True, blank=True, related_name='company_trip_advance_payment_statuses')
+
+    code = models.CharField(
+        max_length=32,
+        unique=True,
+        db_index=True
+    )
+    name = models.CharField(
+        max_length=64
+    )
+
+    serial_number = models.PositiveSmallIntegerField(
+        null=True, blank=True,
+
+    )
+
+    is_final = models.BooleanField(default=False,)
+    is_system = models.BooleanField(default=False,)
+
+    class Meta:
+        ordering = ["serial_number"]
+
+    def __str__(self):
+        return self.name
+
+
+class TripAdvancePayment(models.Model):
+    uf = models.CharField(max_length=36, default=hex_uuid,
+                          db_index=True, unique=True)
+    company = models.ForeignKey(
+        Company, on_delete=models.CASCADE, null=True, blank=True, related_name='company_trip_advance_payments')
+
+    trip = models.ForeignKey(
+        Trip,
+        on_delete=models.CASCADE,
+        related_name="trip_advance_payments"
+    )
+    driver = models.ForeignKey(User, on_delete=models.PROTECT,
+                               related_name="driver_advance_payments"
+                               )
+
+    amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2
+    )
+    purpose = models.CharField(max_length=255,   blank=True)
+
+    currency = models.ForeignKey(
+        Currency, on_delete=models.SET_NULL, blank=True, null=True, related_name='currency_trip_advance_payments')
+
+    payment_method = models.ForeignKey(
+        PaymentMethod, on_delete=models.SET_NULL, blank=True, null=True, related_name='payment_method_trip_advance_payments')
+
+    status = models.ForeignKey(
+        TripAdvancePaymentStatus,
+        on_delete=models.PROTECT,
+        related_name="status_trip_advance_payments"
+    )
+
+    requested_at = models.DateTimeField(auto_now_add=True)
+    approved_at = models.DateTimeField(null=True, blank=True)
+    paid_at = models.DateTimeField(null=True, blank=True)
+
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name="created_advances"
+    )
 
 
 class Load(models.Model):

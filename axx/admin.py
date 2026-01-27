@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from axx.models import Inv, Load, LoadEvent, Trip, TripDriver
+from axx.models import Inv, Load, LoadEvent, Trip, TripAdvancePayment, TripAdvancePaymentStatus, TripDriver
 
 
 @admin.register(Load)
@@ -27,3 +27,19 @@ class TripDriverAdmin(admin.ModelAdmin):
 @admin.register(Inv)
 class InvAdmin(admin.ModelAdmin):
     list_display = ('id', 'company', 'bill_to')
+
+
+@admin.register(TripAdvancePaymentStatus)
+class TripAdvancePaymentStatusAdmin(admin.ModelAdmin):
+    list_display = ('id', 'company', 'code',
+                    'name',
+                    'is_final',
+                    'serial_number',)
+
+
+@admin.register(TripAdvancePayment)
+class TripAdvancePaymentAdmin(admin.ModelAdmin):
+    list_display = ('id', 'company', 'trip',
+                    'driver',
+                    'amount',
+                    'currency',)

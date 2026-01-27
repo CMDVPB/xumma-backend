@@ -12,8 +12,10 @@ from rest_framework.filters import SearchFilter, OrderingFilter
 
 from abb.utils import get_user_company
 
-from .models import Location, Part, PartRequest, StockBalance, StockLot, StockMovement, UnitOfMeasure, Warehouse
+from .models import IssueDocument, Location, Part, PartRequest, StockBalance, StockLot, StockMovement, UnitOfMeasure, Warehouse
 from .serializers import (
+    IssueDocumentDetailSerializer,
+    IssueDocumentListSerializer,
     LocationSerializer,
     PartRequestCreateSerializer,
     PartRequestListSerializer,
@@ -28,7 +30,7 @@ from .serializers import (
     UnitOfMeasureSerializer,
     WarehouseSerializer,
 )
-from .services import receive_stock, reserve_request, issue_request, InventoryError, transfer_stock
+from .services import confirm_issue_document, receive_stock, reserve_request, issue_request, InventoryError, transfer_stock
 
 
 class UnitOfMeasureListView(ListAPIView):
@@ -330,3 +332,42 @@ class StockTransferView(APIView):
             )
 
         return Response(result, status=status.HTTP_200_OK)
+
+
+class IssueDocumentListView(ListAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = IssueDocumentListSerializer
+
+    def get_queryset(self):
+        company = get_user_company(self.request.user)
+        qs = (
+            IssueDocument.objects
+            .select_related("mechanic", "vehicle", "driver")
+            .filter(company=company)
+
+        )
+        return qs.order_by("-created_at")
+
+
+class IssueDocumentDetailView(RetrieveAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = IssueDocumentDetailSerializer
+
+    def get_queryset(self):
+        company = get_user_company(self.request.user)
+        qs = IssueDocument.objects.filter(company=company)
+        return qs
+
+
+class IssueDocumentConfirmView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        doc = confirm_issue_document(
+            doc_id=pk,
+            actor_user=request.user,
+        )
+        return Response(
+            {"status": doc.status},
+            status=status.HTTP_200_OK,
+        )

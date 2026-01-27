@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from avv.models import Location, Part, PartRequest, UnitOfMeasure, Warehouse
+from avv.models import IssueDocument, Location, Part, PartRequest, UnitOfMeasure, Warehouse
 
 
 @admin.register(Part)
@@ -40,4 +40,14 @@ class UnitOfMeasureAdmin(admin.ModelAdmin):
 
     search_fields = ("company__company_name",
                      'code', 'name', 'uf'
+                     )
+
+
+@admin.register(IssueDocument)
+class IssueDocumentAdmin(admin.ModelAdmin):
+    list_display = ('id', 'company', 'status', 'uf',
+                    )
+
+    search_fields = ("company__company_name",
+                     'status', 'uf'
                      )
