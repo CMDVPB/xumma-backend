@@ -3,12 +3,17 @@ import json
 import logging
 from axx.models import Load, LoadEvent
 from ayy.models import UserEmail
+from dff.serializers.serializers_load import LoadListSerializer
 from xumma.celery import app
 from django.conf import settings
 from django.core.mail import EmailMessage, get_connection
 from django.utils import timezone
 from django.db import IntegrityError
 from smtplib import SMTPException
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
+
+channel_layer = get_channel_layer()
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +29,8 @@ def send_basic_email_task(self, email_id, load_uf=None, event_type=None):
         'reply_to': ''
     }
     """
+
+    print('7220', event_type)
 
     try:
         email = UserEmail.objects.select_related(
@@ -63,16 +70,38 @@ def send_basic_email_task(self, email_id, load_uf=None, event_type=None):
         email.sent_at = now
         email.save(update_fields=["status", "sent_at"])
 
+        print('7228', 'SHIPPER_EMAIL_SENT',
+              'SHIPPER_CONFIRMED',
+              'DOCS_SENT_CNEE_BROKER', event_type)
+
         ### Prevent duplicate updates on retry ###
         if load_uf and event_type:
+            load = Load.objects.get(uf=load_uf)
+
             try:
                 LoadEvent.objects.create(
-                    load_id=Load.objects.only("id").get(uf=load_uf).id,
+                    load=load,
                     event_type=event_type,
                     created_by=email.user,
                 )
+
             except IntegrityError:
                 pass
+
+            # 🔑 ALWAYS notify load update (created OR duplicate)
+            async_to_sync(channel_layer.group_send)(
+                f"company_{load.company.id}",
+                {
+                    "type": "forward_load",  # 👈 MUST match method name
+                    "payload": {
+                        "type": "load",
+                        "action": "update",
+                        "data": LoadListSerializer(load).data,
+                    },
+                }
+            )
+
+            print(f"WS group send → company_{load.company_id}")
 
         logger.info(f"Email sent to {email.to}")
 

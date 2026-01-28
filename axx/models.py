@@ -406,8 +406,8 @@ class LoadEvent(models.Model):
     created_by = models.ForeignKey(
         User, null=True, blank=True, on_delete=models.SET_NULL)
 
-    class Meta:
-        unique_together = ('load', 'event_type')
+    # class Meta:
+    #     unique_together = ('load', 'event_type')
 
 
 class Tor(models.Model):

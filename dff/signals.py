@@ -1,7 +1,10 @@
+from django.db.models.signals import post_save
 from django.dispatch import receiver
 
 from axes.signals import user_locked_out
 from rest_framework.exceptions import PermissionDenied
+
+from axx.models import LoadEvent
 
 
 @receiver(user_locked_out)

@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 
 class BasicEmailOptionalAttachmentsView(APIView):
     '''
-    Using celery task to send basic email.
+    Using celery task to send email.
     '''
     permission_classes = [IsAuthenticated]
     parser_classes = (MultiPartParser, FormParser)
@@ -54,6 +54,8 @@ class BasicEmailOptionalAttachmentsView(APIView):
             for item in attachments_ufs_list
             if isinstance(item, dict) and item.get("imageUf")
         ]
+
+        print('2328', to)
 
         if not to:
             return Response(

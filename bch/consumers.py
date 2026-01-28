@@ -6,6 +6,7 @@ from bch.mixins.contact import ContactMixin
 from bch.mixins.issue_document import IssueDocumentMixin
 from bch.mixins.item_for_item_cost import ItemForItemCostMixin
 from bch.mixins.fuel_tank import FuelTankMixin
+from bch.mixins.load import LoadMixin
 from bch.mixins.trip import TripMixin
 
 
@@ -14,6 +15,7 @@ class AppConsumer(
     FuelTankMixin,
     ContactMixin,
     TripMixin,
+    LoadMixin,
     IssueDocumentMixin,
     GenericAsyncAPIConsumer,
 ):

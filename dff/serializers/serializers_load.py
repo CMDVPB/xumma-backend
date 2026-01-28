@@ -703,6 +703,7 @@ class LoadListForTripSerializer(UniqueFieldsMixin, WritableNestedModelSerializer
     entry_loads = EntryBasicReadListSerializer(many=True)
     load_iteminvs = ItemInvSerializer(many=True)
     load_comments = CommentSerializer(many=True)
+    load_events = LoadEventOutSerializer(many=True)
 
     class Meta:
         model = Load
@@ -711,5 +712,6 @@ class LoadListForTripSerializer(UniqueFieldsMixin, WritableNestedModelSerializer
                   'date_loaded', 'date_cleared', 'date_unloaded', 'date_invoiced',
                   'load_address', 'unload_address', 'hb', 'mb', 'booking_number', 'comment1',
                   'bill_to', 'mode', 'bt',
-                  'load_comments', 'entry_loads', 'load_iteminvs',
+                  'load_comments', 'entry_loads', 'load_iteminvs', 'load_events',
                   )
+        read_only_fields = ['load_events']

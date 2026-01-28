@@ -612,8 +612,8 @@ class LoadDetailView(RetrieveUpdateDestroyAPIView):
 ###### Load list for Trip ######
 class LoadListForTripView(ListAPIView):
     ''' Get list of loads for a particular 1 trip'''
-    serializer_class = LoadListForTripSerializer
     permission_classes = [IsAuthenticated]
+    serializer_class = LoadListForTripSerializer
     pagination_class = None
     lookup_field = 'uf'
 
