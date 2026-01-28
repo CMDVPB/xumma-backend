@@ -12,6 +12,10 @@ urlpatterns = [
     path("warehouses/", WarehouseListView.as_view(), name="warehouse-list"),
 
     path("locations/", LocationListView.as_view(), name="location-list"),
+    path("locations/by-part/", LocationsByPartView.as_view(),
+         name="locations-by-part"),
+    path("locations/by-part/<int:part_id>/",
+         LocationsByPartView.as_view(), name="locations-by-part"),
 
     path('parts/', PartListView.as_view()),
     path("parts/create/", PartCreateView.as_view()),
@@ -26,6 +30,16 @@ urlpatterns = [
     path("issues/<int:pk>/", IssueDocumentDetailView.as_view()),
     path("issues/<int:pk>/confirm/", IssueDocumentConfirmView.as_view()),
 
+    path("work-orders/", WorkOrderListView.as_view()),
+    path("work-orders/create/", WorkOrderCreateView.as_view()),
+    path("work-orders/<int:pk>/", WorkOrderDetailView.as_view()),
+    path("work-orders/<int:pk>/start/",
+         WorkOrderStartView.as_view(), name="work-order-start"),
+    path("work-orders/<int:pk>/issue/", WorkOrderIssueView.as_view()),
+    path("work-orders/<int:pk>/issues/", WorkOrderIssueListView.as_view()),
+    path("work-orders/<int:pk>/complete/",
+         WorkOrderCompleteView.as_view(), name="workorder-complete"),
+
     path("stock/", StockListView.as_view()),
     path("stock/balances/", StockBalanceListView.as_view()),
     path("stock/receive/", StockReceiveView.as_view(), name="stock-receive"),
@@ -33,9 +47,4 @@ urlpatterns = [
     path("stock/movements/", StockMovementListView.as_view(), name="stock-movements"),
 
 
-
-
-
 ]
-
-urlpatterns = format_suffix_patterns(urlpatterns)

@@ -5,7 +5,7 @@ from decimal import Decimal
 from typing import Iterable, List, Optional
 
 from django.db import transaction
-from django.db.models import F, Q
+from django.db.models import F, Q, Sum
 from django.utils import timezone
 from django.core.exceptions import ValidationError
 from rest_framework.exceptions import PermissionDenied
@@ -14,7 +14,7 @@ from abb.utils import get_user_company
 
 from .models import (
     Location, Part, PartRequest, PartRequestLine, Reservation,
-    StockBalance, StockLot, StockMovement, IssueDocument, IssueLine
+    StockBalance, StockLot, StockMovement, IssueDocument, IssueLine, WorkOrder, WorkOrderIssue, WorkOrderLaborEntry
 )
 
 
@@ -391,3 +391,110 @@ def confirm_issue_document(*, doc_id: int, actor_user):
     doc.save(update_fields=["status"])
 
     return doc
+
+
+@transaction.atomic
+def issue_from_work_order(
+    *,
+    work_order,
+    part,
+    location,
+    qty: Decimal,
+    issued_by,
+):
+    # Lock the exact balance row (part + location + lot)
+    balance = (
+        StockBalance.objects
+        .select_for_update()
+        .select_related("lot")
+        .get(
+            part=part,
+            location=location,
+        )
+    )
+
+    if balance.qty_available < qty:
+        raise ValidationError("Not enough stock available")
+
+    lot = balance.lot
+    currency = lot.currency
+
+    # if not currency:
+    #     raise ValidationError("Stock lot has no currency defined")
+
+    # ✅ Issue record
+    issued = WorkOrderIssue.objects.create(
+        company=work_order.company,
+        work_order=work_order,
+        part=part,
+        location=location,
+        lot=lot,
+        qty=qty,
+        unit_cost=lot.unit_cost,
+        currency=currency,
+        created_by=issued_by,
+    )
+
+    # ✅ Update stock
+    balance.qty_on_hand = F("qty_on_hand") - qty
+    balance.save(update_fields=["qty_on_hand"])
+
+    return issued
+
+
+def recalc_work_order_cost(work_order):
+    parts = (
+        work_order.issues
+        .aggregate(
+            total=Sum(F("qty") * F("unit_cost"))
+        )["total"] or 0
+    )
+
+    labor = (
+        work_order.labor_entries
+        .aggregate(
+            total=Sum(F("hours") * F("hourly_rate"))
+        )["total"] or 0
+    )
+
+    work_order.parts_cost = parts
+    work_order.labor_cost = labor
+    work_order.total_cost = parts + labor
+    work_order.save(update_fields=[
+        "parts_cost",
+        "labor_cost",
+        "total_cost",
+    ])
+
+
+@transaction.atomic
+def add_labor_entry(*, work_order_id, actor_user, hours, hourly_rate, description=""):
+    wo = WorkOrder.objects.select_for_update().get(id=work_order_id)
+
+    if wo.status != WorkOrder.Status.IN_PROGRESS:
+        raise ValidationError(
+            "Cannot add labor unless work order is IN_PROGRESS")
+
+    return WorkOrderLaborEntry.objects.create(
+        work_order=wo,
+        mechanic=actor_user,
+        hours=hours,
+        hourly_rate=hourly_rate,
+        description=description,
+    )
+
+
+def start_work_order(*, work_order: WorkOrder, actor_user):
+    if work_order.status != WorkOrder.Status.DRAFT:
+        raise ValueError("Only DRAFT work orders can be started")
+
+    # Optional permission check
+    if work_order.mechanic_id and work_order.mechanic_id != actor_user.id:
+        raise PermissionDenied(
+            "Only assigned mechanic can start this work order")
+
+    work_order.status = WorkOrder.Status.IN_PROGRESS
+    work_order.started_at = timezone.now()
+    work_order.save(update_fields=["status", "started_at"])
+
+    return work_order

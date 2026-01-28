@@ -1,8 +1,10 @@
 from decimal import Decimal
 from django.db import transaction
 from django.utils import timezone
-from django.db.models import Sum, F, Q
+from django.db.models import Sum, F, Q, Value
+from django.db.models.functions import Coalesce
 from django.utils.dateparse import parse_date
+from django.shortcuts import get_object_or_404
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import generics, status
 from rest_framework.views import APIView
@@ -12,10 +14,11 @@ from rest_framework.filters import SearchFilter, OrderingFilter
 
 from abb.utils import get_user_company
 
-from .models import IssueDocument, Location, Part, PartRequest, StockBalance, StockLot, StockMovement, UnitOfMeasure, Warehouse
+from .models import IssueDocument, Location, Part, PartRequest, StockBalance, StockLot, StockMovement, UnitOfMeasure, Warehouse, WorkOrder, WorkOrderIssue
 from .serializers import (
     IssueDocumentDetailSerializer,
     IssueDocumentListSerializer,
+    LocationByPartSerializer,
     LocationSerializer,
     PartRequestCreateSerializer,
     PartRequestListSerializer,
@@ -29,8 +32,12 @@ from .serializers import (
     StockReceiveSerializer,
     UnitOfMeasureSerializer,
     WarehouseSerializer,
+    WorkOrderCreateSerializer,
+    WorkOrderDetailSerializer,
+    WorkOrderIssueSerializer,
+    WorkOrderListSerializer,
 )
-from .services import confirm_issue_document, receive_stock, reserve_request, issue_request, InventoryError, transfer_stock
+from .services import confirm_issue_document, issue_from_work_order, receive_stock, reserve_request, issue_request, InventoryError, start_work_order, transfer_stock
 
 
 class UnitOfMeasureListView(ListAPIView):
@@ -199,7 +206,7 @@ class StockReceiveView(APIView):
                 part=data["part"],
                 supplier_name=data.get("supplier_name", ""),
                 unit_cost=data.get("unit_cost", 0),
-                currency=data.get("currency", "EUR"),
+                currency=data.get("currency"),
                 received_at=data.get("received_at") or timezone.now(),
             )
 
@@ -371,3 +378,233 @@ class IssueDocumentConfirmView(APIView):
             {"status": doc.status},
             status=status.HTTP_200_OK,
         )
+
+
+class WorkOrderListView(generics.ListCreateAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        company = get_user_company(self.request.user)
+        return WorkOrder.objects.filter(company=company)
+
+    def get_serializer_class(self):
+        return WorkOrderListSerializer
+
+    def perform_create(self, serializer):
+        serializer.save(
+            company=get_user_company(self.request.user),
+            created_by=self.request.user,
+        )
+
+
+class WorkOrderIssueView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @transaction.atomic
+    def post(self, request, pk):
+        work_order = get_object_or_404(WorkOrder.objects.select_for_update(),
+                                       id=pk,
+                                       )
+        part = get_object_or_404(Part.objects.select_for_update(),
+                                 id=request.data["part"],
+                                 )
+        location = get_object_or_404(Location.objects.select_for_update(),
+                                     id=request.data["location"],
+                                     )
+        issue_from_work_order(
+            work_order=work_order,
+            part=part,
+            location=location,
+            qty=Decimal(request.data["qty"]),
+            issued_by=request.user,
+        )
+        return Response({"status": "ok"})
+
+
+class WorkOrderIssueListView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = WorkOrderIssueSerializer
+
+    def get_queryset(self):
+        company = get_user_company(self.request.user)
+        return WorkOrderIssue.objects.filter(
+            company=company,
+            work_order_id=self.kwargs["pk"],
+        )
+
+
+class WorkOrderCreateView(generics.CreateAPIView):
+    serializer_class = WorkOrderCreateSerializer
+    queryset = WorkOrder.objects.all()
+
+    def perform_create(self, serializer):
+        user_company = get_user_company(self.request.user)
+        serializer.save(
+            company=user_company,
+            created_by=self.request.user,
+            status=WorkOrder.Status.DRAFT,
+        )
+
+
+class WorkOrderDetailView(generics.RetrieveUpdateAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = WorkOrderDetailSerializer
+
+    def get_queryset(self):
+        company = get_user_company(self.request.user)
+        return WorkOrder.objects.filter(company=company)
+
+
+class LocationsByPartView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        part_id = request.query_params.get("part")
+
+        if not part_id:
+            return Response(
+                {"detail": "part query parameter is required"},
+                status=400,
+            )
+
+        company = get_user_company(request.user)
+
+        balances = (
+            StockBalance.objects
+            .filter(
+                company=company,
+                part_id=part_id,
+                qty_on_hand__gt=0,
+            )
+            .select_related("location", "lot")
+            .annotate(
+                qty_available=F("qty_on_hand") - F("qty_reserved"),
+                location_name=F("location__name"),
+                lot_code=Coalesce(F("lot__code"), Value(None)),
+            )
+            .filter(qty_available__gt=0)
+            .values(
+                "id",
+                "location_id",
+                "location_name",
+                "lot_id",
+                "lot_code",
+                "qty_on_hand",
+                "qty_reserved",
+                "qty_available",
+            )
+        )
+
+        data = [
+            {
+                "balance_id": b["id"],
+                "location_id": b["location_id"],
+                "location_name": b["location_name"],
+                "lot_id": b["lot_id"],
+                "lot_code": b["lot_code"],
+                "qty_on_hand": b["qty_on_hand"],
+                "qty_reserved": b["qty_reserved"],
+                "qty_available": b["qty_available"],
+            }
+            for b in balances
+        ]
+
+        return Response(data)
+
+
+class WorkOrderStartView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @transaction.atomic
+    def post(self, request, pk):
+        work_order = get_object_or_404(
+            WorkOrder.objects.select_for_update(),
+            pk=pk,
+            company=get_user_company(request.user),
+        )
+
+        try:
+            start_work_order(
+                work_order=work_order,
+                actor_user=request.user,
+            )
+        except ValueError as e:
+            return Response(
+                {"detail": str(e)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        serializer = WorkOrderDetailSerializer(work_order)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class WorkOrderCompleteView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @transaction.atomic
+    def post(self, request, pk):
+        work_order = get_object_or_404(
+            WorkOrder.objects.select_for_update(),
+            pk=pk,
+        )
+
+        # ✅ Status check
+        if work_order.status != WorkOrder.Status.IN_PROGRESS:
+            return Response(
+                {"detail": "Only IN_PROGRESS work orders can be completed."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # ✅ Permission check
+        if work_order.mechanic_id != request.user.id:
+            return Response(
+                {"detail": "Only assigned mechanic can complete this work order."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        # ✅ Transition
+        work_order.status = WorkOrder.Status.COMPLETED
+        work_order.completed_at = timezone.now()
+        work_order.save(update_fields=["status", "completed_at"])
+
+        return Response(
+            WorkOrderDetailSerializer(work_order).data,
+            status=status.HTTP_200_OK,
+        )
+
+
+class LocationsByPartView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, part_id):
+        company = get_user_company(request.user)
+
+        if not Part.objects.filter(id=part_id, company=company).exists():
+            return Response(
+                {"detail": "Part not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        balances = (
+            StockBalance.objects
+            .filter(
+                company=company,
+                part_id=part_id,
+                qty_on_hand__gt=0,
+            )
+            .select_related("location")
+        )
+
+        data = [
+            {
+                "location_id": b.location.id,
+                "location_name": b.location.name,
+                "qty_on_hand": b.qty_on_hand,
+                "qty_available": b.qty_available,  # ✅ property
+            }
+            for b in balances
+            if b.qty_available > 0
+        ]
+
+        serializer = LocationByPartSerializer(data, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)

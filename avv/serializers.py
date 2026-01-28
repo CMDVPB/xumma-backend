@@ -1,3 +1,4 @@
+from .models import WorkOrderLaborEntry
 from decimal import Decimal
 from django.contrib.auth import get_user_model
 from django.db.models import Sum
@@ -8,7 +9,7 @@ from att.models import Vehicle
 from .models import (
     Part, Location, StockBalance,
     PartRequest, PartRequestLine,
-    IssueDocument, IssueLine, StockMovement, Warehouse, UnitOfMeasure
+    IssueDocument, IssueLine, StockMovement, Warehouse, UnitOfMeasure, WorkOrder, WorkOrderIssue
 )
 
 User = get_user_model()
@@ -555,3 +556,155 @@ class IssueDocumentDetailSerializer(serializers.ModelSerializer):
             "confirmed_by_name",
             "uf",
         ]
+
+
+class WorkOrderCreateSerializer(serializers.ModelSerializer):
+    mechanic = serializers.SlugRelatedField(
+        allow_null=True, slug_field='uf', queryset=User.objects.all(), write_only=True)
+    driver = serializers.SlugRelatedField(
+        allow_null=True, slug_field='uf', queryset=User.objects.all(), write_only=True)
+    vehicle = serializers.SlugRelatedField(
+        allow_null=True, slug_field='uf', queryset=Vehicle.objects.all(), write_only=True)
+
+    class Meta:
+        model = WorkOrder
+        fields = [
+            "vehicle",
+            "mechanic",
+            "driver",
+            "scheduled_at",
+            "problem_description",
+        ]
+
+
+class WorkOrderListSerializer(serializers.ModelSerializer):
+    mechanic_name = serializers.CharField(
+        source="mechanic.get_full_name", read_only=True
+    )
+    vehicle_reg_number = serializers.CharField(
+        source="vehicle.reg_number", read_only=True
+    )
+
+    class Meta:
+        model = WorkOrder
+        fields = [
+            "id",
+            "status",
+            "vehicle_reg_number",
+            "mechanic_name",
+            "created_at",
+            "uf",
+        ]
+
+
+class WorkOrderLaborEntrySerializer(serializers.ModelSerializer):
+    mechanic_name = serializers.CharField(
+        source="mechanic.get_full_name",
+        read_only=True,
+    )
+
+    cost = serializers.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        read_only=True,
+    )
+
+    class Meta:
+        model = WorkOrderLaborEntry
+        fields = [
+            "id",
+            "mechanic",
+            "mechanic_name",
+            "description",
+            "hours",
+            "hourly_rate",
+            "cost",
+            "created_at",
+            "uf",
+        ]
+        read_only_fields = [
+            "id",
+            "mechanic",
+            "mechanic_name",
+            "cost",
+            "created_at",
+            "uf",
+        ]
+
+
+class WorkOrderDetailSerializer(serializers.ModelSerializer):
+    mechanic_name = serializers.CharField(
+        source="mechanic.get_full_name", read_only=True
+    )
+    vehicle_reg_number = serializers.CharField(
+        source="vehicle.reg_number", read_only=True
+    )
+    labor_cost = serializers.DecimalField(
+        max_digits=12, decimal_places=2, read_only=True
+    )
+    parts_cost = serializers.DecimalField(
+        max_digits=12, decimal_places=2, read_only=True
+    )
+    total_cost = serializers.DecimalField(
+        max_digits=12, decimal_places=2, read_only=True
+    )
+
+    labor_entries = WorkOrderLaborEntrySerializer(many=True, read_only=True)
+
+    class Meta:
+        model = WorkOrder
+        fields = [
+            "id",
+            "status",
+            "vehicle",
+            "vehicle_reg_number",
+            "mechanic",
+            "mechanic_name",
+            "problem_description",
+            "created_at",
+            "parts_cost",
+            "labor_cost",
+            "total_cost",
+            "uf",
+
+            "labor_entries",
+        ]
+
+
+class WorkOrderIssueSerializer(serializers.ModelSerializer):
+    part_name = serializers.CharField(source="part.name", read_only=True)
+    location_name = serializers.CharField(
+        source="location.name", read_only=True)
+
+    class Meta:
+        model = WorkOrderIssue
+        fields = [
+            "id",
+            "part_name",
+            "location_name",
+            "qty",
+            "created_at",
+            "uf",
+        ]
+
+
+class LocationByPartSerializer(serializers.Serializer):
+    balance_id = serializers.IntegerField()
+    location_id = serializers.IntegerField()
+    location_name = serializers.CharField()
+    lot_id = serializers.IntegerField(allow_null=True)
+    lot_code = serializers.CharField(allow_null=True)
+    qty_on_hand = serializers.DecimalField(max_digits=12, decimal_places=3)
+    qty_reserved = serializers.DecimalField(max_digits=12, decimal_places=3)
+    qty_available = serializers.DecimalField(max_digits=12, decimal_places=3)
+
+
+class WorkOrderStartSerializer(serializers.Serializer):
+    pass
+
+
+class LocationByPartSerializer(serializers.Serializer):
+    location_id = serializers.IntegerField()
+    location_name = serializers.CharField()
+    qty_on_hand = serializers.DecimalField(max_digits=12, decimal_places=3)
+    qty_available = serializers.DecimalField(max_digits=12, decimal_places=3)

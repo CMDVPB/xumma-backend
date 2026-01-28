@@ -22,7 +22,7 @@ class LoadMixin:
         # ✅ 1. Subscribe model observer
         await self.load_change.subscribe(group_name=group_name)
 
-        # ✅ 2. ADD SOCKET TO CHANNELS GROUP (THIS WAS MISSING)
+        # ✅ 2. ADD SOCKET TO CHANNELS GROUP
         await self.channel_layer.group_add(
             group_name,
             self.channel_name
@@ -41,7 +41,7 @@ class LoadMixin:
     @load_change.serializer
     def load_serializer(self, instance, action, **kwargs):
         from dff.serializers.serializers_load import LoadListSerializer
-        print('5884')
+        # print('5884')
         return {
             "action": action.value,
             "data": LoadListSerializer(instance).data,
@@ -53,5 +53,5 @@ class LoadMixin:
         """
         Handles group_send(type="forward_load")
         """
-        print('5892')
+        # print('5892')
         await self.send_json(event["payload"])
