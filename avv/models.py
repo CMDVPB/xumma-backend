@@ -7,11 +7,13 @@ from django.db import models
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 from django.db.models import Sum, F, DecimalField, ExpressionWrapper
+from django.db.models.functions import Coalesce
+from django.core.exceptions import ValidationError
 
 from abb.models import Currency
 from abb.utils import hex_uuid
 from app.models import Company
-from att.models import Vehicle
+from att.models import Contact, Vehicle
 
 User = get_user_model()
 
@@ -300,10 +302,27 @@ class StockMovement(TimeStampedModel):
 
 
 class WorkOrder(TimeStampedModel):
+
+    class ServiceType(models.TextChoices):
+        INTERNAL = "INTERNAL", "Internal service"
+        THIRD_PARTY = "THIRD_PARTY", "Third-party workshop"
+
     class Status(models.TextChoices):
-        DRAFT = "DRAFT", "Draft"
-        IN_PROGRESS = "IN_PROGRESS", "In progress"
-        COMPLETED = "COMPLETED", "Completed"
+        DRAFT = "DRAFT"
+        IN_PROGRESS = "IN_PROGRESS"
+        ON_HOLD = "ON_HOLD"
+        COMPLETED = "COMPLETED"
+        CANCELLED = "CANCELLED"
+
+    service_type = models.CharField(
+        max_length=20,
+        choices=ServiceType.choices,
+        default=ServiceType.INTERNAL,
+    )
+
+    third_party = models.ForeignKey(
+        Contact, on_delete=models.PROTECT, null=True, blank=True, related_name="third_party_work_orders"
+    )
 
     vehicle = models.ForeignKey(
         Vehicle, on_delete=models.PROTECT, related_name="vehicle_work_orders")
@@ -325,29 +344,27 @@ class WorkOrder(TimeStampedModel):
     started_at = models.DateTimeField(null=True, blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)
 
-    parts_cost = models.DecimalField(
-        max_digits=12,
-        decimal_places=2,
-        default=0,
-    )
-    labor_cost = models.DecimalField(
-        max_digits=12,
-        decimal_places=2,
-        default=0,
-    )
-    total_cost = models.DecimalField(
-        max_digits=12,
-        decimal_places=2,
-        default=0,
-    )
-
     class Meta:
         ordering = ["-created_at"]
 
     @property
+    def work_cost(self):
+        return (
+            self.work_lines.annotate(
+                line_cost=ExpressionWrapper(
+                    F("qty") * Coalesce(F("unit_price"), 0),
+                    output_field=DecimalField(max_digits=12, decimal_places=2),
+                )
+            )
+            .aggregate(total=Sum("line_cost"))
+            .get("total")
+            or 0
+        )
+
+    @property
     def labor_cost(self):
         return (
-            self.labor_entries.annotate(
+            self.work_order_labor_entries.annotate(
                 line_cost=ExpressionWrapper(
                     F("hours") * F("hourly_rate"),
                     output_field=DecimalField(max_digits=12, decimal_places=2),
@@ -361,14 +378,20 @@ class WorkOrder(TimeStampedModel):
     @property
     def parts_cost(self):
         return (
-            self.issued_parts.aggregate(total=Sum("qty" * "unit_cost"))
-            .get("total")
+            self.work_order_issues
+            .filter(unit_cost__gt=0)  # ✅ ignore missing/zero costs
+            .aggregate(
+                total=Sum(
+                    F("qty") * F("unit_cost"),
+                    output_field=DecimalField(max_digits=12, decimal_places=2),
+                )
+            )["total"]
             or 0
         )
 
     @property
     def total_cost(self):
-        return self.labor_cost + self.parts_cost
+        return self.work_cost + self.labor_cost + self.parts_cost
 
 
 class WorkOrderIssue(TimeStampedModel):
@@ -463,3 +486,83 @@ class WorkOrderLaborEntry(TimeStampedModel):
     @property
     def cost(self):
         return self.hours * self.hourly_rate
+
+
+class WorkType(TimeStampedModel):
+    code = models.CharField(max_length=32, unique=True)
+    name = models.CharField(max_length=255)
+
+    default_unit = models.ForeignKey(
+        UnitOfMeasure,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True, related_name="default_unit_work_types",
+    )
+
+    def __str__(self):
+        return self.name
+
+
+class WorkOrderWorkLine(TimeStampedModel):
+    work_order = models.ForeignKey(
+        WorkOrder,
+        on_delete=models.CASCADE,
+        related_name="work_lines",
+    )
+
+    work_type = models.ForeignKey(
+        WorkType,
+        on_delete=models.PROTECT,
+        related_name="work_type_lines",
+    )
+
+    unit = models.ForeignKey(
+        UnitOfMeasure,
+        on_delete=models.PROTECT,
+        related_name="work_line_units",
+    )
+
+    qty = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=1,
+    )
+
+    # only used for THIRD_PARTY
+    unit_price = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
+
+    currency = models.ForeignKey(
+        Currency,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True, related_name="currency_work_types",
+    )
+
+    note = models.CharField(max_length=255, blank=True)
+
+    def clean(self):
+        wo = self.work_order
+
+        if wo.service_type == WorkOrder.ServiceType.INTERNAL:
+            if self.unit_price is not None:
+                raise ValidationError("Internal work cannot have a price.")
+
+        if wo.service_type == WorkOrder.ServiceType.THIRD_PARTY:
+            if self.unit_price is None:
+                raise ValidationError(
+                    "Third-party work requires a unit price.")
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    @property
+    def cost(self):
+        if self.unit_price:
+            return self.qty * self.unit_price
+        return None

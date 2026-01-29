@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from avv.models import IssueDocument, Location, Part, PartRequest, UnitOfMeasure, Warehouse, WorkOrder
+from avv.models import IssueDocument, Location, Part, PartRequest, StockLot, UnitOfMeasure, Warehouse, WorkOrder, WorkOrderIssue, WorkOrderWorkLine, WorkType
 
 
 @admin.register(Part)
@@ -60,4 +60,42 @@ class WorkOrderAdmin(admin.ModelAdmin):
 
     search_fields = ("company__company_name",
                      'status', 'uf'
+                     )
+
+
+@admin.register(WorkType)
+class WorkTypeAdmin(admin.ModelAdmin):
+    list_display = ('id', 'company', 'code', 'name',
+                    )
+
+    search_fields = ("company__company_name", 'uf',
+                     )
+
+
+@admin.register(WorkOrderWorkLine)
+class WorkOrderWorkLineAdmin(admin.ModelAdmin):
+    list_display = ('id', 'company', 'work_order', 'work_type', 'unit', 'qty',
+                    )
+
+    search_fields = ("company__company_name", 'uf',
+                     )
+
+
+@admin.register(StockLot)
+class StockLotAdmin(admin.ModelAdmin):
+    list_display = ('id', 'company', 'part', 'unit_cost', 'currency', 'uf',
+                    )
+
+    search_fields = ("company__company_name",
+                     'uf'
+                     )
+
+
+@admin.register(WorkOrderIssue)
+class WorkOrderIssueAdmin(admin.ModelAdmin):
+    list_display = ('id', 'company', 'work_order', 'part', 'lot', 'unit_cost', 'currency', 'qty', 'uf',
+                    )
+
+    search_fields = ("company__company_name",
+                     'uf'
                      )

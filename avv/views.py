@@ -9,12 +9,13 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework import generics, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.generics import ListAPIView, ListCreateAPIView, RetrieveAPIView
+from rest_framework.generics import CreateAPIView, ListAPIView, ListCreateAPIView, RetrieveAPIView
 from rest_framework.filters import SearchFilter, OrderingFilter
 
+from abb.models import Currency
 from abb.utils import get_user_company
 
-from .models import IssueDocument, Location, Part, PartRequest, StockBalance, StockLot, StockMovement, UnitOfMeasure, Warehouse, WorkOrder, WorkOrderIssue
+from .models import IssueDocument, Location, Part, PartRequest, StockBalance, StockLot, StockMovement, UnitOfMeasure, Warehouse, WorkOrder, WorkOrderIssue, WorkType
 from .serializers import (
     IssueDocumentDetailSerializer,
     IssueDocumentListSerializer,
@@ -36,6 +37,9 @@ from .serializers import (
     WorkOrderDetailSerializer,
     WorkOrderIssueSerializer,
     WorkOrderListSerializer,
+    WorkOrderWorkLineCreateSerializer,
+    WorkTypeCreateSerializer,
+    WorkTypeSerializer,
 )
 from .services import confirm_issue_document, issue_from_work_order, receive_stock, reserve_request, issue_request, InventoryError, start_work_order, transfer_stock
 
@@ -198,6 +202,12 @@ class StockReceiveView(APIView):
         data = serializer.validated_data
         company = get_user_company(request.user)
 
+        currency_code = data.get("currency", "MDL")
+
+        currency = Currency.objects.filter(
+            currency_code=currency_code
+        ).first()
+
         with transaction.atomic():
             # 1️⃣ Create LOT
             lot = StockLot.objects.create(
@@ -206,7 +216,7 @@ class StockReceiveView(APIView):
                 part=data["part"],
                 supplier_name=data.get("supplier_name", ""),
                 unit_cost=data.get("unit_cost", 0),
-                currency=data.get("currency"),
+                currency=currency,
                 received_at=data.get("received_at") or timezone.now(),
             )
 
@@ -235,7 +245,7 @@ class StockReceiveView(APIView):
                 to_location=data["location"],
                 qty=data["qty"],
                 unit_cost_snapshot=data.get("unit_cost", 0),
-                currency=data.get("currency", "EUR"),
+                currency=currency,
                 ref_type="RECEIPT",
                 ref_id=str(lot.id),
             )
@@ -608,3 +618,50 @@ class LocationsByPartView(APIView):
 
         serializer = LocationByPartSerializer(data, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class WorkTypeCreateView(CreateAPIView):
+    serializer_class = WorkTypeCreateSerializer
+    permission_classes = [IsAuthenticated]
+
+    def perform_create(self, serializer):
+        company = get_user_company(self.request.user)
+        serializer.save(company=company)
+
+
+class WorkTypeListView(ListAPIView):
+    serializer_class = WorkTypeSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        company = get_user_company(self.request.user)
+        return WorkType.objects.filter(company=company)
+
+
+class WorkOrderWorkLineCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @transaction.atomic
+    def post(self, request, pk):
+        wo = get_object_or_404(
+            WorkOrder.objects.select_for_update(),
+            pk=pk,
+            company=get_user_company(request.user),
+        )
+
+        # if not can_add_work_line(request.user, wo):
+        #     raise PermissionDenied()
+
+        serializer = WorkOrderWorkLineCreateSerializer(
+            data=request.data,
+            context={"work_order": wo},
+        )
+        serializer.is_valid(raise_exception=True)
+
+        serializer.save(
+            work_order=wo,
+            company=wo.company,
+            created_by=request.user,
+        )
+
+        return Response(serializer.data, status=201)

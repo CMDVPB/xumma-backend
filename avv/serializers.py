@@ -1,11 +1,11 @@
-from .models import WorkOrderLaborEntry
+from .models import WorkOrderLaborEntry, WorkOrderWorkLine, WorkType
 from decimal import Decimal
 from django.contrib.auth import get_user_model
 from django.db.models import Sum
 from rest_framework import serializers
 
 from abb.utils import get_user_company
-from att.models import Vehicle
+from att.models import Contact, Vehicle
 from .models import (
     Part, Location, StockBalance,
     PartRequest, PartRequestLine,
@@ -565,15 +565,19 @@ class WorkOrderCreateSerializer(serializers.ModelSerializer):
         allow_null=True, slug_field='uf', queryset=User.objects.all(), write_only=True)
     vehicle = serializers.SlugRelatedField(
         allow_null=True, slug_field='uf', queryset=Vehicle.objects.all(), write_only=True)
+    third_party = serializers.SlugRelatedField(
+        allow_null=True, slug_field='uf', queryset=Contact.objects.all(), write_only=True)
 
     class Meta:
         model = WorkOrder
         fields = [
             "vehicle",
+            "third_party",
             "mechanic",
             "driver",
             "scheduled_at",
             "problem_description",
+            "service_type",
         ]
 
 
@@ -584,14 +588,19 @@ class WorkOrderListSerializer(serializers.ModelSerializer):
     vehicle_reg_number = serializers.CharField(
         source="vehicle.reg_number", read_only=True
     )
+    third_party_name = serializers.CharField(
+        source="third_party.company_name", read_only=True
+    )
 
     class Meta:
         model = WorkOrder
         fields = [
             "id",
+            "service_type",
             "status",
             "vehicle_reg_number",
             "mechanic_name",
+            "third_party_name",
             "created_at",
             "uf",
         ]
@@ -632,12 +641,47 @@ class WorkOrderLaborEntrySerializer(serializers.ModelSerializer):
         ]
 
 
+class WorkOrderWorkLineSerializer(serializers.ModelSerializer):
+    work_type_name = serializers.CharField(
+        source="work_type.name",
+        read_only=True,
+    )
+    unit_name = serializers.CharField(
+        source="unit.name",
+        read_only=True,
+    )
+
+    class Meta:
+        model = WorkOrderWorkLine
+        fields = [
+            "id",
+            "work_type",
+            "work_type_name",
+            "unit",
+            "unit_name",
+            "qty",
+            "unit_price",
+            "currency",
+            "note",
+            "uf",
+        ]
+
+
 class WorkOrderDetailSerializer(serializers.ModelSerializer):
     mechanic_name = serializers.CharField(
         source="mechanic.get_full_name", read_only=True
     )
+    mechanic_uf = serializers.CharField(
+        source="mechanic.uf", read_only=True
+    )
     vehicle_reg_number = serializers.CharField(
         source="vehicle.reg_number", read_only=True
+    )
+    third_party_name = serializers.CharField(
+        source="third_party.company_name", read_only=True
+    )
+    work_cost = serializers.DecimalField(
+        max_digits=12, decimal_places=2, read_only=True
     )
     labor_cost = serializers.DecimalField(
         max_digits=12, decimal_places=2, read_only=True
@@ -649,25 +693,29 @@ class WorkOrderDetailSerializer(serializers.ModelSerializer):
         max_digits=12, decimal_places=2, read_only=True
     )
 
-    labor_entries = WorkOrderLaborEntrySerializer(many=True, read_only=True)
+    work_lines = WorkOrderWorkLineSerializer(many=True, read_only=True)
+    # labor_entries = WorkOrderLaborEntrySerializer(many=True, read_only=True)
 
     class Meta:
         model = WorkOrder
         fields = [
             "id",
+            "service_type",
             "status",
             "vehicle",
             "vehicle_reg_number",
-            "mechanic",
             "mechanic_name",
+            "mechanic_uf",
+            "third_party_name",
             "problem_description",
             "created_at",
+            "work_cost",
             "parts_cost",
             "labor_cost",
             "total_cost",
             "uf",
 
-            "labor_entries",
+            "work_lines"
         ]
 
 
@@ -708,3 +756,98 @@ class LocationByPartSerializer(serializers.Serializer):
     location_name = serializers.CharField()
     qty_on_hand = serializers.DecimalField(max_digits=12, decimal_places=3)
     qty_available = serializers.DecimalField(max_digits=12, decimal_places=3)
+
+
+class WorkTypeCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WorkType
+        fields = ["id", "code", "name", "default_unit"]
+
+    def validate_code(self, value):
+        if WorkType.objects.filter(code=value).exists():
+            raise serializers.ValidationError("Work type code already exists")
+        return value
+
+
+class WorkTypeSerializer(serializers.ModelSerializer):
+    default_unit = UnitOfMeasureSerializer(read_only=True)
+    default_unit_code = serializers.CharField(
+        source="default_unit.code",
+        read_only=True,
+    )
+
+    class Meta:
+        model = WorkType
+        fields = [
+            "id",
+            "code",
+            "name",
+            "default_unit",
+            "default_unit_code",
+            "uf",
+        ]
+
+
+class WorkOrderWorkLineCreateSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = WorkOrderWorkLine
+        fields = [
+            "work_type",
+            "unit",
+            "qty",
+            "unit_price",
+            "currency",
+            "note",
+
+        ]
+
+    def validate(self, data):
+        wo = self.context["work_order"]
+
+        if wo.service_type == WorkOrder.ServiceType.INTERNAL:
+            data["unit_price"] = None
+            data["currency"] = None
+
+        return data
+
+
+class WorkOrderWorkLineSerializer(serializers.ModelSerializer):
+    cost = serializers.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        read_only=True,
+    )
+    unit_name = serializers.CharField(
+        source="unit.name",
+        read_only=True,
+    )
+
+    class Meta:
+        model = WorkOrderWorkLine
+        fields = [
+            "id",
+            "work_type",
+            "unit",
+            "qty",
+            "unit_price",
+            "cost",
+            "note",
+            "created_at",
+            'unit_name',
+            "uf",
+        ]
+
+    def validate(self, data):
+        work_order = self.context["work_order"]
+
+        if work_order.service_type == WorkOrder.ServiceType.INTERNAL:
+            data["unit_price"] = None
+
+        if work_order.service_type == WorkOrder.ServiceType.THIRD_PARTY:
+            if data.get("unit_price") is None:
+                raise serializers.ValidationError({
+                    "unit_price": "Unit price is required for third-party work"
+                })
+
+        return data

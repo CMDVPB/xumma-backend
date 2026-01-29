@@ -8,6 +8,7 @@ from django.db import transaction
 from django.db.models import F, Q, Sum
 from django.utils import timezone
 from django.core.exceptions import ValidationError
+from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.exceptions import PermissionDenied
 
 from abb.utils import get_user_company
@@ -402,44 +403,73 @@ def issue_from_work_order(
     qty: Decimal,
     issued_by,
 ):
-    # Lock the exact balance row (part + location + lot)
-    balance = (
+    if qty <= 0:
+        raise ValidationError("Quantity must be greater than zero")
+
+    remaining = Decimal(qty)
+    issued_records = []
+
+    #  Lock balances FIFO
+    balances = (
         StockBalance.objects
         .select_for_update()
         .select_related("lot")
-        .get(
+        .filter(
             part=part,
             location=location,
+            qty_on_hand__gt=F("qty_reserved"),
         )
+        .order_by("lot__received_at", "id")
     )
 
-    if balance.qty_available < qty:
-        raise ValidationError("Not enough stock available")
+    if not balances.exists():
+        raise DRFValidationError("No stock available for this part/location")
 
-    lot = balance.lot
-    currency = lot.currency
+    #  Check total availability first
+    total_available = sum(b.qty_available for b in balances)
 
-    # if not currency:
-    #     raise ValidationError("Stock lot has no currency defined")
+    if total_available < qty:
+        raise DRFValidationError(
+            f"Not enough stock. Available {total_available}, requested {qty}"
+        )
 
-    # ✅ Issue record
-    issued = WorkOrderIssue.objects.create(
-        company=work_order.company,
-        work_order=work_order,
-        part=part,
-        location=location,
-        lot=lot,
-        qty=qty,
-        unit_cost=lot.unit_cost,
-        currency=currency,
-        created_by=issued_by,
-    )
+    #  FIFO issuing
+    for balance in balances:
+        if remaining <= 0:
+            break
 
-    # ✅ Update stock
-    balance.qty_on_hand = F("qty_on_hand") - qty
-    balance.save(update_fields=["qty_on_hand"])
+        available = balance.qty_available
 
-    return issued
+        if available <= 0:
+            continue
+
+        take = min(available, remaining)
+
+        lot = balance.lot
+
+        # ✅ Create issue record
+        issued = WorkOrderIssue.objects.create(
+            company=work_order.company,
+            work_order=work_order,
+            part=part,
+            location=location,
+            lot=lot,
+            qty=take,
+            unit_cost=lot.unit_cost,
+            currency=lot.currency,
+            created_by=issued_by,
+        )
+
+        issued_records.append(issued)
+
+        # ✅ Update balance atomically
+        StockBalance.objects.filter(id=balance.id).update(
+            qty_on_hand=F("qty_on_hand") - take
+        )
+
+        remaining -= take
+
+    return issued_records
 
 
 def recalc_work_order_cost(work_order):

@@ -8,6 +8,8 @@ from .views import *
 
 urlpatterns = [
     path("uoms/", UnitOfMeasureListView.as_view(), name="uom-list"),
+    path("work-types/", WorkTypeListView.as_view(), name="worktype-list"),
+    path("work-types/create/", WorkTypeCreateView.as_view()),
 
     path("warehouses/", WarehouseListView.as_view(), name="warehouse-list"),
 
@@ -39,6 +41,8 @@ urlpatterns = [
     path("work-orders/<int:pk>/issues/", WorkOrderIssueListView.as_view()),
     path("work-orders/<int:pk>/complete/",
          WorkOrderCompleteView.as_view(), name="workorder-complete"),
+    path("work-orders/<int:pk>/work-lines/",
+         WorkOrderWorkLineCreateView.as_view(), name="workorder-workline-create"),
 
     path("stock/", StockListView.as_view()),
     path("stock/balances/", StockBalanceListView.as_view()),
