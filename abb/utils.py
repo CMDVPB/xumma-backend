@@ -377,39 +377,6 @@ def how_many_seconds_until_midnight():
     return (midnight - datetime.now()).seconds
 
 
-###### Start Image, files uploads utils ######
-
-def image_upload_path(instance, filename):
-    """
-    Decide upload folder based on related object.
-    """
-
-    base_folder = 'uploads'
-
-    if instance.load_id:
-        subfolder = 'loads'
-        entity_uf = instance.load.uf
-    elif instance.vehicle_id:
-        subfolder = 'vehicles'
-        entity_uf = instance.vehicle.uf
-    elif instance.user_id:
-        subfolder = 'users'
-        entity_uf = instance.user.id
-    elif instance.company_id:
-        subfolder = 'companies'
-        entity_uf = instance.company.uf
-    else:
-        subfolder = 'misc'
-        entity_uf = 'unknown'
-
-    # preserve extension
-    name, ext = os.path.splitext(filename)
-
-    return f'{base_folder}/{subfolder}/{entity_uf}/{filename}'
-
-###### End Image, files uploads utils ######
-
-
 def generate_signed_url(path: str, expires_in: int = None):
     expires_in = expires_in or settings.SIGNED_URL_TTL_SECONDS
     expires = int(time.time()) + expires_in
@@ -540,3 +507,40 @@ def normalize_excel_datetime(value, tz=None):
         dt = make_aware(dt, timezone=tz)
 
     return dt.isoformat()
+
+###### Start Image, files uploads utils ######
+
+
+def image_upload_path(instance, filename):
+    """
+    Decide upload folder based on related object.
+    """
+    # preserve extension
+    name, ext = os.path.splitext(filename)
+    new_name = f"{uuid.uuid4()}{ext}"
+
+    base_folder = 'uploads'
+
+    if instance.load_id:
+        subfolder = 'loads'
+        entity_uf = instance.load.uf
+    elif instance.vehicle_id:
+        subfolder = 'vehicles'
+        entity_uf = instance.vehicle.uf
+    elif instance.user_id:
+        subfolder = 'users'
+        entity_uf = instance.user.id
+    elif instance.company_id:
+        subfolder = 'companies'
+        entity_uf = instance.company.uf
+    elif instance.report_id:
+        subfolder = 'driver_reports'
+        entity_uf = instance.report.uf
+        return f"{base_folder}/driver_reports/{instance.report.uf}/{new_name}"
+    else:
+        subfolder = 'misc'
+        entity_uf = 'unknown'
+
+    return f'{base_folder}/{subfolder}/{entity_uf}/{filename}'
+
+###### End Image, files uploads utils ######

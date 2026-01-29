@@ -14,7 +14,7 @@ from rest_framework.exceptions import PermissionDenied
 from abb.utils import get_user_company
 
 from .models import (
-    Location, Part, PartRequest, PartRequestLine, Reservation,
+    DriverReport, Location, Part, PartRequest, PartRequestLine, Reservation,
     StockBalance, StockLot, StockMovement, IssueDocument, IssueLine, WorkOrder, WorkOrderIssue, WorkOrderLaborEntry
 )
 
@@ -528,3 +528,46 @@ def start_work_order(*, work_order: WorkOrder, actor_user):
     work_order.save(update_fields=["status", "started_at"])
 
     return work_order
+
+
+@transaction.atomic
+def create_work_order_from_driver_report(*, report_id: int, actor_user):
+    company = get_user_company(actor_user)
+
+    report = (
+        DriverReport.objects
+        .select_for_update()
+        .select_related("vehicle", "driver")
+        .get(id=report_id, company=company)
+    )
+
+    if report.status in [DriverReport.Status.REJECTED, DriverReport.Status.CLOSED]:
+        raise ValidationError(
+            "Cannot create work order from REJECTED/CLOSED report.")
+
+    if report.related_work_order_id:
+        # idempotent
+        return report.related_work_order
+
+    # Work order creation (keep simple; manager can fill details later)
+    wo = WorkOrder.objects.create(
+        company=company,
+        created_by=actor_user,
+        vehicle=report.vehicle,
+        driver=report.driver,
+        mechanic=None,
+        third_party=None,
+        scheduled_at=None,
+        problem_description=f"{report.title}\n\n{report.description}",
+        service_type=WorkOrder.ServiceType.INTERNAL,
+        status=WorkOrder.Status.DRAFT,
+    )
+
+    report.related_work_order = wo
+    report.status = DriverReport.Status.IN_EXECUTION
+    report.reviewed_by = actor_user
+    report.reviewed_at = timezone.now()
+    report.save(update_fields=["related_work_order",
+                "status", "reviewed_by", "reviewed_at"])
+
+    return wo

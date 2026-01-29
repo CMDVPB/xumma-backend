@@ -50,5 +50,23 @@ urlpatterns = [
     path("stock/transfer/", StockTransferView.as_view(), name="stock-transfer"),
     path("stock/movements/", StockMovementListView.as_view(), name="stock-movements"),
 
+    # Driver
+    path("driver-reports/", DriverReportCreateView.as_view()),
+    path("driver-reports/my/", MyDriverReportListView.as_view()),
+    path("driver-reports/<int:pk>/send/", DriverReportSendView.as_view()),
+
+    # Manager
+    path("driver-reports/manage/", DriverReportManagerListView.as_view()),
+    path("driver-reports/manage/<int:pk>/",
+         DriverReportManagerDetailView.as_view()),
+    path("driver-reports/manage/<int:pk>/review/",
+         DriverReportMarkReviewedView.as_view()),
+    path("driver-reports/manage/<int:pk>/reject/",
+         DriverReportRejectView.as_view()),
+    path("driver-reports/manage/<int:pk>/close/",
+         DriverReportCloseView.as_view()),
+    path("driver-reports/manage/<int:pk>/create-work-order/",
+         DriverReportCreateWorkOrderView.as_view()),
+
 
 ]

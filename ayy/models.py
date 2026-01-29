@@ -11,7 +11,7 @@ from phonenumber_field.modelfields import PhoneNumberField
 
 from abb.constants import ACTION_CHOICES, UNIT_MEASUREMENT_CHOICES, VAT_CHOICES, VAT_EXEMPTION_REASON, VAT_TYPE_CHOICES
 from abb.models import Country, Currency
-from abb.utils import assign_new_num, hex_uuid, default_notification_status_3, image_upload_path, upload_to
+from abb.utils import assign_new_num, hex_uuid, default_notification_status_3, image_upload_path
 from app.models import CategoryGeneral, Company, TypeCost, TypeGeneral
 from axx.models import Ctr, Exp, Inv, Load, Tor, Trip
 from att.models import Contact, ContactSite, Person, Vehicle

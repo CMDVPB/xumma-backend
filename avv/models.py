@@ -11,7 +11,7 @@ from django.db.models.functions import Coalesce
 from django.core.exceptions import ValidationError
 
 from abb.models import Currency
-from abb.utils import hex_uuid
+from abb.utils import hex_uuid, image_upload_path
 from app.models import Company
 from att.models import Contact, Vehicle
 
@@ -566,3 +566,64 @@ class WorkOrderWorkLine(TimeStampedModel):
         if self.unit_price:
             return self.qty * self.unit_price
         return None
+
+
+class DriverReport(TimeStampedModel):
+    class Status(models.TextChoices):
+        DRAFT = "DRAFT"
+        SENT = "SENT"          # driver submitted
+        REVIEWED = "REVIEWED"  # manager looked at it
+        IN_EXECUTION = "IN_EXECUTION"  # work order created
+        REJECTED = "REJECTED"
+        CLOSED = "CLOSED"
+
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.DRAFT,
+    )
+
+    driver = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name="driver_reports",
+    )
+
+    vehicle = models.ForeignKey(
+        Vehicle,
+        on_delete=models.PROTECT,
+        related_name="vehicle_reports",
+    )
+
+    related_work_order = models.ForeignKey(
+        WorkOrder,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="source_reports",
+    )
+
+    title = models.CharField(max_length=255)
+    description = models.TextField()
+
+    odometer = models.PositiveIntegerField(null=True, blank=True)
+
+    reviewed_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="reviewed_reports",
+    )
+
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
+
+class DriverReportImage(TimeStampedModel):
+    report = models.ForeignKey(
+        DriverReport,
+        on_delete=models.CASCADE,
+        related_name="report_driver_report_images",
+    )
+
+    image = models.ImageField(upload_to=image_upload_path)

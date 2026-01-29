@@ -1,4 +1,3 @@
-from .models import WorkOrderLaborEntry, WorkOrderWorkLine, WorkType
 from decimal import Decimal
 from django.contrib.auth import get_user_model
 from django.db.models import Sum
@@ -9,8 +8,10 @@ from att.models import Contact, Vehicle
 from .models import (
     Part, Location, StockBalance,
     PartRequest, PartRequestLine,
-    IssueDocument, IssueLine, StockMovement, Warehouse, UnitOfMeasure, WorkOrder, WorkOrderIssue
+    IssueDocument, IssueLine, StockMovement, Warehouse, UnitOfMeasure, WorkOrder, WorkOrderIssue,
+    WorkOrderLaborEntry, WorkOrderWorkLine, WorkType
 )
+
 
 User = get_user_model()
 

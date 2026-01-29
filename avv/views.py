@@ -1,10 +1,11 @@
 from decimal import Decimal
 from django.db import transaction
 from django.utils import timezone
-from django.db.models import Sum, F, Q, Value
+from django.db.models import Sum, F, Q, Value, Count
 from django.db.models.functions import Coalesce
 from django.utils.dateparse import parse_date
 from django.shortcuts import get_object_or_404
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import generics, status
 from rest_framework.views import APIView
@@ -14,8 +15,9 @@ from rest_framework.filters import SearchFilter, OrderingFilter
 
 from abb.models import Currency
 from abb.utils import get_user_company
+from avv.serializers_driver_reports import DriverReportCreateSerializer, DriverReportDetailsSerializer, DriverReportListSerializer
 
-from .models import IssueDocument, Location, Part, PartRequest, StockBalance, StockLot, StockMovement, UnitOfMeasure, Warehouse, WorkOrder, WorkOrderIssue, WorkType
+from .models import DriverReport, IssueDocument, Location, Part, PartRequest, StockBalance, StockLot, StockMovement, UnitOfMeasure, Warehouse, WorkOrder, WorkOrderIssue, WorkType
 from .serializers import (
     IssueDocumentDetailSerializer,
     IssueDocumentListSerializer,
@@ -41,7 +43,7 @@ from .serializers import (
     WorkTypeCreateSerializer,
     WorkTypeSerializer,
 )
-from .services import confirm_issue_document, issue_from_work_order, receive_stock, reserve_request, issue_request, InventoryError, start_work_order, transfer_stock
+from .services import confirm_issue_document, create_work_order_from_driver_report, issue_from_work_order, receive_stock, reserve_request, issue_request, InventoryError, start_work_order, transfer_stock
 
 
 class UnitOfMeasureListView(ListAPIView):
@@ -665,3 +667,177 @@ class WorkOrderWorkLineCreateView(APIView):
         )
 
         return Response(serializer.data, status=201)
+
+
+class DriverReportCreateView(generics.CreateAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = DriverReportCreateSerializer
+
+
+class DriverReportSendView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, pk):
+        user = request.user
+        company = get_user_company(user)
+
+        report = get_object_or_404(
+            DriverReport,
+            pk=pk,
+            company=company,
+            driver=user,
+        )
+
+        if report.status != DriverReport.Status.DRAFT:
+            return Response(
+                {"detail": "Only DRAFT reports can be sent"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        report.status = DriverReport.Status.SENT
+        report.save(update_fields=["status"])
+
+        return Response(
+            {"status": report.status},
+            status=status.HTTP_200_OK,
+        )
+
+
+class MyDriverReportListView(generics.ListAPIView):
+    serializer_class = DriverReportListSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        company = get_user_company(user)
+
+        return (
+            DriverReport.objects
+            .filter(company=company, driver=user)
+            .select_related("vehicle")
+            .prefetch_related("report_driver_report_images")
+            .order_by("-created_at")
+        )
+
+
+class DriverReportManagerListView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = DriverReportListSerializer
+
+    def get_queryset(self):
+
+        company = get_user_company(self.request.user)
+        qs = (
+            DriverReport.objects
+            .filter(company=company)
+            .annotate(images_count=Count("report_driver_report_images"))
+            .select_related("vehicle", "driver", "related_work_order", "reviewed_by")
+            .order_by("-created_at")
+        )
+
+        p = self.request.query_params
+
+        # optional filters
+        if p.get("date_from"):
+            qs = qs.filter(created_at__date__gte=p["date_from"])
+        if p.get("date_to"):
+            qs = qs.filter(created_at__date__lte=p["date_to"])
+        if p.get("status"):
+            qs = qs.filter(status=p["status"])
+        if p.get("vehicle"):
+            qs = qs.filter(vehicle_id=p["vehicle"])
+        if p.get("driver"):
+            qs = qs.filter(driver_id=p["driver"])
+
+        return qs
+
+
+class DriverReportManagerDetailView(generics.RetrieveAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = DriverReportDetailsSerializer
+
+    def get_queryset(self):
+        company = get_user_company(self.request.user)
+        return DriverReport.objects.filter(company=company).select_related(
+            "vehicle", "driver", "related_work_order", "reviewed_by"
+        )
+
+
+class DriverReportMarkReviewedView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, pk):
+
+        company = get_user_company(request.user)
+
+        report = get_object_or_404(DriverReport, pk=pk, company=company)
+
+        if report.status not in [DriverReport.Status.SENT]:
+            return Response(
+                {"detail": "Only SENT reports can be marked as reviewed."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        report.status = DriverReport.Status.REVIEWED
+        report.reviewed_by = request.user
+        report.reviewed_at = timezone.now()
+        report.save(update_fields=["status", "reviewed_by", "reviewed_at"])
+
+        return Response({"status": report.status}, status=status.HTTP_200_OK)
+
+
+class DriverReportRejectView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, pk):
+        company = get_user_company(request.user)
+
+        report = get_object_or_404(DriverReport, pk=pk, company=company)
+
+        if report.status in [DriverReport.Status.CLOSED, DriverReport.Status.REJECTED]:
+            return Response({"detail": "Already closed."}, status=400)
+
+        report.status = DriverReport.Status.REJECTED
+        report.reviewed_by = request.user
+        report.reviewed_at = timezone.now()
+        report.save(update_fields=["status", "reviewed_by", "reviewed_at"])
+
+        return Response({"status": report.status}, status=status.HTTP_200_OK)
+
+
+class DriverReportCloseView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, pk):
+        company = get_user_company(request.user)
+
+        report = get_object_or_404(DriverReport, pk=pk, company=company)
+
+        if report.status == DriverReport.Status.REJECTED:
+            return Response({"detail": "Rejected reports cannot be closed."}, status=400)
+
+        report.status = DriverReport.Status.CLOSED
+        report.reviewed_by = request.user
+        report.reviewed_at = timezone.now()
+        report.save(update_fields=["status", "reviewed_by", "reviewed_at"])
+
+        return Response({"status": report.status}, status=status.HTTP_200_OK)
+
+
+class DriverReportCreateWorkOrderView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+
+        try:
+            wo = create_work_order_from_driver_report(
+                report_id=pk,
+                actor_user=request.user,
+            )
+        except DjangoValidationError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(
+            {"work_order_id": wo.id},
+            status=status.HTTP_201_CREATED,
+        )
