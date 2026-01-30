@@ -43,6 +43,10 @@ urlpatterns = [
          WorkOrderCompleteView.as_view(), name="workorder-complete"),
     path("work-orders/<int:pk>/work-lines/",
          WorkOrderWorkLineCreateView.as_view(), name="workorder-workline-create"),
+    path("work-order-files/<uuid:uf>/", WorkOrderFileProxyView.as_view()),
+    path("work-order-files/upload/", WorkOrderAttachmentUploadView.as_view()),
+    path("work-order-files/<int:pk>/delete/",
+         WorkOrderAttachmentDeleteView.as_view()),
 
     path("stock/", StockListView.as_view()),
     path("stock/balances/", StockBalanceListView.as_view()),
@@ -67,6 +71,8 @@ urlpatterns = [
          DriverReportCloseView.as_view()),
     path("driver-reports/manage/<int:pk>/create-work-order/",
          DriverReportCreateWorkOrderView.as_view()),
-
-
+    path("driver-report-images/",
+         DriverReportImageCreateView.as_view(),
+         name="driver-report-image-upload",
+         ),
 ]

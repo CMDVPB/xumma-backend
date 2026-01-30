@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from avv.models import IssueDocument, Location, Part, PartRequest, StockLot, UnitOfMeasure, Warehouse, WorkOrder, WorkOrderIssue, WorkOrderWorkLine, WorkType
+from avv.models import DriverReportImage, IssueDocument, Location, Part, PartRequest, StockLot, UnitOfMeasure, Warehouse, WorkOrder, WorkOrderAttachment, WorkOrderIssue, WorkOrderWorkLine, WorkType
 
 
 @admin.register(Part)
@@ -97,5 +97,25 @@ class WorkOrderIssueAdmin(admin.ModelAdmin):
                     )
 
     search_fields = ("company__company_name",
+                     'uf'
+                     )
+
+
+@admin.register(DriverReportImage)
+class DriverReportImageAdmin(admin.ModelAdmin):
+    list_display = ('id', 'report', 'image', 'uf',
+                    )
+
+    search_fields = ("company__company_name", "report",
+                     'uf'
+                     )
+
+
+@admin.register(WorkOrderAttachment)
+class WorkOrderAttachmentAdmin(admin.ModelAdmin):
+    list_display = ('id', 'work_order', 'file', 'uf',
+                    )
+
+    search_fields = ("company__company_name", "work_order__id",
                      'uf'
                      )

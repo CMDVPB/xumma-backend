@@ -1,3 +1,5 @@
+import os
+from django.shortcuts import get_object_or_404
 from decimal import Decimal
 from django.db import transaction
 from django.utils import timezone
@@ -6,18 +8,21 @@ from django.db.models.functions import Coalesce
 from django.utils.dateparse import parse_date
 from django.shortcuts import get_object_or_404
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.http import FileResponse, Http404
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import generics, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.generics import CreateAPIView, ListAPIView, ListCreateAPIView, RetrieveAPIView
+from rest_framework.generics import CreateAPIView, ListAPIView, ListCreateAPIView, RetrieveAPIView, GenericAPIView
 from rest_framework.filters import SearchFilter, OrderingFilter
+from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.exceptions import PermissionDenied
 
 from abb.models import Currency
 from abb.utils import get_user_company
-from avv.serializers_driver_reports import DriverReportCreateSerializer, DriverReportDetailsSerializer, DriverReportListSerializer
+from avv.serializers_driver_reports import DriverReportCreateSerializer, DriverReportDetailsSerializer, DriverReportImageSerializer, DriverReportListSerializer
 
-from .models import DriverReport, IssueDocument, Location, Part, PartRequest, StockBalance, StockLot, StockMovement, UnitOfMeasure, Warehouse, WorkOrder, WorkOrderIssue, WorkType
+from .models import DriverReport, DriverReportImage, IssueDocument, Location, Part, PartRequest, StockBalance, StockLot, StockMovement, UnitOfMeasure, Warehouse, WorkOrder, WorkOrderAttachment, WorkOrderIssue, WorkType
 from .serializers import (
     IssueDocumentDetailSerializer,
     IssueDocumentListSerializer,
@@ -35,10 +40,12 @@ from .serializers import (
     StockReceiveSerializer,
     UnitOfMeasureSerializer,
     WarehouseSerializer,
+    WorkOrderAttachmentSerializer,
     WorkOrderCreateSerializer,
     WorkOrderDetailSerializer,
     WorkOrderIssueSerializer,
     WorkOrderListSerializer,
+    WorkOrderPatchSerializer,
     WorkOrderWorkLineCreateSerializer,
     WorkTypeCreateSerializer,
     WorkTypeSerializer,
@@ -392,7 +399,7 @@ class IssueDocumentConfirmView(APIView):
         )
 
 
-class WorkOrderListView(generics.ListCreateAPIView):
+class WorkOrderListView(ListCreateAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
@@ -433,7 +440,7 @@ class WorkOrderIssueView(APIView):
         return Response({"status": "ok"})
 
 
-class WorkOrderIssueListView(generics.ListAPIView):
+class WorkOrderIssueListView(ListAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = WorkOrderIssueSerializer
 
@@ -445,7 +452,7 @@ class WorkOrderIssueListView(generics.ListAPIView):
         )
 
 
-class WorkOrderCreateView(generics.CreateAPIView):
+class WorkOrderCreateView(CreateAPIView):
     serializer_class = WorkOrderCreateSerializer
     queryset = WorkOrder.objects.all()
 
@@ -669,6 +676,93 @@ class WorkOrderWorkLineCreateView(APIView):
         return Response(serializer.data, status=201)
 
 
+class WorkOrderUpdateView(APIView):
+
+    def patch(self, request, pk):
+        work_order = get_object_or_404(WorkOrder, pk=pk)
+
+        if work_order.status != "DRAFT":
+            return Response(
+                {"detail": "Only DRAFT work orders can be edited"},
+                status=400,
+            )
+
+        serializer = WorkOrderPatchSerializer(
+            work_order,
+            data=request.data,
+            partial=True
+        )
+
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        return Response(serializer.data)
+
+
+class WorkOrderAttachmentUploadView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        wo_id = request.data.get("work_order")
+        file = request.FILES.get("file")
+
+        wo = get_object_or_404(
+            WorkOrder,
+            id=wo_id,
+            company=get_user_company(request.user)
+        )
+
+        att = WorkOrderAttachment.objects.create(
+            work_order=wo,
+            file=file,
+            company=wo.company
+        )
+
+        return Response(
+            WorkOrderAttachmentSerializer(att).data
+        )
+
+
+class WorkOrderFileProxyView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, uf):
+        att = get_object_or_404(WorkOrderAttachment, uf=uf)
+
+        if att.company != get_user_company(request.user):
+            raise Http404()
+
+        if not os.path.exists(att.file.path):
+            raise Http404()
+
+        response = FileResponse(
+            att.file.open("rb"),
+            content_type=att.content_type or "application/octet-stream",
+        )
+
+        response["Content-Disposition"] = (
+            f'inline; filename="{att.file_name}"'
+        )
+
+        return response
+
+
+class WorkOrderAttachmentDeleteView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, pk):
+        att = get_object_or_404(
+            WorkOrderAttachment,
+            pk=pk,
+            company=get_user_company(request.user)
+        )
+
+        att.file.delete()
+        att.delete()
+
+        return Response(status=204)
+
+
 class DriverReportCreateView(generics.CreateAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = DriverReportCreateSerializer
@@ -758,9 +852,16 @@ class DriverReportManagerDetailView(generics.RetrieveAPIView):
 
     def get_queryset(self):
         company = get_user_company(self.request.user)
-        return DriverReport.objects.filter(company=company).select_related(
-            "vehicle", "driver", "related_work_order", "reviewed_by"
-        )
+        qs = (DriverReport.objects
+              .filter(company=company)
+              .select_related(
+                  "vehicle", "driver", "related_work_order", "reviewed_by"
+              )
+              .prefetch_related(
+                  "report_driver_report_images"
+              ))
+
+        return qs
 
 
 class DriverReportMarkReviewedView(APIView):
@@ -840,4 +941,22 @@ class DriverReportCreateWorkOrderView(APIView):
         return Response(
             {"work_order_id": wo.id},
             status=status.HTTP_201_CREATED,
+        )
+
+
+class DriverReportImageCreateView(CreateAPIView):
+    serializer_class = DriverReportImageSerializer
+    parser_classes = [MultiPartParser, FormParser]
+    permission_classes = [IsAuthenticated]
+
+    def perform_create(self, serializer):
+        report = serializer.validated_data["report"]
+
+        # Security check
+        if report.driver != self.request.user:
+            raise PermissionDenied("Not your report")
+
+        serializer.save(
+            company=report.company,
+            created_by=self.request.user
         )

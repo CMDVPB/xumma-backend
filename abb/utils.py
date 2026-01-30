@@ -515,32 +515,63 @@ def image_upload_path(instance, filename):
     """
     Decide upload folder based on related object.
     """
-    # preserve extension
     name, ext = os.path.splitext(filename)
     new_name = f"{uuid.uuid4()}{ext}"
 
-    base_folder = 'uploads'
+    base = "uploads"
 
-    if instance.load_id:
-        subfolder = 'loads'
-        entity_uf = instance.load.uf
-    elif instance.vehicle_id:
-        subfolder = 'vehicles'
-        entity_uf = instance.vehicle.uf
-    elif instance.user_id:
-        subfolder = 'users'
-        entity_uf = instance.user.id
-    elif instance.company_id:
-        subfolder = 'companies'
-        entity_uf = instance.company.uf
-    elif instance.report_id:
-        subfolder = 'driver_reports'
-        entity_uf = instance.report.uf
-        return f"{base_folder}/driver_reports/{instance.report.uf}/{new_name}"
-    else:
-        subfolder = 'misc'
-        entity_uf = 'unknown'
+    model = instance.__class__.__name__
 
-    return f'{base_folder}/{subfolder}/{entity_uf}/{filename}'
+    if model == "WorkOrderAttachment":
+        return f"{base}/work_orders/{instance.work_order.uf}/{new_name}"
+
+    if model == "DriverReportImage":
+        return f"{base}/driver_reports/{instance.report.uf}/{new_name}"
+
+    if model == "LoadAttachment":
+        return f"{base}/loads/{instance.load.uf}/{new_name}"
+
+    if model == "VehicleAttachment":
+        return f"{base}/vehicles/{instance.vehicle.uf}/{new_name}"
+
+    if model == "UserAttachment":
+        return f"{base}/users/{instance.user.id}/{new_name}"
+
+    if model == "CompanyAttachment":
+        return f"{base}/companies/{instance.company.uf}/{new_name}"
+
+    # GENERIC IMAGEUPLOAD (if still use it / not sure)
+    if model == "ImageUpload":
+        if instance.company:
+            return f"{base}/companies/{instance.company.uf}/{new_name}"
+
+    return f"{base}/misc/{new_name}"
+
+    # # WORK ORDER
+    # if hasattr(instance, "work_order") and instance.work_order:
+    #     return f"{base}/work_orders_att/{instance.work_order.uf}/{new_name}"
+
+    # # DRIVER REPORT
+    # if hasattr(instance, "report") and instance.report:
+    #     return f"{base}/driver_reports/{instance.report.uf}/{new_name}"
+
+    # # LOAD
+    # if hasattr(instance, "load") and instance.load:
+    #     return f"{base}/loads/{instance.load.uf}/{new_name}"
+
+    # # VEHICLE
+    # if hasattr(instance, "vehicle") and instance.vehicle:
+    #     return f"{base}/vehicles/{instance.vehicle.uf}/{new_name}"
+
+    # # USER
+    # if hasattr(instance, "user") and instance.user:
+    #     return f"{base}/users/{instance.user.id}/{new_name}"
+
+    # # COMPANY
+    # if hasattr(instance, "company") and instance.company:
+    #     return f"{base}/companies/{instance.company.uf}/{new_name}"
+
+    # # FALLBACK
+    # return f"{base}/misc/{new_name}"
 
 ###### End Image, files uploads utils ######

@@ -1,7 +1,9 @@
 from decimal import Decimal
 from django.contrib.auth import get_user_model
 from django.db.models import Sum
+from django.conf import settings
 from rest_framework import serializers
+
 
 from abb.utils import get_user_company
 from att.models import Vehicle
@@ -14,18 +16,23 @@ User = get_user_model()
 class DriverReportImageSerializer(serializers.ModelSerializer):
     class Meta:
         model = DriverReportImage
-        fields = ["id", "image"]
+        fields = ["id", "image", "report"]
 
-    def create(self, validated_data):
-        request = self.context["request"]
-        report = self.context["report"]
+    def validate_image(self, img):
+        if img.size > 1024*1024*10:
+            raise serializers.ValidationError("Max 10MB")
+        return img
 
-        return DriverReportImage.objects.create(
-            company=report.company,
-            created_by=request.user,
-            report=report,
-            **validated_data,
-        )
+
+class DriverReportImageReadSerializer(serializers.ModelSerializer):
+    image_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = DriverReportImage
+        fields = ["id", "image_url"]
+
+    def get_image_url(self, obj):
+        return f"{settings.BACKEND_URL}/api/image/{obj.uf}/"
 
 
 class DriverReportCreateSerializer(serializers.ModelSerializer):
@@ -82,13 +89,16 @@ class DriverReportDetailsSerializer(serializers.ModelSerializer):
         source="related_work_order_id", read_only=True)
     reviewed_by_name = serializers.CharField(
         source="reviewed_by.get_full_name", read_only=True)
-    images = serializers.SerializerMethodField()
+    images = DriverReportImageReadSerializer(
+        source="report_driver_report_images",
+        many=True,
+        read_only=True
+    )
 
     class Meta:
         model = DriverReport
         fields = [
             "id",
-            "uf",
             "created_at",
             "status",
             "vehicle",
@@ -100,12 +110,9 @@ class DriverReportDetailsSerializer(serializers.ModelSerializer):
             "reviewed_at",
             "related_work_order",
             "images",
-        ]
-
-    def get_images(self, obj):
-        return [
-            img.image.url
-            for img in obj.report_driver_report_images.all()
+            "work_order_id",
+            "reviewed_by_name",
+            "uf",
         ]
 
 
@@ -147,3 +154,15 @@ class DriverReportListSerializer(serializers.ModelSerializer):
         if obj.reviewed_by:
             return obj.reviewed_by.get_full_name()
         return None
+
+
+# class DriverReportDetailSerializer(serializers.ModelSerializer):
+#     images = DriverReportImageSerializer(
+#         source="report_driver_report_images",
+#         many=True,
+#         read_only=True
+#     )
+
+#     class Meta:
+#         model = DriverReport
+#         fields = "__all__"

@@ -327,7 +327,7 @@ class WorkOrder(TimeStampedModel):
     vehicle = models.ForeignKey(
         Vehicle, on_delete=models.PROTECT, related_name="vehicle_work_orders")
     mechanic = models.ForeignKey(
-        User, on_delete=models.PROTECT, related_name="mechaic_work_orders"
+        User, on_delete=models.PROTECT, null=True, blank=True, related_name="mechaic_work_orders"
     )
 
     driver = models.ForeignKey(
@@ -566,6 +566,25 @@ class WorkOrderWorkLine(TimeStampedModel):
         if self.unit_price:
             return self.qty * self.unit_price
         return None
+
+
+class WorkOrderAttachment(TimeStampedModel):
+    work_order = models.ForeignKey(
+        WorkOrder,
+        on_delete=models.CASCADE,
+        related_name="work_order_attachments"
+    )
+
+    file = models.FileField(upload_to=image_upload_path)
+
+    file_name = models.CharField(max_length=255, blank=True)
+    content_type = models.CharField(max_length=100, blank=True)
+
+    def save(self, *args, **kwargs):
+        if self.file:
+            self.file_name = self.file.name
+            self.content_type = getattr(self.file.file, "content_type", "")
+        super().save(*args, **kwargs)
 
 
 class DriverReport(TimeStampedModel):

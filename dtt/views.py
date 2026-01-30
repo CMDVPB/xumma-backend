@@ -29,6 +29,7 @@ from abb.utils import assign_new_num, get_company_manager, get_user_company
 from app.models import SMTPSettings, UserSettings
 from app.serializers import UserSettingsSerializer
 from att.models import BankAccount, ContactSite, ContractReferenceDate, Note, PaymentTerm, Person, Term
+from avv.models import DriverReportImage
 from axx.models import Load
 from ayy.models import CMR, AuthorizationStockBatch, CMRStockBatch, CTIRStockBatch, ColliType, ImageUpload, ItemForItemCost, ItemForItemInv
 from ayy.serializers import ItemForItemCostSerializer
@@ -692,7 +693,28 @@ class MediaProxyView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, uf):
-        image = get_object_or_404(ImageUpload, uf=uf)
+        print('3230', uf)
+
+        # try driver report images first
+        image = DriverReportImage.objects.filter(uf=uf).first()
+
+        if image:
+            if image.report.company != get_user_company(request.user):
+                raise Http404()
+
+            file_field = image.image
+
+        else:
+            # fallback to generic uploads
+            image = get_object_or_404(ImageUpload, uf=uf)
+
+            if image.company != get_user_company(request.user):
+                raise Http404()
+
+            file_field = image.file_obj
+
+        if not file_field or not os.path.exists(file_field.path):
+            raise Http404()
 
         print('3232', uf)
 
@@ -700,30 +722,40 @@ class MediaProxyView(APIView):
         if image.company != get_user_company(request.user):
             raise Http404()
 
-        file_field = image.file_obj  # FileField
-
-        if not file_field:
-            raise Http404()
-
-        # Check physical file existence
-        if not os.path.exists(file_field.path):
-            # Optional: log this
-            # logger.warning("Missing file for ImageUpload %s", image.id)
-            raise Http404("File not found")
+        ######################
 
         content_type, _ = mimetypes.guess_type(file_field.name)
-        content_type = content_type or "application/octet-stream"
 
-        response = FileResponse(
+        return FileResponse(
             file_field.open("rb"),
-            content_type=content_type,
+            content_type=content_type or "application/octet-stream",
         )
+        #####################
 
-        response["Content-Disposition"] = (
-            f'inline; filename="{image.file_name}"'
-        )
+        # file_field = image.file_obj  # FileField
 
-        return response
+        # if not file_field:
+        #     raise Http404()
+
+        # # Check physical file existence
+        # if not os.path.exists(file_field.path):
+        #     # Optional: log this
+        #     # logger.warning("Missing file for ImageUpload %s", image.id)
+        #     raise Http404("File not found")
+
+        # content_type, _ = mimetypes.guess_type(file_field.name)
+        # content_type = content_type or "application/octet-stream"
+
+        # response = FileResponse(
+        #     file_field.open("rb"),
+        #     content_type=content_type,
+        # )
+
+        # response["Content-Disposition"] = (
+        #     f'inline; filename="{image.file_name}"'
+        # )
+
+        # return response
 
     def delete(self, request, uf):
         image = get_object_or_404(ImageUpload, uf=uf)

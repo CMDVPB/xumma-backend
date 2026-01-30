@@ -2,13 +2,14 @@ from decimal import Decimal
 from django.contrib.auth import get_user_model
 from django.db.models import Sum
 from rest_framework import serializers
+from django.conf import settings
 
 from abb.utils import get_user_company
 from att.models import Contact, Vehicle
 from .models import (
     Part, Location, StockBalance,
     PartRequest, PartRequestLine,
-    IssueDocument, IssueLine, StockMovement, Warehouse, UnitOfMeasure, WorkOrder, WorkOrderIssue,
+    IssueDocument, IssueLine, StockMovement, Warehouse, UnitOfMeasure, WorkOrder, WorkOrderAttachment, WorkOrderIssue,
     WorkOrderLaborEntry, WorkOrderWorkLine, WorkType
 )
 
@@ -668,6 +669,17 @@ class WorkOrderWorkLineSerializer(serializers.ModelSerializer):
         ]
 
 
+class WorkOrderAttachmentReadSerializer(serializers.ModelSerializer):
+    file_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = WorkOrderAttachment
+        fields = ["id", "uf", "file_url"]
+
+    def get_file_url(self, obj):
+        return f"{settings.BACKEND_URL}/api/work-order-files/{obj.uf}/"
+
+
 class WorkOrderDetailSerializer(serializers.ModelSerializer):
     mechanic_name = serializers.CharField(
         source="mechanic.get_full_name", read_only=True
@@ -695,7 +707,8 @@ class WorkOrderDetailSerializer(serializers.ModelSerializer):
     )
 
     work_lines = WorkOrderWorkLineSerializer(many=True, read_only=True)
-    # labor_entries = WorkOrderLaborEntrySerializer(many=True, read_only=True)
+    work_order_attachments = WorkOrderAttachmentReadSerializer(
+        many=True, read_only=True)
 
     class Meta:
         model = WorkOrder
@@ -707,6 +720,7 @@ class WorkOrderDetailSerializer(serializers.ModelSerializer):
             "vehicle_reg_number",
             "mechanic_name",
             "mechanic_uf",
+            "driver",
             "third_party_name",
             "problem_description",
             "created_at",
@@ -716,7 +730,8 @@ class WorkOrderDetailSerializer(serializers.ModelSerializer):
             "total_cost",
             "uf",
 
-            "work_lines"
+            "work_lines",
+            "work_order_attachments",
         ]
 
 
@@ -852,3 +867,26 @@ class WorkOrderWorkLineSerializer(serializers.ModelSerializer):
                 })
 
         return data
+
+
+class WorkOrderPatchSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WorkOrder
+        fields = "__all__"
+        read_only_fields = [
+            "status",
+            "created_at",
+            "mechanic_signed_at",
+            "completed_at",
+        ]
+
+
+class WorkOrderAttachmentSerializer(serializers.ModelSerializer):
+    file_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = WorkOrderAttachment
+        fields = ["id", "uf", "file", "file_url", "file_name", "content_type"]
+
+    def get_file_url(self, obj):
+        return f"{settings.BACKEND_URL}/api/work-order-files/{obj.uf}/"
