@@ -79,6 +79,7 @@ INSTALLED_APPS = [
     'ayy',
     'azz',
     'bch',
+    'cld',
     'dff',
     'dtt',
     'eff',

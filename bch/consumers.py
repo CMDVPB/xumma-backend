@@ -2,6 +2,7 @@ from rest_framework.permissions import IsAuthenticated
 from djangochannelsrestframework.generics import GenericAsyncAPIConsumer
 from djangochannelsrestframework.decorators import action
 
+from bch.mixins.calendar import CalendarEventMixin
 from bch.mixins.contact import ContactMixin
 from bch.mixins.issue_document import IssueDocumentMixin
 from bch.mixins.item_for_item_cost import ItemForItemCostMixin
@@ -17,6 +18,7 @@ class AppConsumer(
     TripMixin,
     LoadMixin,
     IssueDocumentMixin,
+    CalendarEventMixin,
     GenericAsyncAPIConsumer,
 ):
     permission_classes = [IsAuthenticated]

@@ -26,6 +26,7 @@ urlpatterns = [
     path('api/', include('ayy.urls')),
     path('api/', include('azz.urls')),
     path('api/', include('bch.urls')),
+    path('api/', include('cld.urls')),
     path('api/', include('dff.urls')),
     path('api/', include('dtt.urls')),
     path('api/', include('eff.urls')),

@@ -674,7 +674,7 @@ class WorkOrderAttachmentReadSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = WorkOrderAttachment
-        fields = ["id", "uf", "file_url"]
+        fields = ["id", "uf", "file_url", "content_type"]
 
     def get_file_url(self, obj):
         return f"{settings.BACKEND_URL}/api/work-order-files/{obj.uf}/"
