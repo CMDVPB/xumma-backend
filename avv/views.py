@@ -1,4 +1,5 @@
 import os
+from django.utils.timezone import now
 from django.shortcuts import get_object_or_404
 from decimal import Decimal
 from django.db import transaction
@@ -588,6 +589,27 @@ class WorkOrderCompleteView(APIView):
 
         return Response(
             WorkOrderDetailSerializer(work_order).data,
+            status=status.HTTP_200_OK,
+        )
+
+
+class WorkOrderSignView(APIView):
+    def post(self, request, pk):
+        work_order = get_object_or_404(WorkOrder, pk=pk)
+
+        if work_order.status != WorkOrder.Status.COMPLETED:
+            return Response(
+                {"detail": "Only completed work orders can be signed."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # example fields – adjust to your model
+        work_order.signed_by = request.user
+        work_order.signed_at = now()
+        work_order.save(update_fields=["signed_by", "signed_at"])
+
+        return Response(
+            {"detail": "Work order signed successfully."},
             status=status.HTTP_200_OK,
         )
 

@@ -47,6 +47,8 @@ urlpatterns = [
     path("work-order-files/upload/", WorkOrderAttachmentUploadView.as_view()),
     path("work-order-files/<int:pk>/delete/",
          WorkOrderAttachmentDeleteView.as_view()),
+    path("work-orders/<int:pk>/sign/",
+         WorkOrderSignView.as_view(), name="workorder-sign",),
 
     path("stock/", StockListView.as_view()),
     path("stock/balances/", StockBalanceListView.as_view()),

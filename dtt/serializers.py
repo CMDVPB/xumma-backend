@@ -127,7 +127,7 @@ class DamageReportSerializer(WritableNestedModelSerializer):
 
     class Meta:
         model = DamageReport
-        fields = ('damage_report_type', 'reported_at', 'location', 'notes', 'uf',
+        fields = ('damage_report_type', 'reported_at', 'location', 'notes', 'route_sheet', 'is_insured', 'insurance_deductible', 'uf',
                   'vehicle', 'driver', 'reported_by',
                   'report_vehicle_damages', 'damage_imageuploads',
                   )

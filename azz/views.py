@@ -144,13 +144,23 @@ class CostImportListView(ListAPIView):
 
     def get_queryset(self):
         user_company = get_user_company(self.request.user)
-        return (ImportBatch.objects
-                .filter(
-                    company=user_company
-                )
-                .order_by(
-                    "-created_at"
-                ))
+
+        qs = ImportBatch.objects.filter(company=user_company)
+
+        start_date = self.request.query_params.get("start_date")
+        end_date = self.request.query_params.get("end_date")
+
+        if start_date:
+            start_dt = parse_datetime(start_date)
+            if start_dt:
+                qs = qs.filter(created_at__date__gte=start_dt.date())
+
+        if end_date:
+            end_dt = parse_datetime(end_date)
+            if end_dt:
+                qs = qs.filter(created_at__date__lte=end_dt.date())
+
+        return qs.order_by("-created_at")
 
 
 class CostImportDetailView(RetrieveAPIView):
@@ -199,9 +209,23 @@ class FuelTankListView(generics.ListAPIView):
 
     def get_queryset(self):
         user_company = get_user_company(self.request.user)
-        return FuelTank.objects.filter(
-            company=user_company
-        )
+
+        qs = FuelTank.objects.filter(company=user_company)
+
+        start_date = self.request.query_params.get("start_date")
+        end_date = self.request.query_params.get("end_date")
+
+        if start_date:
+            start_dt = parse_datetime(start_date)
+            if start_dt:
+                qs = qs.filter(created_at__date__gte=start_dt.date())
+
+        if end_date:
+            end_dt = parse_datetime(end_date)
+            if end_dt:
+                qs = qs.filter(created_at__date__lte=end_dt.date())
+
+        return qs
 
 
 class FuelTankDetailView(generics.UpdateAPIView):

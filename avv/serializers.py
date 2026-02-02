@@ -724,6 +724,7 @@ class WorkOrderDetailSerializer(serializers.ModelSerializer):
             "third_party_name",
             "problem_description",
             "created_at",
+            "signed_at",
             "work_cost",
             "parts_cost",
             "labor_cost",

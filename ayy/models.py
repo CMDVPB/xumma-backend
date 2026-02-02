@@ -717,6 +717,17 @@ class DamageReport(models.Model):
     location = models.CharField(max_length=255, blank=True)
     notes = models.TextField(blank=True)
 
+    is_insured = models.BooleanField(default=False)
+
+    insurance_deductible = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True
+    )
+
+    route_sheet = models.CharField(max_length=50, blank=True)
+
     def __str__(self):
         return f"Damage report #{self.id} for {self.vehicle}"
 
