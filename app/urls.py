@@ -7,6 +7,7 @@ from app.views import (
     CustomTokenRefreshView,
     CustomTokenVerifyView,
     LogoutView,
+    UserProfileView,
     get_exchange_rates_multi_view,
 )
 
@@ -25,6 +26,8 @@ urlpatterns = [
     path('ex-rates-multi/', get_exchange_rates_multi_view,
          name='get-exchange-rates'),
 
+
+    path("user/profile/", UserProfileView.as_view(), name="user-profile"),
 
 ]
 

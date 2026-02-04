@@ -96,9 +96,40 @@ class UnitOfMeasure(models.Model):
         return f"{self.code} – {self.name}"
 
 
+class PartBrand(TimeStampedModel):
+    code = models.CharField(max_length=50)
+    name = models.CharField(max_length=120)
+
+    is_active = models.BooleanField(default=True)
+
+    is_system = models.BooleanField(default=False)
+
+    class Meta:
+        verbose_name = "Part brand"
+        verbose_name_plural = "Part brands"
+        ordering = ["name"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["name"],
+                name="unique_part_brand_name",
+            )
+        ]
+
+    def __str__(self):
+        return self.name
+
+
 class Part(TimeStampedModel):
     sku = models.CharField(max_length=64, unique=True)
     name = models.CharField(max_length=240)
+
+    brand = models.ForeignKey(
+        PartBrand,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="brand_parts",
+    )
 
     uom = models.ForeignKey(
         UnitOfMeasure,
@@ -122,6 +153,24 @@ class Part(TimeStampedModel):
 
     def __str__(self) -> str:
         return f"{self.sku} - {self.name}"
+
+
+class PartAttachment(TimeStampedModel):
+    part = models.ForeignKey(
+        Part, on_delete=models.CASCADE, related_name="part_attachments")
+
+    file = models.FileField(upload_to=image_upload_path)
+    file_name = models.CharField(max_length=255, blank=True)
+    content_type = models.CharField(max_length=100, blank=True)
+
+    def save(self, *args, **kwargs):
+        if self.file:
+            self.file_name = self.file.name
+            self.content_type = getattr(self.file.file, "content_type", "")
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"Attachment for {self.part_id}"
 
 
 class StockLot(TimeStampedModel):

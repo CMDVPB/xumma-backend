@@ -15,7 +15,7 @@ from abb.serializers_drf_writable import CustomWritableNestedModelSerializer, Cu
 from abb.utils import get_user_company
 from app.serializers import UserBasicSerializer
 from att.models import Contact, ContactSite, Contract, ContractReferenceDate, PaymentTerm, Person, TargetGroup, Term, Vehicle, VehicleUnit
-from att.serializers import VehicleContactSerializer, VehicleSerializer
+from att.serializers import ContactStatusSerializer, VehicleContactSerializer, VehicleSerializer
 from axx.models import Load
 from ayy.models import CMR, Comment, Document, History, ImageUpload
 from dff.serializers.serializers_bce import BankAccountSerializer
@@ -57,14 +57,12 @@ class VehicleUnitBasicReadSerializer(WritableNestedModelSerializer):
 
 class VehicleUnitSerializer(CustomUniqueFieldsMixin, CustomWritableNestedModelSerializer):
 
-    # vehicle_gendocs = DocumentSerializer(many=True)
-
     class Meta:
         model = VehicleUnit
         fields = ('reg_number', 'vehicle_type', 'payload', 'uf',
                   'volume', 'comment',
                   'contact',
-                  # 'vehicle_gendocs',
+
                   )
         lookup_field = 'uf'
 
@@ -208,17 +206,18 @@ class ContactTripListSerializer(WritableNestedModelSerializer):
 
 
 class ContactBasicReadSerializer(WritableNestedModelSerializer):
-
+    status = ContactStatusSerializer(read_only=True)
     country_code_post = CountrySerializer(allow_null=True)
 
     class Meta:
         model = Contact
         fields = ('fiscal_code', 'company_name', 'zip_code_post', 'city_post', 'address_post', 'lat', 'lon', 'uf',
-                  'country_code_post',
+                  'country_code_post', 'status',
                   )
 
 
 class ContactSerializer(WritableNestedModelSerializer):
+    status = ContactStatusSerializer(read_only=True)
 
     country_code_legal = serializers.SlugRelatedField(
         slug_field='uf', queryset=Country.objects.all(), write_only=True, required=True)
@@ -281,6 +280,7 @@ class ContactSerializer(WritableNestedModelSerializer):
                   'country_code_legal', 'zip_code_legal', 'city_legal', 'address_legal', 'county_legal', 'sect_legal',
                   'comment1', 'comment2',
                   'lat', 'lon',
+                  'status',
                   'contact_persons', 'contact_vehicles', 'contact_bank_accounts', 'contact_sites',
                   'contact_contracts',
                   )

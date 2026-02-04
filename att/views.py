@@ -8,24 +8,28 @@ from django.views.decorators.cache import cache_page
 from django.utils.decorators import method_decorator
 from django.http import HttpResponse
 from rest_framework.decorators import authentication_classes, api_view, permission_classes
-from rest_framework.generics import CreateAPIView, ListAPIView, ListCreateAPIView, CreateAPIView, RetrieveUpdateDestroyAPIView, DestroyAPIView
+from rest_framework.generics import (CreateAPIView, ListAPIView, ListCreateAPIView,
+                                     UpdateAPIView, RetrieveUpdateDestroyAPIView, DestroyAPIView)
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
-from rest_framework.views import APIView  # exception_handler
 from rest_framework import permissions, status
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.views import APIView
+from django.shortcuts import get_object_or_404
 
 from abb.constants import DOCUMENT_STATUS_CHOICES
 from abb.models import BodyType, Incoterm, ModeType, StatusType
 from abb.pagination import LimitResultsSetPagination
 from abb.utils import get_user_company, is_valid_queryparam
 from app.models import CategoryGeneral, TypeGeneral
-from att.models import EmissionClass, RouteSheetNumber, RouteSheetStockBatch, VehicleBrand, Vehicle
-from att.serializers import BodyTypeSerializer, CategoryGeneralSerializer, EmissionClassSerializer, IncotermSerializer, ModeTypeSerializer, RouteSheetStockBatchSerializer, StatusTypeSerializer, TypeGeneralSerializer, \
-    VehicleBrandSerializer, VehicleSerializer
+from att.models import Contact, ContactStatus, EmissionClass, RouteSheetNumber, RouteSheetStockBatch, VehicleBrand, Vehicle, VehicleDocument
+from att.serializers import BodyTypeSerializer, CategoryGeneralSerializer, ContactStatusSerializer, ContactStatusUpdateSerializer, EmissionClassSerializer, IncotermSerializer, ModeTypeSerializer, RouteSheetStockBatchSerializer, StatusTypeSerializer, TypeGeneralSerializer, \
+    VehicleBrandSerializer, VehicleDocumentSerializer, VehicleSerializer
 
 
 import logging
+
+from att.services import update_contact_status_service
 logger = logging.getLogger(__name__)
 
 
@@ -201,10 +205,15 @@ class VehicleListView(ListAPIView):
         try:
             user = self.request.user
             user_company = get_user_company(user)
-            queryset = Vehicle.objects.filter(
+            qs = Vehicle.objects.filter(
                 company__id=user_company.id)
 
-            return queryset
+            qs = qs.prefetch_related(
+                'vehicle_documents',
+                'vehicle_documents__document_type'
+            )
+
+            return qs
         except Exception as e:
             logger.error(
                 f'ERRORLOG735 VehicleCompanyListView. get_queryset. Error: {e}')
@@ -333,3 +342,80 @@ def reserve_trip_number(customer):
         number.save(update_fields=["status", "reserved_at"])
 
         return number
+
+
+class VehicleDocumentCreateView(CreateAPIView):
+    queryset = VehicleDocument.objects.all()
+    serializer_class = VehicleDocumentSerializer
+    permission_classes = [IsAuthenticated]
+    parser_classes = (MultiPartParser, FormParser)
+
+
+class VehicleDocumentUpdateView(UpdateAPIView):
+    queryset = VehicleDocument.objects.all()
+    serializer_class = VehicleDocumentSerializer
+    permission_classes = [IsAuthenticated]
+    parser_classes = (MultiPartParser, FormParser)
+
+
+class VehicleDocumentDeleteView(DestroyAPIView):
+    queryset = VehicleDocument.objects.all()
+    permission_classes = [IsAuthenticated]
+
+
+class VehicleDocumentListView(ListAPIView):
+    serializer_class = VehicleDocumentSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        qs = VehicleDocument.objects.all()
+        vehicle_id = self.request.query_params.get('vehicle')
+
+        if vehicle_id:
+            qs = qs.filter(vehicle_id=vehicle_id)
+
+        return qs
+
+
+class ContactStatusListAPIView(ListAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = ContactStatusSerializer
+
+    def get_queryset(self):
+        qs = ContactStatus.objects.filter(is_active=True).order_by("severity")
+        return qs
+
+
+class ContactStatusUpdateAPIView(APIView):
+    """
+    Update contact status and create history record
+    """
+
+    def patch(self, request, uf):
+        user_company = get_user_company(request.user)
+        contact = get_object_or_404(
+            Contact.objects.select_related("status"),
+            uf=uf,
+            company=user_company
+        )
+
+        serializer = ContactStatusUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        update_contact_status_service(
+            contact=contact,
+            status=serializer.validated_data["status"],
+            user=request.user,
+            reason=serializer.validated_data.get("reason")
+        )
+
+       # IMPORTANT: refresh relation after service
+        contact.refresh_from_db(fields=["status"])
+
+        return Response(
+            {
+                "id": contact.id,
+                "status": ContactStatusSerializer(contact.status).data,
+            },
+            status=status.HTTP_200_OK
+        )

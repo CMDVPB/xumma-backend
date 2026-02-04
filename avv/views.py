@@ -23,12 +23,14 @@ from abb.models import Currency
 from abb.utils import get_user_company
 from avv.serializers_driver_reports import DriverReportCreateSerializer, DriverReportDetailsSerializer, DriverReportImageSerializer, DriverReportListSerializer
 
-from .models import DriverReport, DriverReportImage, IssueDocument, Location, Part, PartRequest, StockBalance, StockLot, StockMovement, UnitOfMeasure, Warehouse, WorkOrder, WorkOrderAttachment, WorkOrderIssue, WorkType
+from .models import DriverReport, DriverReportImage, IssueDocument, Location, Part, PartAttachment, PartBrand, PartRequest, StockBalance, StockLot, StockMovement, UnitOfMeasure, Warehouse, WorkOrder, WorkOrderAttachment, WorkOrderIssue, WorkType
 from .serializers import (
     IssueDocumentDetailSerializer,
     IssueDocumentListSerializer,
     LocationByPartSerializer,
     LocationSerializer,
+    PartAttachmentSerializer,
+    PartBrandSerializer,
     PartRequestCreateSerializer,
     PartRequestListSerializer,
     PartRequestReadSerializer,
@@ -108,6 +110,23 @@ class StockBalanceListView(generics.ListAPIView):
         return qs
 
 
+class PartBrandListView(generics.ListAPIView):
+    serializer_class = PartBrandSerializer
+
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+
+        user_company = get_user_company(self.request.user)
+
+        qs = PartBrand.objects.filter(
+            Q(is_system=True) |
+            Q(company=user_company)
+        )
+
+        return qs.order_by("name")
+
+
 class PartListView(ListAPIView):
     serializer_class = PartSerializer
     filter_backends = [SearchFilter]
@@ -172,6 +191,79 @@ class PartRequestDetailView(generics.RetrieveAPIView):
         "request_part_request_lines",
         "request_part_request_lines__part",
     )
+
+
+class PartAttachmentUploadView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        part_id = request.data.get("part")
+        file = request.FILES.get("file")
+
+        user_company = get_user_company(request.user)
+
+        if not part_id or not file:
+            return Response(
+                {"detail": "part and file are required"},
+                status=400,
+            )
+
+        part = get_object_or_404(
+            Part,
+            id=part_id,
+            company=get_user_company(request.user),
+        )
+
+        att = PartAttachment.objects.create(
+            company=user_company,
+            part=part,
+            file=file,
+        )
+
+        return Response(
+            PartAttachmentSerializer(att).data,
+            status=201,
+        )
+
+
+class PartFileProxyView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, uf):
+        att = get_object_or_404(PartAttachment, uf=uf)
+
+        if att.part.company != get_user_company(request.user):
+            raise Http404()
+
+        if not os.path.exists(att.file.path):
+            raise Http404()
+
+        response = FileResponse(
+            att.file.open("rb"),
+            content_type=att.content_type or "application/octet-stream",
+        )
+
+        response["Content-Disposition"] = (
+            f'inline; filename="{att.file_name}"'
+        )
+
+        return response
+
+
+class PartAttachmentDeleteView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, pk):
+        att = get_object_or_404(
+            PartAttachment,
+            pk=pk,
+            part__company=get_user_company(request.user),
+        )
+
+        att.file.delete(save=False)
+        att.delete()
+
+        return Response(status=204)
 
 
 class ReserveRequestView(APIView):

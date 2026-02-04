@@ -1,11 +1,16 @@
 from django.contrib import admin
 
-from .models import Contact, ContactSite, Contract, ContractReferenceDate, ContractReferenceDateTranslation, EmissionClass, PaymentTerm, VehicleBrand, Vehicle, VehicleUnit, Person, BankAccount
+from .models import Contact, ContactSite, ContactStatus, Contract, ContractReferenceDate, ContractReferenceDateTranslation, EmissionClass, PaymentTerm, VehicleBrand, Vehicle, VehicleDocument, VehicleUnit, Person, BankAccount
 
 
 @admin.register(BankAccount)
 class BankAccountAdmin(admin.ModelAdmin):
     list_display = ('id', 'currency_code', 'company', 'iban_number')
+
+
+@admin.register(ContactStatus)
+class ContactStatusAdmin(admin.ModelAdmin):
+    list_display = ('id', 'company', 'code', 'name', 'description')
 
 
 @admin.register(Contact)
@@ -88,5 +93,14 @@ class ContractReferenceDateTranslationAdmin(admin.ModelAdmin):
     list_display = ('id', 'reference_date', 'language', 'label',)
 
     search_fields = ('reference_date', 'language', 'label', 'uf',)
+
+    ordering = ['-id']
+
+
+@admin.register(VehicleDocument)
+class VehicleDocumentAdmin(admin.ModelAdmin):
+    list_display = ('id', 'vehicle', 'document_type', 'file',)
+
+    search_fields = ('uf',)
 
     ordering = ['-id']

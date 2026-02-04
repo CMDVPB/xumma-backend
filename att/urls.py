@@ -1,9 +1,9 @@
 from django.urls import path
 from rest_framework.urlpatterns import format_suffix_patterns
 
-from att.views import BodyTypeListView, CategoryGeneralListView, EmissionClassListView, IncotermListView, \
+from att.views import BodyTypeListView, CategoryGeneralListView, ContactStatusListAPIView, ContactStatusUpdateAPIView, EmissionClassListView, IncotermListView, \
     ModeTypeListView, RouteSheetStockBatchDetailsView, RouteSheetStockBatchListCreateView, StatusTypeListView, TypeGeneralListView, VehicleBrandListView, VehicleCreateView, \
-    VehicleDetailView, VehicleListView
+    VehicleDetailView, VehicleDocumentCreateView, VehicleDocumentDeleteView, VehicleDocumentListView, VehicleDocumentUpdateView, VehicleListView
 
 urlpatterns = [
 
@@ -32,6 +32,21 @@ urlpatterns = [
     path('route-sheet-stock/<str:uf>/', RouteSheetStockBatchDetailsView.as_view(),
          name='route-sheets_details'),
 
+    path('vehicle-documents/', VehicleDocumentCreateView.as_view(),
+         name='vehicle-document-create'),
+    path('vehicle-documents/<int:pk>/',
+         VehicleDocumentUpdateView.as_view(), name='vehicle-document-update'),
+    path('vehicle-documents/<int:pk>/delete/',
+         VehicleDocumentDeleteView.as_view(), name='vehicle-document-delete'),
+    path('vehicle-documents/list/', VehicleDocumentListView.as_view(),
+         name='vehicle-document-list'),
+
+
+    path("contact-statuses/", ContactStatusListAPIView.as_view(),
+         name="contact-status-list"
+         ),
+    path("contacts/<str:uf>/status/", ContactStatusUpdateAPIView.as_view(),
+         name="contact-status-update"),
 ]
 
 urlpatterns = format_suffix_patterns(urlpatterns)

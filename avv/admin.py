@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from avv.models import DriverReportImage, IssueDocument, Location, Part, PartRequest, StockLot, UnitOfMeasure, Warehouse, WorkOrder, WorkOrderAttachment, WorkOrderIssue, WorkOrderWorkLine, WorkType
+from avv.models import DriverReportImage, IssueDocument, Location, Part, PartAttachment, PartBrand, PartRequest, StockLot, UnitOfMeasure, Warehouse, WorkOrder, WorkOrderAttachment, WorkOrderIssue, WorkOrderWorkLine, WorkType
 
 
 @admin.register(Part)
@@ -8,6 +8,18 @@ class PartAdmin(admin.ModelAdmin):
     list_display = ('id', 'company', 'name', 'sku', 'uom', 'min_level')
 
     search_fields = ("company__company_name", 'name', 'sku', 'uom', 'uf')
+
+
+@admin.register(PartAttachment)
+class PartAttachmentAdmin(admin.ModelAdmin):
+    list_display = ("id", "part", "file", "uf",)
+
+
+@admin.register(PartBrand)
+class PartBrandAdmin(admin.ModelAdmin):
+    list_display = ("name", "uf", "is_active", "created_at")
+    search_fields = ("name", "uf")
+    list_filter = ("is_active",)
 
 
 @admin.register(Warehouse)

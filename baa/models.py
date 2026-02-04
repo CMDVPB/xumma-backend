@@ -17,6 +17,10 @@ class VehicleChecklistItem(models.Model):
     title = models.CharField(max_length=255)
     description = models.CharField(max_length=500, blank=True, null=True)
     order = models.PositiveIntegerField(default=0)
+
+    applies_to_departure = models.BooleanField(default=True)
+    applies_to_arrival = models.BooleanField(default=True)
+
     is_active = models.BooleanField(default=True)
 
     is_system = models.BooleanField(default=False)
@@ -29,6 +33,11 @@ class VehicleChecklistItem(models.Model):
 
 
 class VehicleChecklist(models.Model):
+    INSPECTION_TYPES = (
+        ("departure", "Departure"),
+        ("arrival", "Arrival"),
+    )
+
     uf = models.CharField(max_length=36, default=hex_uuid,
                           unique=True, db_index=True)
     company = models.ForeignKey(
@@ -40,6 +49,14 @@ class VehicleChecklist(models.Model):
     driver = models.ForeignKey(
         User, on_delete=models.CASCADE, related_name="driver_checklists"
     )
+
+    verified_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL, related_name="verified_checklists")
+
+    verified_at = models.DateTimeField(null=True, blank=True)
+
+    inspection_type = models.CharField(
+        max_length=20, choices=INSPECTION_TYPES, db_index=True)
 
     started_at = models.DateTimeField(auto_now_add=True)
     finished_at = models.DateTimeField(null=True, blank=True)
@@ -66,6 +83,14 @@ class VehicleChecklistAnswer(models.Model):
 
     is_ok = models.BooleanField()
     comment = models.CharField(max_length=500, blank=True, null=True)
+
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE, blank=True, null=True,
+        related_name="created_by_checklist_answers"
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         unique_together = ("checklist", "item")

@@ -16,7 +16,7 @@ from app.models import CategoryGeneral, Company, TypeCost, TypeGeneral
 from axx.models import Ctr, Exp, Inv, Load, Tor, Trip
 from att.models import Contact, ContactSite, Person, Vehicle
 
-from .utils import dynamic_upload_path, user_photo_upload_path
+from .utils import user_photo_upload_path
 
 import logging
 logger = logging.getLogger(__name__)
@@ -87,22 +87,33 @@ class DocumentType(models.Model):
     uf = models.CharField(max_length=36, default=hex_uuid, unique=True)
     company = models.ForeignKey(
         Company, on_delete=models.CASCADE, null=True, blank=True, related_name='company_document_types')
-    contact = models.ForeignKey(
-        Contact, on_delete=models.CASCADE, null=True, blank=True, related_name='contact_document_types')
 
-    document_name = models.CharField(max_length=255)
-    code = models.CharField(max_length=50, null=True, blank=True)
+    code = models.CharField(max_length=50)
+    name = models.CharField(max_length=100)
     description = models.TextField(blank=True, null=True)
 
-    is_for_vehicle = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
+
+    order = models.PositiveIntegerField(default=0)
+
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='created_by_document_types'
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    is_system = models.BooleanField(default=False)
 
     class Meta:
         verbose_name = "Document Type"
         verbose_name_plural = "Document Types"
 
     def __str__(self):
-        return self.document_name
+        return self.name
 
 
 class Document(models.Model):

@@ -1,7 +1,7 @@
 from django.contrib import admin
 
 from app.views import User
-from ayy.models import AuthorizationStockBatch, CMRStockBatch, ColliType, DamageReport, EmailTemplate, ImageUpload, ItemCost, ItemForItemCost, MailLabelV2, MailMessage, PhoneNumber, UserEmail
+from ayy.models import AuthorizationStockBatch, CMRStockBatch, ColliType, DamageReport, DocumentType, EmailTemplate, ImageUpload, ItemCost, ItemForItemCost, MailLabelV2, MailMessage, PhoneNumber, UserEmail
 
 
 @admin.register(CMRStockBatch)
@@ -94,4 +94,13 @@ class ItemForItemCostAdmin(admin.ModelAdmin):
                     'description', 'code', 'vat', 'is_system')
 
     search_fields = ('company__company_name',
+                     )
+
+
+@admin.register(DocumentType)
+class DocumentTypeAdmin(admin.ModelAdmin):
+    list_display = ('id', 'company', 'code', 'name',
+                    'description', 'is_system', 'uf',)
+
+    search_fields = ('company__company_name', 'code', 'name', 'description',
                      )

@@ -1,4 +1,3 @@
-import smtplib
 from datetime import datetime, timedelta
 from django.db import IntegrityError
 from django.utils import timezone
@@ -18,9 +17,14 @@ from rest_framework_simplejwt.views import (
 )
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from djoser.social.views import ProviderAuthView
+from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.response import Response
+from rest_framework import status
 
 import logging
 
+from app.models import UserProfile
+from app.serializers import UserProfileSerializer
 from app.utils import get_all_exchange_rates
 logger = logging.getLogger(__name__)
 
@@ -300,7 +304,7 @@ class LogoutView(APIView):
         return response
 
 
-###### Start other views ######
+###### OTHER VIEWS ######
 
 
 @api_view(['GET'])
@@ -322,4 +326,26 @@ def get_exchange_rates_multi_view(request):
         return Response(status=400)
 
 
-###### End other views ######
+class UserProfileView(APIView):
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def get_profile(self, user):
+        profile, _ = UserProfile.objects.get_or_create(user=user)
+        return profile
+
+    def get(self, request):
+        profile = self.get_profile(request.user)
+        serializer = UserProfileSerializer(profile)
+        return Response(serializer.data)
+
+    def patch(self, request):
+        profile = request.user.user_profile
+        serializer = UserProfileSerializer(
+            profile,
+            data=request.data,
+            partial=True
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_200_OK)

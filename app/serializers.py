@@ -2,6 +2,7 @@
 from django.contrib.auth.models import Group
 from django.contrib.auth import get_user_model
 from django.db import transaction
+from django.conf import settings
 from rest_framework import serializers
 from drf_writable_nested.serializers import WritableNestedModelSerializer
 from drf_writable_nested.mixins import NestedCreateMixin, NestedUpdateMixin, UniqueFieldsMixin
@@ -11,7 +12,7 @@ import logging
 from abb.models import Currency
 from abb.serializers import CountrySerializer, CurrencySerializer
 from abb.utils import company_latest_exp_date_subscription, get_company_manager, get_company_users, get_user_company
-from app.models import Company, UserSettings
+from app.models import Company, UserProfile, UserSettings
 from dff.serializers.serializers_bce import ImageUploadOutSerializer
 
 logger = logging.getLogger(__name__)
@@ -42,6 +43,8 @@ class UserBasicSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
 class UserBasicPlusSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
     from ayy.serializers import PhoneNumberSerializer, DocumentSerializer
 
+    avatar_url = serializers.SerializerMethodField()
+
     user_documents = DocumentSerializer(
         many=True, context={'request': 'request'})
     user_phone_numbers = PhoneNumberSerializer(
@@ -68,8 +71,18 @@ class UserBasicPlusSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
         fields = ('email', 'first_name', 'last_name', 'personal_id', 'uf',
                   'comment', 'date_registered', 'date_of_birth', 'date_termination', 'is_archived',
                   'image', 'phone', 'messanger',
+                  'avatar_url',
                   'user_documents', 'user_phone_numbers', 'user_imageuploads',
                   )
+
+    def get_avatar_url(self, obj):
+        try:
+            profile = obj.user_profile
+            if profile.avatar:
+                return f"{settings.BACKEND_URL}{profile.avatar.url}"
+        except Exception:
+            pass
+        return None
 
 
 class UserSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
@@ -136,6 +149,8 @@ class UserSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
                   'date_registered', 'date_of_birth', 'date_termination', 'is_archived',
                   'company',
                   'user_documents', 'user_phone_numbers', 'user_imageuploads',
+
+
                   )
 
 
@@ -152,3 +167,20 @@ class UserSettingsSerializer(serializers.ModelSerializer):
                   'trip_loads_columns', 'trip_columns', 'tor_columns', 'ctr_columns', 'quote_columns', 'inv_columns', 'exp_columns',
                   'default_document_tab',
                   )
+
+
+class UserProfileSerializer(serializers.ModelSerializer):
+    avatar = serializers.SerializerMethodField()
+
+    class Meta:
+        model = UserProfile
+        fields = (
+            "uf",
+            "position",
+            "avatar",
+        )
+
+    def get_avatar(self, obj):
+        if obj.avatar:
+            return f"{settings.BACKEND_URL}{obj.avatar.url}"
+        return None

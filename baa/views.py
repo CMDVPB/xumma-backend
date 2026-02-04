@@ -3,6 +3,7 @@ from django.utils import timezone
 from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
 from django.db.models import Exists, OuterRef, Q
+from django.http import FileResponse, Http404
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 from rest_framework.generics import CreateAPIView, ListAPIView, ListCreateAPIView, RetrieveAPIView, GenericAPIView, \
@@ -10,10 +11,34 @@ from rest_framework.generics import CreateAPIView, ListAPIView, ListCreateAPIVie
 from rest_framework.exceptions import PermissionDenied, NotFound
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.parsers import MultiPartParser, FormParser
 
+from abb.utils import get_user_company
 from att.models import Vehicle
 from baa.models import VehicleChecklist, VehicleChecklistAnswer, VehicleChecklistItem, VehicleChecklistPhoto, VehicleEquipment
-from baa.serializers import VehicleChecklistAnswerSerializer, VehicleChecklistItemSerializer, VehicleChecklistPhotoSerializer, VehicleChecklistSerializer, VehicleEquipmentSerializer
+from baa.serializers import VehicleChecklistAnswerSerializer, VehicleChecklistItemSerializer, VehicleChecklistListSerializer, VehicleChecklistPhotoSerializer, VehicleChecklistSerializer, VehicleEquipmentSerializer
+
+
+class VehicleChecklistListAPIView(ListAPIView):
+    """
+    List all vehicle checklists (history + active).
+    """
+    serializer_class = VehicleChecklistListSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        user_company = get_user_company(user)
+
+        qs = VehicleChecklist.objects.select_related(
+            "vehicle", "driver"
+        ).prefetch_related(
+            "checklist_answers"
+        )
+
+        qs = qs.filter(company=user_company)
+
+        return qs.order_by("-started_at")
 
 
 class StartVehicleChecklistAPIView(APIView):
@@ -47,21 +72,19 @@ class StartVehicleChecklistAPIView(APIView):
 
 
 class VehicleChecklistAnswerAPIView(UpdateAPIView):
-    queryset = VehicleChecklistAnswer.objects.all()
-    serializer_class = VehicleChecklistAnswerSerializer
     permission_classes = [IsAuthenticated]
+    serializer_class = VehicleChecklistAnswerSerializer
+    queryset = VehicleChecklistAnswer.objects.all()
 
 
 class VehicleChecklistPhotoCreateAPIView(CreateAPIView):
     serializer_class = VehicleChecklistPhotoSerializer
     permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
 
     def perform_create(self, serializer):
-        serializer.save(
-            answer_id=self.kwargs["answer_id"],
-            company=self.request.user.company if hasattr(
-                self.request.user, "company") else None,
-        )
+        answer_id = self.kwargs["answer_id"]
+        serializer.save(answer_id=answer_id)
 
 
 class FinishChecklistAPIView(APIView):
@@ -91,6 +114,7 @@ class VehicleChecklistDetailAPIView(RetrieveAPIView):
     queryset = VehicleChecklist.objects.select_related(
         "vehicle", "driver"
     ).prefetch_related(
+        "checklist_answers__item",
         "checklist_answers__answer_photos"
     )
     serializer_class = VehicleChecklistSerializer
@@ -118,4 +142,43 @@ class VehicleEquipmentListCreateAPIView(ListCreateAPIView):
 class VehicleEquipmentUpdateAPIView(UpdateAPIView):
     queryset = VehicleEquipment.objects.all()
     serializer_class = VehicleEquipmentSerializer
+    permission_classes = [IsAuthenticated]
+
+
+class InspectionFileProxyView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, uf):
+        try:
+            photo = VehicleChecklistPhoto.objects.select_related(
+                "answer__checklist"
+            ).get(uf=uf)
+        except VehicleChecklistPhoto.DoesNotExist:
+            raise Http404()
+
+        user_company = get_user_company(request.user)
+
+        if (
+            photo.answer.checklist.company
+            and user_company != photo.answer.checklist.company
+        ):
+            raise Http404()
+
+        return FileResponse(
+            photo.image.open(),
+            content_type="image/jpeg",
+        )
+
+
+class InspectionFileUploadView(CreateAPIView):
+    serializer_class = VehicleChecklistPhotoSerializer
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def perform_create(self, serializer):
+        serializer.save(answer_id=self.request.data.get("answer_id"))
+
+
+class InspectionFileDeleteView(DestroyAPIView):
+    queryset = VehicleChecklistPhoto.objects.all()
     permission_classes = [IsAuthenticated]

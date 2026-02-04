@@ -8,10 +8,11 @@ from django.core.exceptions import ValidationError
 
 from abb.models import Currency, Country, BodyType
 from abb.custom_exceptions import CustomApiException
-from abb.utils import hex_uuid, get_contact_type_default, normalize_reg_number
+from abb.utils import hex_uuid, get_contact_type_default, image_upload_path, normalize_reg_number
 from abb.mixins import ProtectedDeleteMixin
 from abb.constants import APP_LANGS_TUPLE, DOCUMENT_STATUS_CHOICES, VEHICLE_TYPES
 from app.models import CategoryGeneral, Company, TypeGeneral, UnavailabilityReason
+
 
 logger = logging.getLogger(__name__)
 
@@ -94,6 +95,49 @@ class TargetGroup(models.Model):
         return self.id or ''
 
 
+class ContactStatus(models.Model):
+    uf = models.CharField(max_length=36, default=hex_uuid,
+                          unique=True, db_index=True)
+    company = models.ForeignKey(
+        Company, on_delete=models.CASCADE, null=True, blank=True, related_name='company_contact_statuses')
+
+    code = models.CharField(
+        max_length=30,
+        unique=True,
+        db_index=True
+    )
+    name = models.CharField(
+        max_length=100
+    )
+    description = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True
+    )
+
+    # behavior flags
+    is_blocking = models.BooleanField(
+        default=False,
+        help_text="If true, contact cannot be used in operations"
+    )
+    severity = models.PositiveSmallIntegerField(
+        default=0,
+        help_text="Higher = worse (used for sorting & UI color)"
+    )
+
+    is_active = models.BooleanField(default=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Contact Status"
+        verbose_name_plural = "Contact Statuses"
+        ordering = ["severity", "name"]
+
+    def __str__(self):
+        return self.name
+
+
 class ContactManager(models.Manager):
     def get_by_natural_key(self, name):
         return self.get(name=name)
@@ -153,6 +197,16 @@ class Contact(models.Model):
     contract_reference_date = models.ForeignKey(
         ContractReferenceDate, on_delete=models.SET_NULL, related_name='contract_reference_date_contacts', null=True, blank=True)
 
+    status = models.ForeignKey(
+        ContactStatus,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="status_contacts"
+    )
+
+    status_updated_at = models.DateTimeField(auto_now=True)
+
     objects = ContactManager()
 
     class Meta:
@@ -173,8 +227,56 @@ class Contact(models.Model):
     def natural_key(self):
         return (self.company_name)
 
+    @property
+    def is_blocked(self):
+        return bool(self.status and self.status.is_blocking)
+
     def __str__(self):
         return self.company_name or str(self.id) or ''
+
+
+class ContactStatusHistory(models.Model):
+    contact = models.ForeignKey(
+        Contact,
+        on_delete=models.CASCADE,
+        related_name="status_histories"
+    )
+
+    old_status = models.ForeignKey(
+        ContactStatus,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="old_status_histories"
+    )
+    new_status = models.ForeignKey(
+        ContactStatus,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="new_status_histories"
+    )
+
+    reason = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True
+    )
+
+    changed_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="changed_by_status_histories"
+    )
+
+    changed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Contact Status History"
+        verbose_name_plural = "Contact Status History"
+        ordering = ["-changed_at"]
 
 
 class ContractTemplate(models.Model):
@@ -479,6 +581,44 @@ class Vehicle(ProtectedDeleteMixin, models.Model):
 
     def __str__(self):
         return self.reg_number or ''
+
+
+class VehicleDocument(models.Model):
+    vehicle = models.ForeignKey(
+        Vehicle,
+        on_delete=models.CASCADE,
+        related_name='vehicle_documents'
+    )
+
+    document_type = models.ForeignKey(
+        'ayy.DocumentType',
+        on_delete=models.PROTECT,
+        related_name='document_type_vehicle_documents'
+    )
+
+    document_number = models.CharField(
+        max_length=100,
+        blank=True
+    )
+
+    date_issued = models.DateField()
+    date_expiry = models.DateField(null=True, blank=True)
+
+    file = models.FileField(
+        upload_to=image_upload_path,
+        null=True,
+        blank=True
+    )
+
+    notes = models.TextField(blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-date_expiry']
+
+    def __str__(self):
+        return f'{self.vehicle} – {self.document_type}'
 
 
 class VehicleUnavailability(models.Model):

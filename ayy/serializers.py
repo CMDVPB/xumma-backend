@@ -13,7 +13,7 @@ from abb.serializers import CurrencySerializer
 from abb.serializers_drf_writable import CustomWritableNestedModelSerializer, CustomUniqueFieldsMixin
 from abb.utils import get_user_company
 from app.models import TypeCost
-from ayy.models import Document, ItemCost, ItemForItemCost, PhoneNumber
+from ayy.models import Document, DocumentType, ItemCost, ItemForItemCost, PhoneNumber
 from ayy.services.fuel_sync import sync_fueling_from_item_cost
 
 
@@ -241,3 +241,39 @@ class DocumentSerializer(CustomUniqueFieldsMixin, CustomWritableNestedModelSeria
         lookup_field = 'uf'
         fields = ('doc_det', 'date_exp', 'uf',
                   )
+
+
+###### START DOCUMENT TYPE SERIALIZERS ######
+
+
+class DocumentTypeCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DocumentType
+        fields = ['code', 'name', 'description']
+
+    def create(self, validated_data):
+        user = self.context['request'].user
+
+        user_company = get_user_company(user)
+
+        return DocumentType.objects.create(
+            company=user_company,
+            created_by=user,
+            is_system=False,
+            **validated_data
+        )
+
+
+class DocumentTypeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DocumentType
+        fields = [
+            'id',
+            'code',
+            'name',
+            'description',
+            'is_system',
+            'uf',
+        ]
+
+###### END DOCUMENT TYPE SERIALIZERS ######

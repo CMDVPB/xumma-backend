@@ -9,7 +9,9 @@ from abb.models import BodyType, Currency, Incoterm, ModeType, StatusType
 from abb.serializers_drf_writable import CustomUniqueFieldsMixin, CustomWritableNestedModelSerializer
 from abb.utils import get_request_language, get_user_company
 from app.models import CategoryGeneral, TypeGeneral
-from att.models import Contact, EmissionClass, RouteSheetStockBatch, VehicleBrand, Vehicle, VehicleKmRate
+from att.models import Contact, ContactStatus, EmissionClass, RouteSheetStockBatch, VehicleBrand, Vehicle, VehicleDocument, VehicleKmRate
+from ayy.models import DocumentType
+from ayy.serializers import DocumentTypeSerializer
 from dff.serializers.serializers_bce import ImageUploadOutSerializer
 
 
@@ -112,6 +114,45 @@ class VehicleKmRateSerializer(serializers.ModelSerializer):
         )
 
 
+class VehicleDocumentSerializer(serializers.ModelSerializer):
+    document_type = DocumentTypeSerializer(read_only=True)
+    document_type_id = serializers.PrimaryKeyRelatedField(
+        queryset=DocumentType.objects.all(),
+        source='document_type',
+        write_only=True
+    )
+
+    vehicle = serializers.PrimaryKeyRelatedField(
+        queryset=Vehicle.objects.all()
+    )
+
+    class Meta:
+        model = VehicleDocument
+        fields = [
+            'id',
+            'vehicle',
+            'document_type',
+            'document_type_id',
+            'document_number',
+            'date_issued',
+            'date_expiry',
+            'file',
+            'notes',
+        ]
+    read_only_fields = ('id', 'created_at')
+
+    def validate(self, attrs):
+        date_issued = attrs.get('date_issued')
+        date_expiry = attrs.get('date_expiry')
+
+        if date_expiry and date_issued and date_expiry < date_issued:
+            raise serializers.ValidationError({
+                'date_expiry': 'Expiry date must be after issue date'
+            })
+
+        return attrs
+
+
 class VehicleSerializer(WritableNestedModelSerializer):
 
     contact = SlugRelatedField(
@@ -129,8 +170,7 @@ class VehicleSerializer(WritableNestedModelSerializer):
 
     vehicle_km_rates = VehicleKmRateSerializer(many=True)
     vehicle_imageuploads = ImageUploadOutSerializer(many=True, read_only=True)
-
-    # vehicle_gendocs = GenDocSerializer(many=True)
+    vehicle_documents = VehicleDocumentSerializer(many=True)
 
     def _empty_strings_to_none(self, data, fields):
         for field in fields:
@@ -158,56 +198,16 @@ class VehicleSerializer(WritableNestedModelSerializer):
 
         return super().to_internal_value(data)
 
-    # def create(self, validated_data):
-    #     # print('1614:', validated_data)
-    #     relations, reverse_relations = self._extract_relations(validated_data)
-
-    #     # Create or update direct relations (foreign key, one-to-one)
-    #     self.update_or_create_direct_relations(
-    #         validated_data,
-    #         relations,
-    #     )
-
-    #     # Create instance with atomic
-    #     with transaction.atomic():
-    #         instance = super(NestedCreateMixin,
-    #                          self).create(validated_data)
-    #         self.update_or_create_reverse_relations(
-    #             instance, reverse_relations)
-
-    #     return instance
-
-    # def update(self, instance, validated_data):
-    #     # print('3347', validated_data, instance)
-    #     relations, reverse_relations = self._extract_relations(validated_data)
-
-    #     # Create or update direct relations (foreign key, one-to-one)
-    #     self.update_or_create_direct_relations(
-    #         validated_data,
-    #         relations,
-    #     )
-
-    #     # Update instance with atomic
-    #     with transaction.atomic():
-    #         instance = super(NestedUpdateMixin, self).update(
-    #             instance,
-    #             validated_data,
-    #         )
-    #         self.update_or_create_reverse_relations(
-    #             instance, reverse_relations)
-    #         self.delete_reverse_relations_if_need(instance, reverse_relations)
-    #         instance.refresh_from_db()
-    #         return instance
-
     class Meta:
         model = Vehicle
         fields = ('id', 'reg_number', 'vin', 'vehicle_type', 'date_registered', 'is_available', 'is_archived', 'is_service', 'uf',
                   'length', 'width', 'height', 'weight_capacity', 'volume_capacity',
-                  'tank_volume', 'adblue_tank_volume', 'change_oil_interval', 'consumption_summer', 'consumption_winter', 'buy_price', 'sell_price', 'km_initial',
+                  'tank_volume', 'adblue_tank_volume', 'change_oil_interval', 'consumption_summer', 'consumption_winter',
+                  'buy_price', 'sell_price', 'km_initial',
                   'interval_taho', 'last_date_unload_taho', 'comment',
                   'brand', 'vehicle_category', 'vehicle_category_type', 'vehicle_body', 'emission_class',
                   'contact',
-                  'vehicle_imageuploads', 'vehicle_km_rates',
+                  'vehicle_imageuploads', 'vehicle_km_rates', 'vehicle_documents'
                   )
 
 
@@ -229,3 +229,29 @@ class RouteSheetStockBatchSerializer(WritableNestedModelSerializer):
             company=company,
             **validated_data
         )
+
+
+class ContactStatusSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ContactStatus
+        fields = (
+            "id",
+            "code",
+            "name",
+            "description",
+            "is_blocking",
+            "severity",
+        )
+
+
+class ContactStatusUpdateSerializer(serializers.Serializer):
+    status_id = serializers.PrimaryKeyRelatedField(
+        queryset=ContactStatus.objects.filter(is_active=True),
+        source="status"
+    )
+    reason = serializers.CharField(
+        max_length=255,
+        required=False,
+        allow_blank=True,
+        allow_null=True
+    )

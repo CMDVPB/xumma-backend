@@ -522,6 +522,15 @@ def image_upload_path(instance, filename):
 
     model = instance.__class__.__name__
 
+    if model == "UserProfile":
+        return f"{base}/users/{instance.user.id}/avatar/{new_name}"
+
+    if model == "PartAttachment":
+        return f"{base}/parts/{instance.part.uf}/{new_name}"
+
+    if model == "VehicleDocument":
+        return f"{base}/vehicles/{instance.vehicle.uf}/documents/{new_name}"
+
     if model == "WorkOrderAttachment":
         return f"{base}/work_orders/{instance.work_order.uf}/{new_name}"
 
@@ -547,31 +556,5 @@ def image_upload_path(instance, filename):
 
     return f"{base}/misc/{new_name}"
 
-    # # WORK ORDER
-    # if hasattr(instance, "work_order") and instance.work_order:
-    #     return f"{base}/work_orders_att/{instance.work_order.uf}/{new_name}"
-
-    # # DRIVER REPORT
-    # if hasattr(instance, "report") and instance.report:
-    #     return f"{base}/driver_reports/{instance.report.uf}/{new_name}"
-
-    # # LOAD
-    # if hasattr(instance, "load") and instance.load:
-    #     return f"{base}/loads/{instance.load.uf}/{new_name}"
-
-    # # VEHICLE
-    # if hasattr(instance, "vehicle") and instance.vehicle:
-    #     return f"{base}/vehicles/{instance.vehicle.uf}/{new_name}"
-
-    # # USER
-    # if hasattr(instance, "user") and instance.user:
-    #     return f"{base}/users/{instance.user.id}/{new_name}"
-
-    # # COMPANY
-    # if hasattr(instance, "company") and instance.company:
-    #     return f"{base}/companies/{instance.company.uf}/{new_name}"
-
-    # # FALLBACK
-    # return f"{base}/misc/{new_name}"
 
 ###### End Image, files uploads utils ######

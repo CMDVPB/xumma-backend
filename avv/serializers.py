@@ -7,7 +7,7 @@ from django.conf import settings
 from abb.utils import get_user_company
 from att.models import Contact, Vehicle
 from .models import (
-    Part, Location, StockBalance,
+    Part, Location, PartAttachment, PartBrand, StockBalance,
     PartRequest, PartRequestLine,
     IssueDocument, IssueLine, StockMovement, Warehouse, UnitOfMeasure, WorkOrder, WorkOrderAttachment, WorkOrderIssue,
     WorkOrderLaborEntry, WorkOrderWorkLine, WorkType
@@ -24,7 +24,33 @@ class UnitOfMeasureSerializer(serializers.ModelSerializer):
                   )
 
 
+class PartBrandSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PartBrand
+        fields = ["id", "uf", "code", "name"]
+
+
+class PartAttachmentSerializer(serializers.ModelSerializer):
+    file_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PartAttachment
+        fields = ["id", "uf", "file_url", "file_name", "content_type"]
+        read_only_fields = fields
+
+    def get_file_url(self, obj):
+        return f"{settings.BACKEND_URL}/api/part-files/{obj.uf}/"
+
+
 class PartSerializer(serializers.ModelSerializer):
+    brand_uf = serializers.SlugRelatedField(
+        source="brand",
+        slug_field="uf",
+        queryset=PartBrand.objects.filter(is_active=True),
+        allow_null=True,
+        required=False,
+        write_only=True,
+    )
     uom_uf = serializers.SlugRelatedField(
         allow_null=True,
         source="uom",  # important
@@ -34,11 +60,17 @@ class PartSerializer(serializers.ModelSerializer):
     )
     uom = UnitOfMeasureSerializer(read_only=True)
 
+    part_attachments = PartAttachmentSerializer(
+        many=True,
+        read_only=True,
+    )
+
     class Meta:
         model = Part
         fields = [
-            "id", "sku", "name", "uom_uf", "uom", "barcode",
-            "min_level", "reorder_level", "reorder_qty", "note", "uf"
+            "id", "sku", "name", "brand_uf", "uom_uf", "uom", "barcode",
+            "min_level", "reorder_level", "reorder_qty", "note", "uf",
+            "part_attachments",
         ]
         read_only_fields = ["id", "is_active", "uf"]
 

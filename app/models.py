@@ -11,7 +11,7 @@ from cryptography.fernet import Fernet
 
 from abb.models import Country, Currency
 from abb.utils import get_default_empty_strings_20, get_order_by_default, \
-    hex_uuid, get_default_notification_status_3, validate_columns_arrayfield_length_min_5
+    hex_uuid, get_default_notification_status_3, image_upload_path, validate_columns_arrayfield_length_min_5
 from abb.constants import BASE_COUNTRIES, BASE_COUNTRIES_LIST, APP_LANGS, DOC_LANG_CHOICES, MEMBERSHIP_CHOICES
 from abb.validators import validate_columns_arrayfield_length_exactly_20
 
@@ -134,6 +134,12 @@ class UserProfile(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    avatar = models.ImageField(
+        upload_to=image_upload_path,
+        null=True,
+        blank=True
+    )
 
     class Meta:
         verbose_name = 'User Profile'
