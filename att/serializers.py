@@ -1,6 +1,8 @@
 from collections import defaultdict
 from django.db import transaction
+from django.conf import settings
 from rest_framework import serializers
+import mimetypes
 from rest_framework.serializers import SlugRelatedField
 from drf_writable_nested.serializers import WritableNestedModelSerializer
 from drf_writable_nested.mixins import UniqueFieldsMixin, NestedCreateMixin, NestedUpdateMixin
@@ -126,18 +128,33 @@ class VehicleDocumentSerializer(serializers.ModelSerializer):
         queryset=Vehicle.objects.all()
     )
 
+    file_url = serializers.SerializerMethodField(read_only=True)
+    content_type = serializers.SerializerMethodField()
+
+    # def update(self, instance, validated_data):
+    #     new_file = validated_data.get('file')
+
+    #     if new_file and instance.file:
+    #         instance.file.delete(save=False)
+
+    #     return super().update(instance, validated_data)
+
     class Meta:
         model = VehicleDocument
         fields = [
             'id',
+            'uf',
             'vehicle',
             'document_type',
             'document_type_id',
             'document_number',
             'date_issued',
             'date_expiry',
-            'file',
+
             'notes',
+            'file',
+            'file_url',            # for download
+            'content_type',       # file content_type
         ]
     read_only_fields = ('id', 'created_at')
 
@@ -151,6 +168,18 @@ class VehicleDocumentSerializer(serializers.ModelSerializer):
             })
 
         return attrs
+
+    def get_file_url(self, obj):
+        if obj.file:
+            return f"{settings.BACKEND_URL}/api/documents-files/{obj.uf}/"
+        return None
+
+    def get_content_type(self, obj):
+        if not obj.file:
+            return None
+
+        content_type, _ = mimetypes.guess_type(obj.file.name)
+        return content_type
 
 
 class VehicleSerializer(WritableNestedModelSerializer):

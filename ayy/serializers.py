@@ -249,7 +249,8 @@ class DocumentSerializer(CustomUniqueFieldsMixin, CustomWritableNestedModelSeria
 class DocumentTypeCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = DocumentType
-        fields = ['code', 'name', 'description']
+        fields = ['id', 'code', 'name', 'description', 'uf']
+        read_only_fields = ['id', 'uf']
 
     def create(self, validated_data):
         user = self.context['request'].user

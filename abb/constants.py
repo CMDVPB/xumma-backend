@@ -78,6 +78,7 @@ EMAIL_TEMPLATE_CODES = {
     "request_info_from_shipper",
     "request_info_from_consignee",
     "send_docs_to_import_broker",
+    "send_documents_to_customer",
 }
 
 SYSTEM_LABELS = [

@@ -24,6 +24,7 @@ from rest_framework import status
 from rest_framework.parsers import MultiPartParser, FormParser
 
 from abb.utils import get_user_company
+from axx.models import Load
 from ayy.models import EmailTemplate, EmailTemplateTranslation, ImageUpload, MailLabelV2, MailMessage, UserEmail, UserEmailAttachment
 from eml.serializers import EmailTemplateCreateSerializer, EmailTemplateDetailSerializer, EmailTemplateSerializer, \
     EmailTemplateUpdateSerializer, MailLabelV2Serializer, MailMessageDetailSerializer, MailMessageListSerializer
@@ -69,6 +70,22 @@ class BasicEmailOptionalAttachmentsView(APIView):
         load_uf = request.data.get('loadUf')
         event_type = request.data.get('eventType')
 
+        attachments_meta = request.data.getlist('attachmentsMeta')
+        meta_map = {}
+        for raw in attachments_meta:
+            try:
+                data = json.loads(raw)
+                meta_map[data.get('filename')] = data.get('document_type')
+            except Exception:
+                pass
+
+        load = None
+        if load_uf:
+            load = Load.objects.filter(
+                uf=load_uf,
+                company=get_user_company(user)
+            ).first()
+
         with transaction.atomic():
             email = UserEmail.objects.create(
                 user=user,
@@ -80,7 +97,7 @@ class BasicEmailOptionalAttachmentsView(APIView):
                 status='queued'
             )
 
-            print('3340', attachments_ufs)
+            print('3340', meta_map)
 
             # 🔹 Attach ImageUpload files (if provided) via UFs
             if attachments_ufs:
@@ -101,7 +118,7 @@ class BasicEmailOptionalAttachmentsView(APIView):
 
             print('3348', files)
 
-            # 📎 Save attachments (if any)
+            # Save attachments (if any)
             for f in files:
                 UserEmailAttachment.objects.create(
                     email=email,
@@ -109,6 +126,37 @@ class BasicEmailOptionalAttachmentsView(APIView):
                     filename=f.name,
                     size=f.size,
                 )
+
+                # ALSO save as ImageUpload on Load
+                if load:
+                    document_type = meta_map.get(f.name)
+
+                    if document_type:
+                        existing = ImageUpload.objects.filter(
+                            load=load,
+                            source='generated',
+                            document_type=document_type,
+                        ).first()
+
+                        if existing:
+                            # remove old file from storage
+                            if existing.file_obj:
+                                existing.file_obj.delete(save=False)
+
+                            # replace file + metadata
+                            existing.file_obj = f
+                            existing.status = 'final'
+                            existing.company = get_user_company(user)
+                            existing.save()
+                        else:
+                            ImageUpload.objects.create(
+                                company=get_user_company(user),
+                                file_obj=f,
+                                load=load,
+                                source='generated',
+                                status='final',
+                                document_type=document_type,
+                            )
 
             ### safe get-or-create "Sent" label ###
             sent_label, _ = MailLabelV2.objects.get_or_create(

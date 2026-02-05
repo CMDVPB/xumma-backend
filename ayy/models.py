@@ -169,6 +169,16 @@ class UserPhoto(models.Model):
 
 
 class ImageUpload(models.Model):
+    SOURCE_CHOICES = (
+        ('upload', 'User upload'),
+        ('generated', 'System generated'),
+    )
+
+    STATUS_CHOICES = (
+        ('draft', 'Draft'),
+        ('final', 'Final'),
+    )
+
     uf = models.CharField(max_length=36, default=hex_uuid)
     company = models.ForeignKey(
         Company, on_delete=models.CASCADE, null=True, blank=True, related_name='company_imageuploads')
@@ -186,6 +196,20 @@ class ImageUpload(models.Model):
         Vehicle, on_delete=models.CASCADE, null=True, blank=True, related_name='vehicle_imageuploads')
     damage = models.ForeignKey(
         'DamageReport', on_delete=models.CASCADE, null=True, blank=True, related_name='damage_imageuploads')
+
+    source = models.CharField(max_length=20, choices=SOURCE_CHOICES)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES)
+
+    document_type = models.CharField(
+        max_length=50,
+        choices=(
+            ('invoice', 'Invoice'),
+            ('order', 'Order'),
+            ('act', 'Act of execution'),
+        ),
+        null=True,
+        blank=True
+    )
 
     def clean(self):
         relations = [self.load, self.vehicle, self.user]

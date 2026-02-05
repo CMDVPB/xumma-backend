@@ -584,6 +584,11 @@ class Vehicle(ProtectedDeleteMixin, models.Model):
 
 
 class VehicleDocument(models.Model):
+    uf = models.CharField(max_length=36, default=hex_uuid,
+                          db_index=True, unique=True)
+    company = models.ForeignKey(
+        Company, on_delete=models.CASCADE, null=True, blank=True, related_name='company_vehicle_documents')
+
     vehicle = models.ForeignKey(
         Vehicle,
         on_delete=models.CASCADE,

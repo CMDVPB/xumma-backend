@@ -211,7 +211,7 @@ class ContactBasicReadSerializer(WritableNestedModelSerializer):
 
     class Meta:
         model = Contact
-        fields = ('fiscal_code', 'company_name', 'zip_code_post', 'city_post', 'address_post', 'lat', 'lon', 'uf',
+        fields = ('fiscal_code', 'company_name', 'email', 'zip_code_post', 'city_post', 'address_post', 'lat', 'lon', 'uf',
                   'country_code_post', 'status',
                   )
 

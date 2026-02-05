@@ -42,9 +42,9 @@ User = get_user_model()
 
 class LoadListView(ListAPIView):
     ''' Get list of loads'''
+    permission_classes = [IsAuthenticated]
     pagination_class = CustomInfiniteCursorPagination
     serializer_class = LoadListSerializer
-    permission_classes = [IsAuthenticated]
     lookup_field = 'uf'
 
     def get_queryset(self):

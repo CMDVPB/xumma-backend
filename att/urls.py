@@ -3,7 +3,7 @@ from rest_framework.urlpatterns import format_suffix_patterns
 
 from att.views import BodyTypeListView, CategoryGeneralListView, ContactStatusListAPIView, ContactStatusUpdateAPIView, EmissionClassListView, IncotermListView, \
     ModeTypeListView, RouteSheetStockBatchDetailsView, RouteSheetStockBatchListCreateView, StatusTypeListView, TypeGeneralListView, VehicleBrandListView, VehicleCreateView, \
-    VehicleDetailView, VehicleDocumentCreateView, VehicleDocumentDeleteView, VehicleDocumentListView, VehicleDocumentUpdateView, VehicleListView
+    VehicleDetailView, VehicleDocumentCreateView, VehicleDocumentFileDeleteView, VehicleDocumentFileView, VehicleDocumentListView, VehicleDocumentUpdateView, VehicleListView
 
 urlpatterns = [
 
@@ -36,10 +36,15 @@ urlpatterns = [
          name='vehicle-document-create'),
     path('vehicle-documents/<int:pk>/',
          VehicleDocumentUpdateView.as_view(), name='vehicle-document-update'),
-    path('vehicle-documents/<int:pk>/delete/',
-         VehicleDocumentDeleteView.as_view(), name='vehicle-document-delete'),
+    path(
+        'vehicle-documents/<str:uf>/file/',
+        VehicleDocumentFileDeleteView.as_view(),
+        name='vehicle-document-file-delete',
+    ),
     path('vehicle-documents/list/', VehicleDocumentListView.as_view(),
          name='vehicle-document-list'),
+    path('documents-files/<str:uf>/', VehicleDocumentFileView.as_view(),
+         name='vehicle-document-file'),
 
 
     path("contact-statuses/", ContactStatusListAPIView.as_view(),

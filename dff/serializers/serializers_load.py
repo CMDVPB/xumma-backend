@@ -698,7 +698,6 @@ class LoadListForTripSerializer(UniqueFieldsMixin, WritableNestedModelSerializer
     mode = ModeTypeSerializer(allow_null=True)
     bt = BodyTypeSerializer(allow_null=True)
     # currency = CurrencySerializer(allow_null=True)
-    # status = StatusTypeSerializer(allow_null=True)
 
     entry_loads = EntryBasicReadListSerializer(many=True)
     load_iteminvs = ItemInvSerializer(many=True)
