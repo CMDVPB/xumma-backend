@@ -189,9 +189,11 @@ class LoadListSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
                   'load_comments', 'load_tors', 'entry_loads', 'load_iteminvs', 'load_events',
                   'load_imageuploads',
 
-                  'payment_term_days'
+                  'payment_term_days',
+
+
                   )
-        read_only_fields = ['load_events']
+        read_only_fields = ['load_events', 'is_invoiced', 'date_invoiced']
 
 
 class LoadSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
@@ -508,8 +510,10 @@ class LoadSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
                   'load_histories', 'load_exps',
                   'trip', 'carrier', 'person_carrier', 'driver', 'vehicle_tractor', 'vehicle_trailer',
                   'load_events',
+
+
                   )
-        read_only_fields = ['load_events']
+        read_only_fields = ['load_events', 'is_invoiced', 'date_invoiced']
 
 
 class LoadPatchSerializer(WritableNestedModelSerializer):
@@ -714,3 +718,16 @@ class LoadListForTripSerializer(UniqueFieldsMixin, WritableNestedModelSerializer
                   'load_comments', 'entry_loads', 'load_iteminvs', 'load_events',
                   )
         read_only_fields = ['load_events']
+
+
+class IssueInvoiceSerializer(serializers.Serializer):
+    invoice_amount = serializers.DecimalField(
+        max_digits=12,
+        decimal_places=4
+    )
+    exchange_rate = serializers.DecimalField(
+        max_digits=12,
+        decimal_places=6
+    )
+    rate_date = serializers.DateField()
+    is_overridden = serializers.BooleanField(default=False)

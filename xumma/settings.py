@@ -437,3 +437,6 @@ LOGGING = {
         },
     },
 }
+
+# wkhtmltopdf binary path (Windows)
+WKHTMLTOPDF_CMD = r"C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe"

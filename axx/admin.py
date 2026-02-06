@@ -1,12 +1,18 @@
 from django.contrib import admin
 
-from axx.models import Inv, Load, LoadEvent, Trip, TripAdvancePayment, TripAdvancePaymentStatus, TripDriver
+from axx.models import Inv, Load, LoadEvent, LoadInv, Trip, TripAdvancePayment, TripAdvancePaymentStatus, TripDriver
 
 
 @admin.register(Load)
 class LoadAdmin(admin.ModelAdmin):
-    list_display = ('id', 'company', 'is_loaded',
+    list_display = ('id', 'company', 'sn', 'is_loaded',
                     'is_cleared', 'is_unloaded', 'is_invoiced')
+
+
+@admin.register(LoadInv)
+class LoadInvAdmin(admin.ModelAdmin):
+    list_display = ('id', 'company', 'load', 'issued_date', 'amount_mdl',
+                    )
 
 
 @admin.register(LoadEvent)

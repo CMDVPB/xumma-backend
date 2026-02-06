@@ -410,6 +410,95 @@ class LoadEvent(models.Model):
     #     unique_together = ('load', 'event_type')
 
 
+class LoadInv(models.Model):
+    uf = models.CharField(max_length=36, default=hex_uuid,
+                          db_index=True, unique=True)
+    company = models.ForeignKey(
+        Company, on_delete=models.CASCADE, null=True, blank=True, related_name='company_load_invs')
+
+    load = models.ForeignKey(
+        Load,
+        on_delete=models.PROTECT,
+        related_name='issued_load_invs'
+    )
+
+    issued_at = models.DateTimeField(auto_now_add=True)
+    issued_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='issued_by_load_invs'
+    )
+
+    invoice_number = models.CharField(max_length=32, null=True, blank=True)
+    issued_date = models.DateField(null=True, blank=True)
+
+    amount_mdl = models.DecimalField(
+        max_digits=12,
+        decimal_places=4
+    )
+
+    exchange_rate = models.DecimalField(
+        max_digits=12,
+        decimal_places=6
+    )
+
+    rate_date = models.DateField()
+
+    original_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=4
+    )
+
+    amount_overridden = models.BooleanField(default=False)
+
+    currency = models.CharField(max_length=3)
+
+    STATUS_CHOICES = (
+        ('issued', 'Issued'),
+        ('cancelled', 'Cancelled'),
+    )
+    status = models.CharField(
+        max_length=16,
+        choices=STATUS_CHOICES,
+        default='issued'
+    )
+
+    INVOICE_TYPE_CHOICES = (
+        ('standard', 'Standard'),
+        ('credit', 'Credit note'),
+        ('debit', 'Debit note'),
+    )
+    invoice_type = models.CharField(
+        max_length=16,
+        choices=INVOICE_TYPE_CHOICES,
+        default='standard'
+    )
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['issued_date']),
+            models.Index(fields=['company']),
+            models.Index(fields=['status']),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['company', 'invoice_number'],
+                name='uniq_invoice_number_per_company'
+            )
+        ]
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            original = LoadInv.objects.get(pk=self.pk)
+            if original.status == 'issued':
+                raise ValidationError('Issued invoices cannot be modified')
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f'Invoice {self.invoice_number} ({self.company})'
+
+
 class Tor(models.Model):
     ''' Carrier transport order '''
     company = models.ForeignKey(
@@ -634,7 +723,7 @@ class Inv(models.Model):
     status = models.ForeignKey(
         StatusType, on_delete=models.SET_NULL, blank=True, null=True, related_name='status_invs')
     load = models.ForeignKey(
-        Load, on_delete=models.SET_NULL, blank=True, null=True, related_name='load_invs',)
+        Load, on_delete=models.SET_NULL, blank=True, null=True, related_name='load_invs')
     contract_terms = models.ForeignKey(Term, on_delete=models.SET_NULL,
                                        blank=True, null=True, related_name='contract_terms_invs')
 

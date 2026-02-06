@@ -11,12 +11,14 @@ from django.conf import settings
 from django.db import IntegrityError
 from django.db.models import QuerySet, Prefetch, Q, F
 from django.core.exceptions import PermissionDenied
+from django.db import transaction
+from django.shortcuts import get_object_or_404
 from djoser import signals
 from djoser.compat import get_user_email
 from djoser.email import ActivationEmail, ConfirmationEmail
 from rest_framework import permissions, status, exceptions
 from rest_framework import generics, mixins
-from rest_framework.generics import CreateAPIView, ListAPIView, RetrieveUpdateDestroyAPIView
+from rest_framework.generics import CreateAPIView, ListAPIView, RetrieveUpdateDestroyAPIView, GenericAPIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated  # used for FBV
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -27,13 +29,14 @@ from abb.pagination import CustomInfiniteCursorPagination, LimitResultsSetPagina
 from abb.permissions import AssignedUserManagerOrReadOnlyIfLocked, AssignedUserOrManagerOrReadOnly
 from abb.utils import get_user_company, is_valid_queryparam
 from app.utils import is_user_member_group
-from axx.models import Ctr, Exp, Inv, Load, Tor
+from axx.models import Ctr, Exp, Inv, Load, LoadInv, Tor
+from axx.service import issue_invoice
 from ayy.models import CMR, Comment, Entry, ImageUpload, ItemInv
 
 
 import logging
 
-from dff.serializers.serializers_load import LoadListForTripSerializer, LoadListSerializer, LoadPatchSerializer, LoadSerializer
+from dff.serializers.serializers_load import IssueInvoiceSerializer, LoadListForTripSerializer, LoadListSerializer, LoadPatchSerializer, LoadSerializer
 logger = logging.getLogger(__name__)
 
 
@@ -674,3 +677,48 @@ class LoadListForTripView(ListAPIView):
             logger.error(
                 f'ERRORLOG3919 LoadListForTripView. filter_queryset. Error: {e}')
             return queryset
+
+
+class IssueInvoiceView(GenericAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = IssueInvoiceSerializer
+
+    @transaction.atomic
+    def post(self, request, load_uf):
+        user = request.user
+        load = get_object_or_404(Load, uf=load_uf)
+
+        # Guard conditions
+        if not load.date_cleared:
+            return Response(
+                {'detail': 'Load is not cleared'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if load.issued_load_invs.filter(status='issued').exists():
+            return Response(
+                {'detail': 'Invoice already issued'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        print('4148', load)
+
+        # Create invoice snapshot
+        invoice = issue_invoice(load, user, data)
+
+        load.is_invoiced = True
+        load.date_invoiced = load.date_cleared
+        load.save(update_fields=['is_invoiced', 'date_invoiced'])
+
+        return Response(
+            {
+                'status': 'issued',
+                'invoice_uf': invoice.uf,
+                'invoice_number': invoice.invoice_number,
+            },
+            status=status.HTTP_201_CREATED
+        )
