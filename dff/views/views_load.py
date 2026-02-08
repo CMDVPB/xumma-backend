@@ -722,3 +722,55 @@ class IssueInvoiceView(GenericAPIView):
             },
             status=status.HTTP_201_CREATED
         )
+
+
+class CancelInvoiceView(GenericAPIView):
+    permission_classes = [IsAuthenticated]
+
+    @transaction.atomic
+    def post(self, request, load_uf):
+        user = request.user
+        load = get_object_or_404(Load, uf=load_uf)
+
+        # Guard: load not invoiced
+        if not load.is_invoiced:
+            return Response(
+                {'detail': 'Load is not invoiced'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Get issued invoice
+        invoice = load.issued_load_invs.filter(status='issued').first()
+
+        if not invoice:
+            return Response(
+                {'detail': 'No issued invoice found'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Guard: already cancelled
+        if invoice.status == 'cancelled':
+            return Response(
+                {'detail': 'Invoice already cancelled'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Cancel invoice
+        invoice.status = 'cancelled'
+        invoice.cancelled_by = user
+        invoice.cancelled_at = timezone.now()
+        invoice.save(update_fields=['status', 'cancelled_by', 'cancelled_at'])
+
+        # Roll back load flags
+        load.is_invoiced = False
+        load.date_invoiced = None
+        load.save(update_fields=['is_invoiced', 'date_invoiced'])
+
+        return Response(
+            {
+                'status': 'cancelled',
+                'invoice_uf': invoice.uf,
+                'invoice_number': invoice.invoice_number,
+            },
+            status=status.HTTP_200_OK
+        )

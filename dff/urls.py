@@ -2,7 +2,7 @@ from django.urls import path
 from rest_framework.urlpatterns import format_suffix_patterns
 
 from dff.views.views_inv import InvCreateView, InvDetailView, InvListView
-from dff.views.views_load import IssueInvoiceView, LoadCreateView, LoadDetailView, LoadListForTripView, LoadListView
+from dff.views.views_load import CancelInvoiceView, IssueInvoiceView, LoadCreateView, LoadDetailView, LoadListForTripView, LoadListView
 from dff.views.views_quote import QuoteCreateView, QuoteDetailView, QuoteListView
 from dff.views.views_trip import TripCreateView, TripDetailView, TripListView, get_trips_trucks_view
 from dff.views.views_user import UserCreate, UserDetailSelfOrByManagerView, UserDetailSelfView, UserCompleteView, UserManagerCreate
@@ -26,6 +26,8 @@ urlpatterns = [
          name='load_list_for_trip'),
     path('loads/<str:load_uf>/issue-invoice/',
          IssueInvoiceView.as_view(), name='issue-load-invoice'),
+    path('loads/<str:load_uf>/cancel-invoice/',
+         CancelInvoiceView.as_view(), name='cancel-load-invoice'),
 
     path('trips/', TripListView.as_view(), name='trips'),
     path('trips/create/', TripCreateView.as_view(), name='trip_create'),

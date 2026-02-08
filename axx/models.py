@@ -456,6 +456,16 @@ class LoadInv(models.Model):
 
     currency = models.CharField(max_length=3)
 
+    cancelled_at = models.DateTimeField(null=True, blank=True)
+
+    cancelled_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='cancelled_invoices'
+    )
+
     STATUS_CHOICES = (
         ('issued', 'Issued'),
         ('cancelled', 'Cancelled'),
@@ -492,9 +502,16 @@ class LoadInv(models.Model):
 
     def save(self, *args, **kwargs):
         if self.pk:
-            original = LoadInv.objects.get(pk=self.pk)
-            if original.status == 'issued':
+            old = type(self).objects.get(pk=self.pk)
+
+            # Block editing issued invoices
+            if old.status == 'issued' and self.status == 'issued':
                 raise ValidationError('Issued invoices cannot be modified')
+
+            # Allow issued → cancelled
+            if old.status == 'issued' and self.status == 'cancelled':
+                pass
+
         super().save(*args, **kwargs)
 
     def __str__(self):

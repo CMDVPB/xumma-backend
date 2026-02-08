@@ -251,10 +251,17 @@ class GenerateLoadDocumentView(APIView):
     def post(self, request, load_uf, doc_type):
         load = get_object_or_404(Load, uf=load_uf)
 
+        generation_data = {
+            "amount": request.data.get("amount"),
+            "notes": request.data.get("notes"),
+            "currency_code": request.data.get("currencyCode"),
+        }
+
         doc = LoadDocumentService.generate(
             load=load,
             doc_type=doc_type,
             user=request.user,
+            runtime_data=generation_data
         )
 
         return Response({

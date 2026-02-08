@@ -1,3 +1,5 @@
+import os
+import shutil
 from io import BytesIO
 from reportlab.lib import colors
 from reportlab.lib.units import mm
@@ -16,10 +18,27 @@ from html import unescape
 import pdfkit
 from django.template.loader import render_to_string
 
-WKHTMLTOPDF_PATH = r"C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe"
-PDFKIT_CONFIG = pdfkit.configuration(
-    wkhtmltopdf=WKHTMLTOPDF_PATH
-)
+
+def get_pdfkit_config():
+    wkhtmltopdf_path = os.getenv("WKHTMLTOPDF_PATH", "wkhtmltopdf")
+
+    # ✅ Absolute path (Windows / Docker ENV)
+    if os.path.isabs(wkhtmltopdf_path):
+        if not os.path.exists(wkhtmltopdf_path):
+            raise RuntimeError(
+                f"wkhtmltopdf not found at '{wkhtmltopdf_path}'. "
+                f"Check WKHTMLTOPDF_PATH."
+            )
+
+    # ✅ Command on PATH (Linux / Docker)
+    else:
+        if not shutil.which(wkhtmltopdf_path):
+            raise RuntimeError(
+                f"wkhtmltopdf not found on PATH ('{wkhtmltopdf_path}'). "
+                f"Install wkhtmltopdf or set WKHTMLTOPDF_PATH."
+            )
+
+    return pdfkit.configuration(wkhtmltopdf=wkhtmltopdf_path)
 
 
 def html_to_rl_paragraphs(html: str):
@@ -132,6 +151,8 @@ def generate_proforma_pdf(proforma_data: dict) -> bytes:
             f"<b>Scadenta:</b> {meta['due_date']}", styles["InvoiceText"]),
         Paragraph(
             f"<b>Ref. client:</b> {meta['customer_ref']}", styles["InvoiceText"]),
+        Paragraph(
+            f"<b>Valuta:</b> {meta['currency']}", styles["InvoiceText"]),
     ]
 
     header_table = Table(
@@ -342,7 +363,7 @@ def generate_order_pdf(order_data: dict) -> bytes:
     pdf = pdfkit.from_string(
         html,
         False,
-        configuration=PDFKIT_CONFIG,
+        configuration=get_pdfkit_config(),
         options={
             "page-size": "A4",
             "margin-top": "20mm",

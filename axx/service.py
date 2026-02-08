@@ -66,32 +66,34 @@ def safe_fk(obj, fk_attr, field, default="-"):
         return default
 
 
-def build_proforma_data(load) -> dict:
+def build_proforma_data(load, runtime_data) -> dict:
     company = getattr(load, "company", None)
     bill_to = getattr(load, "bill_to", None)
 
+    # currency override
     currency = safe_str(
-        getattr(
-            getattr(load, "currency", None),
-            "currency_code",
-            None,
-        ),
+        runtime_data.get("currency_code")
+        or getattr(getattr(load, "currency", None), "currency_code", None),
         "",
     )
+
+    # amount override (string or number safe)
+    raw_amount = runtime_data.get("amount") or getattr(
+        load, "freight_price", None)
 
     return {
         "title": "Cont de plata",
 
         "from": {
-            "name": safe_str(getattr(company, "name", "Compania Mea SRL")),
+            "name": safe_str(getattr(company, "company_name", "")),
             "address": [
-                safe_str(getattr(company, "address_line1",
-                         "Strada Industriala, 1000, bir. 100")),
+                safe_str(getattr(company, "address_legal",
+                         "")),
                 safe_str(
-                    f"{getattr(company, 'postcode', '2020')} {getattr(company, 'city', 'Chisinau')}".strip(
+                    f"{getattr(company, 'zip_code_legal', '')} {getattr(company, 'city_legal', '')}".strip(
                     )
                 ),
-                safe_str(getattr(company, "country", 'MD')),
+                safe_fk(company, "country_code_legal", "value"),
             ],
             "iban": safe_str(getattr(company, "iban", 'MD00TESTIBAN0000000000456')),
         },
@@ -107,7 +109,7 @@ def build_proforma_data(load) -> dict:
                 safe_str(
                     getattr(
                         getattr(bill_to, "country_code_legal", None),
-                        "country_code",
+                        "value",
                         None,
                     )
                 )
@@ -119,21 +121,28 @@ def build_proforma_data(load) -> dict:
             "date": safe_date(getattr(load, "date_cleared", None)),
             "due_date": safe_date(getattr(load, "invoice_due_date", None)),
             "customer_ref": safe_str(getattr(load, "customer_ref", None)),
+            "currency": currency,
         },
 
         "rows": [
             {
-                "description": safe_str(getattr(load, "service_description", 'Transport rutier internatioal de marfa')),
+                "description": safe_str(
+                    getattr(
+                        load,
+                        "service_description",
+                        "Transport rutier international de marfa",
+                    )
+                ),
                 "quantity": "1",
-                "rate": safe_money(getattr(load, "freight_price", None), currency),
-                "amount": safe_money(getattr(load, "freight_price", None), currency),
+                "rate": safe_money(raw_amount, currency),
+                "amount": safe_money(raw_amount, currency),
             }
         ],
 
         "totals": [
             {
                 "label": "Sub Total",
-                "amount": safe_money(getattr(load, "freight_price", None), currency),
+                "amount": safe_money(raw_amount, currency),
             },
             {
                 "label": f"VAT ({safe_str(getattr(load, 'vat_rate', None), '0')}%)",
@@ -141,16 +150,19 @@ def build_proforma_data(load) -> dict:
             },
             {
                 "label": "Total",
-                "amount": safe_money(getattr(load, "freight_price", None), currency),
+                "amount": safe_money(raw_amount, currency),
                 "bold": True,
             },
         ],
-
-        "notes": safe_str(getattr(load, "invoice_notes", None)),
+        # notes override (NOT stored)
+        "notes": safe_str(
+            runtime_data.get("notes")
+            or getattr(load, "invoice_notes", None)
+        ),
     }
 
 
-def build_order_data(load) -> dict:
+def build_order_data(load, runtime_data) -> dict:
     bill_to = getattr(load, "bill_to", None)
 
     contract = None
@@ -194,8 +206,8 @@ def build_order_data(load) -> dict:
     }
 
 
-def build_act_data(load) -> dict:
-    data = build_proforma_data(load)
+def build_act_data(load, runtime_data) -> dict:
+    data = build_proforma_data(load, runtime_data)
     data["title"] = "Act of Execution of Services"
     return data
 
@@ -211,7 +223,7 @@ class LoadDocumentService:
 
     @staticmethod
     @transaction.atomic
-    def generate(load, doc_type: str, user):
+    def generate(load, doc_type: str, user, runtime_data=None):
         if doc_type not in DOCUMENT_GENERATORS:
             raise ValueError(f"Unsupported document type: {doc_type}")
 
@@ -227,7 +239,7 @@ class LoadDocumentService:
         new_version = (old_doc.version + 1) if old_doc else 1
 
         # 2. Build data
-        invoice_data = config["builder"](load)
+        invoice_data = config["builder"](load, runtime_data)
 
         # 3. Generate PDF bytes
         pdf_bytes = config["generator"](invoice_data)
@@ -250,4 +262,6 @@ class LoadDocumentService:
         doc.file.save(filename, ContentFile(pdf_bytes), save=True)
 
         return doc
+
+
 ###### END PDF GENERATION LOGIC ######
