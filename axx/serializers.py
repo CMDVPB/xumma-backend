@@ -1,6 +1,7 @@
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 from django.utils import timezone
+from django.conf import settings
 
 from abb.models import Currency
 from abb.utils import get_user_company
@@ -172,3 +173,17 @@ class TripAdvancePaymentChangeStatusSerializer(serializers.Serializer):
             return TripAdvancePaymentStatus.objects.get(code=value)
         except TripAdvancePaymentStatus.DoesNotExist:
             raise serializers.ValidationError("Invalid status")
+
+
+class LoadDocumentItemSerializer(serializers.Serializer):
+    exists = serializers.BooleanField()
+    id = serializers.IntegerField(required=False)
+    version = serializers.IntegerField(required=False)
+    uf = serializers.UUIDField(required=False)
+    url = serializers.SerializerMethodField()
+
+    def get_url(self, obj):
+        uf = obj.get("uf")
+        if not uf:
+            return None
+        return f"{settings.BACKEND_URL}/api/load-documents/{uf}/"

@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      font-size: 11px;
+      line-height: 1.5;
+    }
+
+    h1, h2, h3 {
+      margin-top: 24px;
+    }
+
+    hr {
+      margin: 20px 0;
+      border: none;
+      border-top: 1px solid #000;
+    }
+
+    .meta {
+      margin-bottom: 20px;
+      font-size: 10px;
+    }
+
+    .block {
+      margin-bottom: 16px;
+    }
+  </style>
+</head>
+<body>
+
+<h1>{{ order.title }}</h1>
+
+<div class="meta">
+  <strong>Nr. contract:</strong> {{ order.meta.number }}<br/>
+  <strong>Data:</strong> {{ order.meta.date }}
+</div>
+
+<div class="block">
+  <strong>Transportator:</strong><br/>
+  {{ order.from.name }}<br/>
+  {% for line in order.from.address %}
+    {{ line }}<br/>
+  {% endfor %}
+</div>
+
+<div class="block">
+  <strong>Beneficiar:</strong><br/>
+  {{ order.to.name }}<br/>
+  {% for line in order.to.address %}
+    {{ line }}<br/>
+  {% endfor %}
+</div>
+
+<hr/>
+
+<!-- 🔥 CONTRACT BODY FROM DB -->
+{{ order.content_html|safe }}
+
+</body>
+</html>

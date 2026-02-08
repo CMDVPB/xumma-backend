@@ -13,7 +13,7 @@ from abb.serializers import CurrencySerializer
 from abb.serializers_drf_writable import CustomWritableNestedModelSerializer, CustomUniqueFieldsMixin
 from abb.utils import get_user_company
 from app.models import TypeCost
-from ayy.models import Document, DocumentType, ItemCost, ItemForItemCost, PhoneNumber
+from ayy.models import UserDocument, DocumentType, ItemCost, ItemForItemCost, PhoneNumber
 from ayy.services.fuel_sync import sync_fueling_from_item_cost
 
 
@@ -234,13 +234,47 @@ class PhoneNumberSerializer(CustomUniqueFieldsMixin, CustomWritableNestedModelSe
                   )
 
 
-class DocumentSerializer(CustomUniqueFieldsMixin, CustomWritableNestedModelSerializer):
+class DocumentTypeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DocumentType
+        fields = [
+            'code',
+            'name',
+            'description',
+
+            'expiry_alert_days',
+            'target',
+
+            'is_system',
+            'uf',
+        ]
+
+
+class UserDocumentSerializer(CustomUniqueFieldsMixin, CustomWritableNestedModelSerializer):
+    # READ (expanded)
+    document_type = DocumentTypeSerializer(read_only=True)
+
+    document_type_uf = serializers.SlugRelatedField(
+        source='document_type',
+        slug_field='uf',
+        queryset=DocumentType.objects.all(),
+        write_only=True
+    )
 
     class Meta:
-        model = Document
+        model = UserDocument
         lookup_field = 'uf'
-        fields = ('doc_det', 'date_exp', 'uf',
+        fields = ('document_number', 'date_issued', 'date_expiry', 'notes', 'uf',
+                  'document_type',      # read
+                  'document_type_uf',   # write
                   )
+
+    def validate_document_type(self, value):
+        if value.target != 'user':
+            raise serializers.ValidationError(
+                'Invalid document type for user documents'
+            )
+        return value
 
 
 ###### START DOCUMENT TYPE SERIALIZERS ######
@@ -249,8 +283,13 @@ class DocumentSerializer(CustomUniqueFieldsMixin, CustomWritableNestedModelSeria
 class DocumentTypeCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = DocumentType
-        fields = ['id', 'code', 'name', 'description', 'uf']
+        fields = ['id', 'code', 'name', 'description', 'target', 'uf']
         read_only_fields = ['id', 'uf']
+
+    def validate_target(self, value):
+        if value not in dict(DocumentType.TARGET_CHOICES):
+            raise serializers.ValidationError('Invalid target')
+        return value
 
     def create(self, validated_data):
         user = self.context['request'].user
@@ -264,17 +303,5 @@ class DocumentTypeCreateSerializer(serializers.ModelSerializer):
             **validated_data
         )
 
-
-class DocumentTypeSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = DocumentType
-        fields = [
-            'id',
-            'code',
-            'name',
-            'description',
-            'is_system',
-            'uf',
-        ]
 
 ###### END DOCUMENT TYPE SERIALIZERS ######

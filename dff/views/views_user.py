@@ -215,6 +215,9 @@ class UserCompleteView(RetrieveUpdateDestroyAPIView):
                         'user_daily_allowances',
                         'user_vehicle_km_rate_overrides',
                         'user_vehicle_km_rate_overrides__vehicle',
+                        'user_documents',
+                        'user_documents__document_type',
+
                     ))
 
         request_user_email = self.request.user.email

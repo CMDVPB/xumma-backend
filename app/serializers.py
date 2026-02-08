@@ -41,11 +41,11 @@ class UserBasicSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
 
 
 class UserBasicPlusSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
-    from ayy.serializers import PhoneNumberSerializer, DocumentSerializer
+    from ayy.serializers import PhoneNumberSerializer, UserDocumentSerializer
 
     avatar_url = serializers.SerializerMethodField()
 
-    user_documents = DocumentSerializer(
+    user_documents = UserDocumentSerializer(
         many=True, context={'request': 'request'})
     user_phone_numbers = PhoneNumberSerializer(
         many=True, context={'request': 'request'})
@@ -86,11 +86,11 @@ class UserBasicPlusSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
 
 
 class UserSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
-    from ayy.serializers import PhoneNumberSerializer, DocumentSerializer
+    from ayy.serializers import PhoneNumberSerializer, UserDocumentSerializer
 
     company = CompanyUserSerializer(read_only=True)
 
-    user_documents = DocumentSerializer(
+    user_documents = UserDocumentSerializer(
         many=True, context={'request': 'request'})
     user_phone_numbers = PhoneNumberSerializer(
         many=True, context={'request': 'request'})

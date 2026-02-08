@@ -1,4 +1,5 @@
 from datetime import datetime
+from xml.parsers.expat import model
 import pandas as pd
 from django.utils.timezone import make_aware
 import base64
@@ -522,6 +523,9 @@ def image_upload_path(instance, filename):
 
     model = instance.__class__.__name__
 
+    if model == "LoadDocument":
+        return f"{base}/loads/{instance.load.uf}/documents/{new_name}"
+
     if model == "UserProfile":
         return f"{base}/users/{instance.user.id}/avatar/{new_name}"
 
@@ -530,6 +534,9 @@ def image_upload_path(instance, filename):
 
     if model == "VehicleDocument":
         return f"{base}/vehicles/{instance.vehicle.uf}/documents/{new_name}"
+
+    if model == "UserDocument":
+        return f"{base}/users/{instance.user.id}/documents/{new_name}"
 
     if model == "WorkOrderAttachment":
         return f"{base}/work_orders/{instance.work_order.uf}/{new_name}"

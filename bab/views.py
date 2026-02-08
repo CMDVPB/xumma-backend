@@ -6,14 +6,21 @@ from django.conf import settings
 from django.shortcuts import get_object_or_404
 from django.db import transaction
 from django.http import HttpResponse
+from django.http import FileResponse
+from rest_framework.views import APIView
 from rest_framework.generics import GenericAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
+import tempfile
 
+from abb.constants import LOAD_DOCUMENT_TYPES
 from abb.utils import get_user_company
-from axx.models import Load
+from axx.models import Load, LoadDocument
+from axx.service import LoadDocumentService
+from axx.utils_generate import generate_proforma_pdf
+
 
 from .models import DocumentTemplate
 from .serializers import DocumentTemplateSerializer
@@ -281,3 +288,26 @@ class HtmlToPdfPreviewView(GenericAPIView):
         response["Cache-Control"] = "no-store"
 
         return response
+
+
+class InvoicePdfView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        amount = request.data.get("amount", "0.00")
+        notes = request.data.get("notes", "")
+
+        tmp = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
+
+        generate_proforma_pdf(
+            filepath=tmp.name,
+            amount=amount,
+            notes=notes,
+        )
+
+        return FileResponse(
+            open(tmp.name, "rb"),
+            as_attachment=True,
+            filename="invoice.pdf",
+            content_type="application/pdf",
+        )

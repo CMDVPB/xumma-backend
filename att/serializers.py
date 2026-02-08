@@ -1,6 +1,7 @@
 from collections import defaultdict
 from django.db import transaction
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from rest_framework import serializers
 import mimetypes
 from rest_framework.serializers import SlugRelatedField
@@ -12,9 +13,12 @@ from abb.serializers_drf_writable import CustomUniqueFieldsMixin, CustomWritable
 from abb.utils import get_request_language, get_user_company
 from app.models import CategoryGeneral, TypeGeneral
 from att.models import Contact, ContactStatus, EmissionClass, RouteSheetStockBatch, VehicleBrand, Vehicle, VehicleDocument, VehicleKmRate
-from ayy.models import DocumentType
+from ayy.models import DocumentType, UserDocument
 from ayy.serializers import DocumentTypeSerializer
 from dff.serializers.serializers_bce import ImageUploadOutSerializer
+
+
+User = get_user_model()
 
 
 class TypeGeneralSerializer(serializers.ModelSerializer):
@@ -238,6 +242,37 @@ class VehicleSerializer(WritableNestedModelSerializer):
                   'contact',
                   'vehicle_imageuploads', 'vehicle_km_rates', 'vehicle_documents'
                   )
+
+
+class UserDocumentSerializer(serializers.ModelSerializer):
+    user = serializers.SlugRelatedField(
+        slug_field='uf',
+        queryset=User.objects.all()
+    )
+
+    document_type = DocumentTypeSerializer(read_only=True)
+
+    document_type_uf = serializers.SlugRelatedField(
+        source='document_type',
+        slug_field='uf',
+        queryset=DocumentType.objects.all(),
+        write_only=True
+    )
+
+    class Meta:
+        model = UserDocument
+        fields = ('user', 'document_number', 'date_issued', 'date_expiry', 'notes', 'uf',
+                  'document_type',      # read
+                  'document_type_uf',   # write
+                  )
+        read_only_fields = ('id', 'uf')
+
+    def validate_document_type(self, value):
+        if value.target != 'user':
+            raise serializers.ValidationError(
+                'This document type is not allowed for user documents.'
+            )
+        return value
 
 
 class RouteSheetStockBatchSerializer(WritableNestedModelSerializer):

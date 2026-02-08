@@ -87,3 +87,11 @@ SYSTEM_LABELS = [
     ("drafts", "Drafts", 3),
     ("trash", "Trash", 99),
 ]
+
+
+LOAD_DOCUMENT_TYPES = [
+    "order",
+    "proforma",
+    "invoice",
+    "act",
+]

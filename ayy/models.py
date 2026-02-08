@@ -84,6 +84,11 @@ class PhoneNumber(models.Model):
 
 
 class DocumentType(models.Model):
+    TARGET_CHOICES = [
+        ('user', 'User'),
+        ('vehicle', 'Vehicle'),
+    ]
+
     uf = models.CharField(max_length=36, default=hex_uuid, unique=True)
     company = models.ForeignKey(
         Company, on_delete=models.CASCADE, null=True, blank=True, related_name='company_document_types')
@@ -91,6 +96,11 @@ class DocumentType(models.Model):
     code = models.CharField(max_length=50)
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True, null=True)
+
+    expiry_alert_days = models.PositiveIntegerField(
+        default=0,
+        help_text="Number of days before expiry to send alerts. 0 = no alerts."
+    )
 
     is_active = models.BooleanField(default=True)
 
@@ -108,6 +118,12 @@ class DocumentType(models.Model):
 
     is_system = models.BooleanField(default=False)
 
+    target = models.CharField(
+        max_length=20,
+        choices=TARGET_CHOICES,
+        default='vehicle'
+    )
+
     class Meta:
         verbose_name = "Document Type"
         verbose_name_plural = "Document Types"
@@ -116,26 +132,33 @@ class DocumentType(models.Model):
         return self.name
 
 
-class Document(models.Model):
+class UserDocument(models.Model):
     uf = models.CharField(max_length=36, default=hex_uuid, unique=True)
-    doc_num = models.CharField(max_length=100, blank=True, null=True)
-    date_doc = models.DateTimeField(blank=True, null=True)
-    date_exp = models.DateTimeField()
-    doc_det = models.CharField(max_length=500, blank=True, null=True)
-    doc_type = models.ForeignKey(
-        DocumentType, on_delete=models.CASCADE, blank=True, null=True, related_name='doc_type_documents')
+    document_number = models.CharField(max_length=100, blank=True, null=True)
+    date_issued = models.DateTimeField(blank=True, null=True)
+    date_expiry = models.DateTimeField()
+    notes = models.TextField(max_length=500, blank=True, null=True)
+
+    document_type = models.ForeignKey(
+        DocumentType, on_delete=models.CASCADE, blank=True, null=True, related_name='document_type_user_documents')
 
     user = models.ForeignKey(
         User, on_delete=models.CASCADE, blank=True, null=True, related_name='user_documents')
 
-    person = models.ForeignKey(
-        Person, on_delete=models.CASCADE, blank=True, null=True, related_name='person_documents')
-
-    company_vehicle = models.ForeignKey(
-        Vehicle, on_delete=models.CASCADE, blank=True, null=True, related_name='company_vehicle_documents')
-
     notifications = ArrayField(models.BooleanField(
     ), default=default_notification_status_3, size=3)
+
+    file = models.FileField(upload_to=image_upload_path, null=True, blank=True)
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def clean(self):
+        if self.document_type and self.document_type.target != 'user':
+            raise ValidationError({
+                'document_type': 'This document type is not allowed for user documents.'
+            })
 
     def check_exp_date_less_than_time(self, time, notifications_arr_index):
         try:

@@ -8,7 +8,7 @@ from django.core.exceptions import ValidationError
 from abb.constants import DOCUMENT_TYPES, LOAD_SIZE, DOC_LANG_CHOICES, LOAD_TYPES
 from abb.custom_exceptions import CustomApiException
 from abb.models import Currency, BodyType, ModeType, StatusType, Incoterm
-from abb.utils import assign_new_num_inv, hex_uuid, assign_new_num, tripLoadsTotals
+from abb.utils import assign_new_num_inv, hex_uuid, assign_new_num, image_upload_path, tripLoadsTotals, upload_to
 from app.models import CategoryGeneral, Company
 from att.models import Contact, Person, RouteSheetNumber, Term, Vehicle, VehicleUnit, PaymentTerm
 
@@ -274,6 +274,8 @@ class TripAdvancePayment(models.Model):
         related_name="created_advances"
     )
 
+###### START LOAD ######
+
 
 class Load(models.Model):
     ''' Load model '''
@@ -498,6 +500,57 @@ class LoadInv(models.Model):
     def __str__(self):
         return f'Invoice {self.invoice_number} ({self.company})'
 
+
+class LoadDocumentType(models.TextChoices):
+    ORDER = "order", "Customer Order"
+    PROFORMA = "proforma", "Proforma Invoice"
+    INVOICE = "invoice", "Invoice"
+    ACT = "act", "Act of Execution of Services"
+
+
+class LoadDocument(models.Model):
+    uf = models.CharField(max_length=36, default=hex_uuid,
+                          db_index=True, unique=True)
+    company = models.ForeignKey(
+        Company, on_delete=models.CASCADE, null=True, blank=True, related_name='company_load_documents')
+
+    load = models.ForeignKey(
+        Load,
+        on_delete=models.CASCADE,
+        related_name="load_documents"
+    )
+
+    doc_type = models.CharField(
+        max_length=32,
+        choices=LoadDocumentType.choices
+    )
+
+    file = models.FileField(upload_to=image_upload_path)
+
+    version = models.PositiveIntegerField(default=1)
+
+    is_active = models.BooleanField(default=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    generated_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL
+
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["load", "doc_type"],
+                condition=models.Q(is_active=True),
+                name="unique_active_document_per_type",
+            )
+        ]
+
+
+###### END LOAD ######
 
 class Tor(models.Model):
     ''' Carrier transport order '''

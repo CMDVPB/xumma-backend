@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from axx.models import Inv, Load, LoadEvent, LoadInv, Trip, TripAdvancePayment, TripAdvancePaymentStatus, TripDriver
+from axx.models import Inv, Load, LoadDocument, LoadEvent, LoadInv, Trip, TripAdvancePayment, TripAdvancePaymentStatus, TripDriver
 
 
 @admin.register(Load)
@@ -12,6 +12,12 @@ class LoadAdmin(admin.ModelAdmin):
 @admin.register(LoadInv)
 class LoadInvAdmin(admin.ModelAdmin):
     list_display = ('id', 'company', 'load', 'issued_date', 'amount_mdl',
+                    )
+
+
+@admin.register(LoadDocument)
+class LoadDocumentAdmin(admin.ModelAdmin):
+    list_display = ('id', 'company', 'load', 'doc_type', 'file',
                     )
 
 

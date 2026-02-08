@@ -9,7 +9,7 @@ from django.utils.decorators import method_decorator
 from django.http import HttpResponse
 from django.http import FileResponse, Http404
 from rest_framework.decorators import authentication_classes, api_view, permission_classes
-from rest_framework.generics import (CreateAPIView, ListAPIView, ListCreateAPIView,
+from rest_framework.generics import (CreateAPIView, ListAPIView, ListCreateAPIView, RetrieveUpdateAPIView,
                                      UpdateAPIView, RetrieveUpdateDestroyAPIView, DestroyAPIView)
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
@@ -24,13 +24,14 @@ from abb.pagination import LimitResultsSetPagination
 from abb.utils import get_user_company, is_valid_queryparam
 from app.models import CategoryGeneral, TypeGeneral
 from att.models import Contact, ContactStatus, EmissionClass, RouteSheetNumber, RouteSheetStockBatch, VehicleBrand, Vehicle, VehicleDocument
-from att.serializers import BodyTypeSerializer, CategoryGeneralSerializer, ContactStatusSerializer, ContactStatusUpdateSerializer, EmissionClassSerializer, IncotermSerializer, ModeTypeSerializer, RouteSheetStockBatchSerializer, StatusTypeSerializer, TypeGeneralSerializer, \
+from att.serializers import BodyTypeSerializer, CategoryGeneralSerializer, ContactStatusSerializer, ContactStatusUpdateSerializer, EmissionClassSerializer, IncotermSerializer, ModeTypeSerializer, RouteSheetStockBatchSerializer, StatusTypeSerializer, TypeGeneralSerializer, UserDocumentSerializer, \
     VehicleBrandSerializer, VehicleDocumentSerializer, VehicleSerializer
 
 
 import logging
 
 from att.services import update_contact_status_service
+from ayy.models import UserDocument
 logger = logging.getLogger(__name__)
 
 
@@ -357,6 +358,7 @@ class VehicleDocumentUpdateView(UpdateAPIView):
     queryset = VehicleDocument.objects.all()
     serializer_class = VehicleDocumentSerializer
     parser_classes = (MultiPartParser, FormParser)
+    lookup_field = 'uf'
 
 
 class VehicleDocumentFileDeleteView(APIView):
@@ -388,6 +390,54 @@ class VehicleDocumentListView(ListAPIView):
             qs = qs.filter(vehicle_id=vehicle_id)
 
         return qs
+
+
+class VehicleDocumentFileView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, uf):
+        try:
+            doc = VehicleDocument.objects.get(uf=uf)
+        except VehicleDocument.DoesNotExist:
+            raise Http404
+
+        if not doc.file:
+            raise Http404
+
+        return FileResponse(
+            doc.file.open('rb'),
+            as_attachment=True,
+            filename=doc.file.name.split('/')[-1]
+        )
+
+
+class UserDocumentListCreateView(ListCreateAPIView):
+    serializer_class = UserDocumentSerializer
+    parser_classes = (MultiPartParser, FormParser)
+
+    def get_queryset(self):
+        # adjust for multi-tenant if needed
+        return UserDocument.objects.all()
+
+    def perform_create(self, serializer):
+        serializer.save()
+
+
+class UserDocumentRetrieveUpdateView(RetrieveUpdateDestroyAPIView):
+    serializer_class = UserDocumentSerializer
+    parser_classes = (MultiPartParser, FormParser)
+    queryset = UserDocument.objects.all()
+    lookup_field = 'uf'
+
+
+class UserDocumentDeleteFileView(APIView):
+    def delete(self, request, uf):
+        doc = get_object_or_404(UserDocument, uf=uf)
+
+        if doc.file:
+            doc.file.delete(save=True)
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class ContactStatusListAPIView(ListAPIView):
@@ -431,23 +481,4 @@ class ContactStatusUpdateAPIView(APIView):
                 "status": ContactStatusSerializer(contact.status).data,
             },
             status=status.HTTP_200_OK
-        )
-
-
-class VehicleDocumentFileView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request, uf):
-        try:
-            doc = VehicleDocument.objects.get(uf=uf)
-        except VehicleDocument.DoesNotExist:
-            raise Http404
-
-        if not doc.file:
-            raise Http404
-
-        return FileResponse(
-            doc.file.open('rb'),
-            as_attachment=True,
-            filename=doc.file.name.split('/')[-1]
         )

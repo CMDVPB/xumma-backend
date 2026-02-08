@@ -12,6 +12,7 @@ from django.http import HttpResponse
 from rest_framework.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
 from rest_framework import status, exceptions
+from django.http import FileResponse, Http404
 from rest_framework.views import APIView
 from rest_framework.generics import CreateAPIView, ListAPIView, ListCreateAPIView, CreateAPIView, \
     RetrieveUpdateDestroyAPIView, DestroyAPIView
@@ -20,11 +21,13 @@ from rest_framework.parsers import MultiPartParser, FormParser  # JSONParser
 from rest_framework.decorators import authentication_classes, api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated  # used for FBV
 
+from abb.constants import LOAD_DOCUMENT_TYPES
 from abb.permissions import IsSubscriptionActiveOrReadOnly
 from abb.utils import get_user_company
 from att.models import BankAccount, Contact, Contract, Person, VehicleUnit
-from axx.models import TripAdvancePayment
-from axx.serializers import TripAdvancePaymentChangeStatusSerializer, TripAdvancePaymentCreateSerializer, TripAdvancePaymentListSerializer
+from axx.models import Load, LoadDocument, TripAdvancePayment
+from axx.serializers import LoadDocumentItemSerializer, TripAdvancePaymentChangeStatusSerializer, TripAdvancePaymentCreateSerializer, TripAdvancePaymentListSerializer
+from axx.service import LoadDocumentService
 from dff.serializers.serializers_other import ContactSerializer, ContractFKSerializer, ContractListSerializer
 
 import logging
@@ -240,3 +243,82 @@ class TripAdvancePaymentDeleteView(DestroyAPIView):
             raise ValidationError('Only requested advances can be deleted')
 
         instance.delete()
+
+
+class GenerateLoadDocumentView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, load_uf, doc_type):
+        load = get_object_or_404(Load, uf=load_uf)
+
+        doc = LoadDocumentService.generate(
+            load=load,
+            doc_type=doc_type,
+            user=request.user,
+        )
+
+        return Response({
+            "id": doc.id,
+            "doc_type": doc.doc_type,
+            "version": doc.version,
+            "url": doc.file.url,
+        })
+
+
+class LoadDocumentsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, load_uf):
+        load = get_object_or_404(Load, uf=load_uf)
+
+        docs = (
+            LoadDocument.objects
+            .filter(load=load, is_active=True)
+        )
+
+        docs_by_type = {doc.doc_type: doc for doc in docs}
+
+        response = {}
+
+        for doc_type in LOAD_DOCUMENT_TYPES:
+            doc = docs_by_type.get(doc_type)
+
+            if not doc:
+                response[doc_type] = {"exists": False}
+            else:
+                data = {
+                    "exists": True,
+                    "id": doc.id,
+                    "version": doc.version,
+                    "uf": doc.uf,
+                }
+                response[doc_type] = LoadDocumentItemSerializer(data).data
+
+        return Response(response)
+
+
+class LoadDocumentProxyView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, uf):
+        try:
+            document = (
+                LoadDocument.objects
+                .select_related("load")
+                .get(uf=uf, is_active=True)
+            )
+        except LoadDocument.DoesNotExist:
+            raise Http404()
+
+        user_company = get_user_company(request.user)
+
+        # Company-level access control
+        # if document.load.company and document.load.company != user_company:
+        #     raise Http404()
+
+        return FileResponse(
+            document.file.open("rb"),
+            content_type="application/pdf",
+            as_attachment=True,
+            filename=document.file.name.split("/")[-1],
+        )

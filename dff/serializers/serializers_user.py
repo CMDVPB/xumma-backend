@@ -11,7 +11,7 @@ from abb.utils import get_company_manager, get_company_users, get_user_company
 from app.models import UserCompensationSettings
 from app.serializers import CompanyUserSerializer, UserBasicPlusSerializer
 from att.models import UserBaseSalary, UserDailyAllowance, UserLoadingPointRate, UserUnloadingPointRate, UserVehicleKmRateOverride, Vehicle
-from ayy.serializers import PhoneNumberSerializer, DocumentSerializer
+from ayy.serializers import PhoneNumberSerializer, UserDocumentSerializer
 from dff.serializers.serializers_bce import ImageUploadOutSerializer
 
 logger = logging.getLogger(__name__)
@@ -113,7 +113,7 @@ class UserCompleteSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
 
     company = CompanyUserSerializer(read_only=True)
 
-    user_documents = DocumentSerializer(
+    user_documents = UserDocumentSerializer(
         many=True, context={'request': 'request'})
     user_phone_numbers = PhoneNumberSerializer(
         many=True, context={'request': 'request'})

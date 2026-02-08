@@ -106,7 +106,7 @@ class ItemForItemCostAdmin(admin.ModelAdmin):
 @admin.register(DocumentType)
 class DocumentTypeAdmin(admin.ModelAdmin):
     list_display = ('id', 'company', 'code', 'name',
-                    'description', 'is_system', 'uf',)
+                    'description', 'target', 'is_system', 'uf',)
 
     search_fields = ('company__company_name', 'code', 'name', 'description',
                      )

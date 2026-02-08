@@ -14,6 +14,11 @@ urlpatterns = [
 
     path("draft/html-preview/", HtmlToPdfPreviewView.as_view(),
          name="html-to-pdf-preview"),
+
+
+    path("invoice/pdf/", InvoicePdfView.as_view()),
+
+
 ]
 
 urlpatterns = format_suffix_patterns(urlpatterns)

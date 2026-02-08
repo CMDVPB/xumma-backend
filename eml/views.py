@@ -56,7 +56,7 @@ class BasicEmailOptionalAttachmentsView(APIView):
             if isinstance(item, dict) and item.get("imageUf")
         ]
 
-        print('2328', to)
+        print('2328', attachments_ufs)
 
         if not to:
             return Response(
@@ -97,10 +97,13 @@ class BasicEmailOptionalAttachmentsView(APIView):
                 status='queued'
             )
 
-            print('3340', meta_map)
+            # print('3340', meta_map)
 
-            # 🔹 Attach ImageUpload files (if provided) via UFs
+            # Attach ImageUpload files (if provided) via UFs
             if attachments_ufs:
+                # Track what we resolved
+                resolved_ufs = set()
+
                 uploads = ImageUpload.objects.filter(
                     uf__in=attachments_ufs,
                     company=get_user_company(user)
@@ -114,9 +117,25 @@ class BasicEmailOptionalAttachmentsView(APIView):
                         filename=upload.file_name,
                         size=upload.file_size,
                     )
-                    print('3344', upload)
 
-            print('3348', files)
+                    # print('3344', upload)
+                    resolved_ufs.add(upload.uf)
+
+                from axx.models import LoadDocument
+                documents = LoadDocument.objects.filter(
+                    uf__in=set(attachments_ufs) - resolved_ufs,
+                    # load__company=get_user_company(user)
+                )
+                for doc in documents:
+                    UserEmailAttachment.objects.create(
+                        email=email,
+                        file=doc.file,
+                        filename=doc.file.name.split('/')[-1],
+                        size=doc.file.size,
+                    )
+                    resolved_ufs.add(doc.uf)
+
+            # print('3348', files)
 
             # Save attachments (if any)
             for f in files:

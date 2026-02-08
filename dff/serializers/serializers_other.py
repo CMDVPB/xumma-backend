@@ -17,28 +17,28 @@ from app.serializers import UserBasicSerializer
 from att.models import Contact, ContactSite, Contract, ContractReferenceDate, PaymentTerm, Person, TargetGroup, Term, Vehicle, VehicleUnit
 from att.serializers import ContactStatusSerializer, VehicleContactSerializer, VehicleSerializer
 from axx.models import Load
-from ayy.models import CMR, Comment, Document, History, ImageUpload
+from ayy.models import CMR, Comment, UserDocument, History, ImageUpload
 from dff.serializers.serializers_bce import BankAccountSerializer
 from dtt.serializers import ContractReferenceDateSerializer
 
 
-class DocumentSerializer(WritableNestedModelSerializer):
-    def to_internal_value(self, data):
-        if 'doc_type' in data and data['doc_type'] == '':
-            data['doc_type'] = None
-        if 'doc_num' in data and data['doc_num'] == '':
-            data['doc_num'] = None
-        if 'date_doc' in data and data['date_doc'] == '':
-            data['date_doc'] = None
-        if 'doc_det' in data and data['doc_det'] == '':
-            data['doc_det'] = None
+# class DocumentSerializer(WritableNestedModelSerializer):
+#     def to_internal_value(self, data):
+#         if 'doc_type' in data and data['doc_type'] == '':
+#             data['doc_type'] = None
+#         if 'doc_num' in data and data['doc_num'] == '':
+#             data['doc_num'] = None
+#         if 'date_doc' in data and data['date_doc'] == '':
+#             data['date_doc'] = None
+#         if 'doc_det' in data and data['doc_det'] == '':
+#             data['doc_det'] = None
 
-        return super(DocumentSerializer, self).to_internal_value(data)
+#         return super(DocumentSerializer, self).to_internal_value(data)
 
-    class Meta:
-        model = Document
-        fields = ('doc_num', 'date_doc', 'date_exp',
-                  'doc_det', 'doc_type', 'uf')
+#     class Meta:
+#         model = UserDocument
+#         fields = ('doc_num', 'date_doc', 'date_exp',
+#                   'doc_det', 'doc_type', 'uf')
 
 
 class VehicleBasicReadSerializer(WritableNestedModelSerializer):
