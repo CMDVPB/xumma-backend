@@ -13,7 +13,7 @@ from abb.serializers import CurrencySerializer
 from abb.serializers_drf_writable import CustomWritableNestedModelSerializer, CustomUniqueFieldsMixin
 from abb.utils import get_user_company
 from app.models import TypeCost
-from ayy.models import UserDocument, DocumentType, ItemCost, ItemForItemCost, PhoneNumber
+from ayy.models import CompanyCard, UserDocument, DocumentType, ItemCost, ItemForItemCost, PhoneNumber
 from ayy.services.fuel_sync import sync_fueling_from_item_cost
 
 
@@ -305,3 +305,50 @@ class DocumentTypeCreateSerializer(serializers.ModelSerializer):
 
 
 ###### END DOCUMENT TYPE SERIALIZERS ######
+
+
+###### START CARD SERIALIZERS ######
+
+
+class CompanyCardSerializer(serializers.ModelSerializer):
+    current_employee = serializers.SerializerMethodField()
+    current_vehicle = serializers.SerializerMethodField()
+
+    class Meta:
+        model = CompanyCard
+        fields = [
+            "id",
+            "uf",
+            "card_type",
+            "provider",
+            "card_number",
+            "expires_at",
+            "is_active",
+            "current_employee",
+            "current_vehicle",
+        ]
+        read_only_fields = ["uf"]
+
+    def get_current_employee(self, obj):
+        if not obj.current_employee:
+            return None
+        return {
+            "id": obj.current_employee.id,
+            "name": obj.current_employee.get_full_name(),
+        }
+
+    def get_current_vehicle(self, obj):
+        if not obj.current_vehicle:
+            return None
+        return {
+            "id": obj.current_vehicle.id,
+            "name": str(obj.current_vehicle),
+        }
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        # mask card number
+        data["card_number"] = f"**** {instance.card_number[-4:]}"
+        return data
+
+###### END CARD SERIALIZERS ######

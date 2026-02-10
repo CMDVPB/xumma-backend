@@ -659,6 +659,8 @@ class History(models.Model):
         return str(self.id) or ''
 
 
+###### START CMR Models ######
+
 class CMRStockBatch(models.Model):
     uf = models.CharField(max_length=36, default=hex_uuid, db_index=True)
 
@@ -676,7 +678,6 @@ class CMRStockBatch(models.Model):
     received_at = models.DateField()
 
     total_count = models.PositiveIntegerField(editable=False)
-    used_count = models.PositiveIntegerField(default=0)
 
     notes = models.TextField(max_length=1000, blank=True)
 
@@ -689,7 +690,116 @@ class CMRStockBatch(models.Model):
 
     @property
     def available_count(self):
-        return self.total_count - self.used_count
+        return self.total_count
+
+
+class CMRHolder(models.Model):
+    COMPANY = "COMPANY"
+    CUSTOMER = "CUSTOMER"
+    VEHICLE = "VEHICLE"
+
+    HOLDER_TYPES = (
+        (COMPANY, "Company"),
+        (CUSTOMER, "Customer"),
+        (VEHICLE, "Vehicle"),
+    )
+
+    holder_type = models.CharField(max_length=20, choices=HOLDER_TYPES)
+
+    company = models.ForeignKey(
+        Company, on_delete=models.CASCADE, null=True, blank=True
+    )
+    customer = models.ForeignKey(
+        Contact, on_delete=models.CASCADE, null=True, blank=True
+    )
+    vehicle = models.ForeignKey(
+        Vehicle, on_delete=models.CASCADE, null=True, blank=True
+    )
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                name="cmrholder_exactly_one_fk",
+                condition=(
+                    # at least one
+                    (
+                        models.Q(company__isnull=False) |
+                        models.Q(customer__isnull=False) |
+                        models.Q(vehicle__isnull=False)
+                    )
+                    &
+                    # no two at the same time
+                    ~(
+                        (models.Q(company__isnull=False) & models.Q(customer__isnull=False)) |
+                        (models.Q(company__isnull=False) & models.Q(vehicle__isnull=False)) |
+                        (models.Q(customer__isnull=False)
+                         & models.Q(vehicle__isnull=False))
+                    )
+                ),
+            )
+        ]
+
+
+class CMRStockMovement(models.Model):
+    TRANSFER = "TRANSFER"
+    CONSUMED = "CONSUMED"
+
+    MOVEMENT_TYPES = (
+        (TRANSFER, "Transfer"),
+        (CONSUMED, "Consumed"),
+    )
+
+    uf = models.CharField(max_length=36, default=hex_uuid, db_index=True)
+
+    batch = models.ForeignKey(
+        CMRStockBatch,
+        on_delete=models.CASCADE,
+        related_name="movements"
+    )
+
+    series = models.CharField(max_length=20, blank=True, null=True)
+    number_from = models.PositiveIntegerField()
+    number_to = models.PositiveIntegerField()
+
+    quantity = models.PositiveIntegerField(editable=False)
+
+    movement_type = models.CharField(max_length=20, choices=MOVEMENT_TYPES)
+
+    from_holder = models.ForeignKey(
+        CMRHolder,
+        on_delete=models.PROTECT,
+        related_name="outgoing_movements",
+        null=True,
+        blank=True,
+    )
+
+    to_holder = models.ForeignKey(
+        CMRHolder,
+        on_delete=models.PROTECT,
+        related_name="incoming_movements",
+        null=True,
+        blank=True,
+    )
+
+    # WHICH LOAD USED THE CMR
+    load = models.ForeignKey(
+        Load,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="cmr_movements"
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+
+    notes = models.TextField(blank=True)
+
+    def save(self, *args, **kwargs):
+        self.quantity = self.number_to - self.number_from + 1
+        super().save(*args, **kwargs)
+
+###### END CMR Models ######
 
 
 class AuthorizationStockBatch(models.Model):
@@ -1062,3 +1172,130 @@ class MailMessage(models.Model):
 
     def __str__(self):
         return self.subject
+
+
+###### START CARDS ######
+
+class CompanyCard(models.Model):
+    BANK = "BANK"
+    FUEL = "FUEL"
+    TOLL = "TOLL"
+
+    CARD_TYPES = (
+        (BANK, "Bank card"),
+        (FUEL, "Fuel card"),
+        (TOLL, "Toll card"),
+    )
+
+    uf = models.CharField(max_length=36, default=hex_uuid, db_index=True)
+    company = models.ForeignKey(
+        Company,
+        on_delete=models.CASCADE,
+        related_name="company_cards"
+    )
+
+    card_type = models.CharField(max_length=20, choices=CARD_TYPES)
+
+    provider = models.CharField(max_length=100)  # Visa, Shell, BP, etc.
+    card_number = models.CharField(max_length=50, unique=True)
+
+    expires_at = models.DateField(null=True, blank=True)
+
+    # current allocation (IMPORTANT)
+    current_employee = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="current_employee_cards"
+    )
+
+    current_vehicle = models.ForeignKey(
+        Vehicle,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="current_vehicle_cards"
+    )
+
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                name="card_only_one_current_holder",
+                condition=(
+                    # either driver OR vehicle OR none
+                    ~(
+                        models.Q(current_employee__isnull=False) &
+                        models.Q(current_vehicle__isnull=False)
+                    )
+                ),
+            )
+        ]
+
+
+class CardAssignment(models.Model):
+    ASSIGN = "ASSIGN"
+    UNASSIGN = "UNASSIGN"
+
+    ACTIONS = (
+        (ASSIGN, "Assign"),
+        (UNASSIGN, "Unassign"),
+    )
+
+    card = models.ForeignKey(
+        CompanyCard,
+        on_delete=models.CASCADE,
+        related_name="card_assignments"
+    )
+
+    employee = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="employee_assigned_cards"
+    )
+
+    vehicle = models.ForeignKey(
+        Vehicle,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="vehicle_assigned_cards"
+    )
+
+    action = models.CharField(max_length=20, choices=ACTIONS)
+
+    assigned_at = models.DateTimeField(auto_now_add=True)
+    assigned_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True
+    )
+
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                name="card_assignment_one_target",
+                condition=(
+                    ~(
+                        models.Q(employee__isnull=False) &
+                        models.Q(vehicle__isnull=False)
+                    )
+                ),
+            )
+        ]
+
+    def clean(self):
+        targets = [self.employee, self.vehicle]
+
+        if self.action == self.ASSIGN and sum(t is not None for t in targets) != 1:
+            raise ValidationError(
+                "ASSIGN must target exactly one of employee or vehicle."
+            )
+
+###### END CARDS ######

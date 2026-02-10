@@ -20,7 +20,7 @@ from app.serializers import UserBasicSerializer, UserSerializer
 from att.models import Contact, PaymentTerm, Person, Vehicle, VehicleUnit
 from att.serializers import BodyTypeSerializer, IncotermSerializer, ModeTypeSerializer, StatusTypeSerializer, VehicleSerializer
 from axx.models import Ctr, Exp, Inv, Load, LoadEvent, Tor, Trip
-from ayy.models import CMR
+from ayy.models import CMR, CMRStockMovement
 from dff.serializers.serializers_bce import ImageUploadOutSerializer, ImageUploadUFOnlySerializer
 from dff.serializers.serializers_ctr import CtrSerializer
 from dff.serializers.serializers_entry_detail import EntryBasicReadListSerializer, EntrySerializer
@@ -264,6 +264,8 @@ class LoadSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
         many=True, slug_field='uf', queryset=Exp.objects.all(), write_only=True)
 
     cmr = CMRSerializer(allow_null=True)
+
+    cmr_consumed = serializers.SerializerMethodField(read_only=True)
 
     entry_loads = EntrySerializer(many=True)
     load_iteminvs = ItemInvSerializer(many=True)
@@ -511,9 +513,33 @@ class LoadSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
                   'trip', 'carrier', 'person_carrier', 'driver', 'vehicle_tractor', 'vehicle_trailer',
                   'load_events',
 
+                  'cmr_consumed',
 
                   )
         read_only_fields = ['load_events', 'is_invoiced', 'date_invoiced']
+
+    def get_cmr_consumed(self, instance):
+        movement = (
+            instance.cmr_movements
+            .filter(movement_type=CMRStockMovement.CONSUMED)
+            .order_by("-created_at")
+            .first()
+        )
+
+        if not movement:
+            return None
+
+        return {
+            "batch_uf": movement.batch.uf,
+            "series": movement.series,
+            "number": movement.number_from,
+            "consumed_at": movement.created_at,
+            "consumed_by": (
+                f"{movement.created_by.first_name} {movement.created_by.last_name}".strip()
+                if movement.created_by and (movement.created_by.first_name or movement.created_by.last_name)
+                else movement.created_by.email if movement.created_by else None
+            ),
+        }
 
 
 class LoadPatchSerializer(WritableNestedModelSerializer):

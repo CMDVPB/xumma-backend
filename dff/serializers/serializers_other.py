@@ -302,6 +302,7 @@ class ContactSiteBasicReadSerializer(WritableNestedModelSerializer):
 class ContactSiteListSerializer(WritableNestedModelSerializer):
     country_code_site = serializers.SlugRelatedField(
         allow_null=True, slug_field='uf', queryset=Country.objects.all(), required=False)
+    site_persons = PersonSerializer(many=True)
 
     class Meta:
         model = ContactSite
@@ -309,6 +310,7 @@ class ContactSiteListSerializer(WritableNestedModelSerializer):
         fields = ('name_site', 'address_site', 'city_site', 'zip_code_site', 'lat', 'lon', 'uf',
                   'phone', 'email', 'comment1', 'comment2', 'language',
                   'country_code_site',
+                  'site_persons',
                   )
 
 

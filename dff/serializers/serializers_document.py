@@ -22,7 +22,7 @@ class CMRStockBatchSerializer(WritableNestedModelSerializer):
     class Meta:
         model = CMRStockBatch
         fields = ('series', 'received_at', 'number_from', 'number_to', 'total_count', 'uf',
-                  'used_count', 'notes', 'available_count',
+                  'notes', 'available_count',
                   )
         read_only_fields = ("company",)
 

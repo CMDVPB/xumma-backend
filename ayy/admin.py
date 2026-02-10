@@ -1,7 +1,7 @@
 from django.contrib import admin
 
 from app.views import User
-from ayy.models import AuthorizationStockBatch, CMRStockBatch, ColliType, DamageReport, DocumentType, EmailTemplate, EmailTemplateTranslation, ImageUpload, ItemCost, ItemForItemCost, MailLabelV2, MailMessage, PhoneNumber, UserEmail
+from ayy.models import AuthorizationStockBatch, CMRHolder, CMRStockBatch, CMRStockMovement, ColliType, DamageReport, DocumentType, EmailTemplate, EmailTemplateTranslation, ImageUpload, ItemCost, ItemForItemCost, MailLabelV2, MailMessage, PhoneNumber, UserEmail
 
 
 @admin.register(CMRStockBatch)
@@ -10,6 +10,22 @@ class CMRStockBatchAdmin(admin.ModelAdmin):
 
     search_fields = ('series', 'company__company_name',
                      'number_from', 'number_to')
+
+
+@admin.register(CMRHolder)
+class CMRHolderAdmin(admin.ModelAdmin):
+    list_display = ('id', 'company', 'customer', 'vehicle', )
+
+    search_fields = ('company__company_name',
+                     'customer__company_name', 'vehicle__reg_number')
+
+
+@admin.register(CMRStockMovement)
+class CMRStockMovementAdmin(admin.ModelAdmin):
+    list_display = ('id', 'load',)
+
+    search_fields = ('load',
+                     )
 
 
 @admin.register(ColliType)

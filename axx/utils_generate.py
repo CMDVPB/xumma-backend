@@ -20,25 +20,25 @@ from django.template.loader import render_to_string
 
 
 def get_pdfkit_config():
-    wkhtmltopdf_path = os.getenv("WKHTMLTOPDF_PATH", "wkhtmltopdf")
+    wkhtmltopdf_path = os.getenv("WKHTMLTOPDF_PATH")
 
-    # ✅ Absolute path (Windows / Docker ENV)
-    if os.path.isabs(wkhtmltopdf_path):
+    # 1️⃣ If ENV is set, trust it
+    if wkhtmltopdf_path:
         if not os.path.exists(wkhtmltopdf_path):
             raise RuntimeError(
-                f"wkhtmltopdf not found at '{wkhtmltopdf_path}'. "
-                f"Check WKHTMLTOPDF_PATH."
+                f"wkhtmltopdf not found at '{wkhtmltopdf_path}'."
             )
+        return pdfkit.configuration(wkhtmltopdf=wkhtmltopdf_path)
 
-    # ✅ Command on PATH (Linux / Docker)
-    else:
-        if not shutil.which(wkhtmltopdf_path):
-            raise RuntimeError(
-                f"wkhtmltopdf not found on PATH ('{wkhtmltopdf_path}'). "
-                f"Install wkhtmltopdf or set WKHTMLTOPDF_PATH."
-            )
+    # 2️⃣ Otherwise, resolve from PATH (Docker/Linux)
+    resolved = shutil.which("wkhtmltopdf")
+    if resolved:
+        return pdfkit.configuration(wkhtmltopdf=resolved)
 
-    return pdfkit.configuration(wkhtmltopdf=wkhtmltopdf_path)
+    # 3️⃣ Nothing worked
+    raise RuntimeError(
+        "wkhtmltopdf not found. Install it or set WKHTMLTOPDF_PATH."
+    )
 
 
 def html_to_rl_paragraphs(html: str):
