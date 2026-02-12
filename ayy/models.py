@@ -1176,6 +1176,44 @@ class MailMessage(models.Model):
 
 ###### START CARDS ######
 
+class CardProvider(models.Model):
+    uf = models.CharField(max_length=36, default=hex_uuid, db_index=True)
+    company = models.ForeignKey(
+        Company,
+        on_delete=models.CASCADE,
+        blank=True,
+        null=True,
+        related_name="company_card_providers"
+    )
+
+    code = models.CharField(max_length=30, unique=True)
+    name = models.CharField(max_length=100, unique=True)
+
+    is_system = models.BooleanField(default=False)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["company", "code"],
+                name="unique_provider_code_per_company",
+            ),
+            models.UniqueConstraint(
+                fields=["company", "name"],
+                name="unique_provider_name_per_company",
+            ),
+            models.CheckConstraint(
+                name="system_provider_company_logic",
+                condition=(
+                    models.Q(is_system=True, company__isnull=True) |
+                    models.Q(is_system=False, company__isnull=False)
+                ),
+            ),
+        ]
+
+    def __str__(self):
+        return self.name
+
+
 class CompanyCard(models.Model):
     BANK = "BANK"
     FUEL = "FUEL"
@@ -1196,12 +1234,12 @@ class CompanyCard(models.Model):
 
     card_type = models.CharField(max_length=20, choices=CARD_TYPES)
 
-    provider = models.CharField(max_length=100)  # Visa, Shell, BP, etc.
+    provider = models.ForeignKey(CardProvider, on_delete=models.PROTECT,
+                                 blank=True, null=True, related_name="provider_cards")
     card_number = models.CharField(max_length=50, unique=True)
 
     expires_at = models.DateField(null=True, blank=True)
 
-    # current allocation (IMPORTANT)
     current_employee = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,
@@ -1222,17 +1260,23 @@ class CompanyCard(models.Model):
 
     class Meta:
         constraints = [
+
             models.CheckConstraint(
                 name="card_only_one_current_holder",
-                condition=(
-                    # either driver OR vehicle OR none
-                    ~(
-                        models.Q(current_employee__isnull=False) &
-                        models.Q(current_vehicle__isnull=False)
-                    )
+                condition=~(
+                    models.Q(current_employee__isnull=False) &
+                    models.Q(current_vehicle__isnull=False)
                 ),
-            )
+            ),
         ]
+
+    def clean(self):
+        if self.provider:
+            if not self.provider.is_system:
+                if self.provider.company_id != self.company_id:
+                    raise ValidationError(
+                        {"provider": "Provider must belong to the same company"}
+                    )
 
 
 class CardAssignment(models.Model):

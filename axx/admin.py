@@ -11,7 +11,7 @@ class LoadAdmin(admin.ModelAdmin):
 
 @admin.register(LoadInv)
 class LoadInvAdmin(admin.ModelAdmin):
-    list_display = ('id', 'company', 'load', 'issued_date', 'amount_mdl',
+    list_display = ('id', 'company', 'load', 'invoice_number', 'issued_date', 'original_amount', 'currency', 'amount_mdl', 'status',
                     )
 
 

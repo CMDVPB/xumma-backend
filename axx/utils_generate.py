@@ -18,6 +18,9 @@ from html import unescape
 import pdfkit
 from django.template.loader import render_to_string
 
+from axx.translations import TRANSLATIONS, VALID_DOC_TYPES
+from axx.utils import resolve_inv_type_title
+
 
 def get_pdfkit_config():
     wkhtmltopdf_path = os.getenv("WKHTMLTOPDF_PATH")
@@ -80,9 +83,44 @@ def html_to_rl_paragraphs(html: str):
 
     return text.split("\n\n")
 
+###### START PDF GENERATORS ######
 
-def generate_proforma_pdf(proforma_data: dict) -> bytes:
+
+def generate_order_pdf(order_data: dict) -> bytes:
+    html = render_to_string(
+        "pdf/order_contract.html",
+        {"order": order_data},
+    )
+
+    pdf = pdfkit.from_string(
+        html,
+        False,
+        configuration=get_pdfkit_config(),
+        options={
+            "page-size": "A4",
+            "margin-top": "20mm",
+            "margin-bottom": "20mm",
+            "margin-left": "20mm",
+            "margin-right": "20mm",
+            "encoding": "UTF-8",
+        },
+    )
+
+    return pdf
+
+
+def generate_proforma_pdf(proforma_data: dict, lang: str, inv_type: str) -> bytes:
     buffer = BytesIO()
+
+    t = TRANSLATIONS.get(lang, TRANSLATIONS["en"])
+
+    if inv_type not in VALID_DOC_TYPES:
+        inv_type = "proforma"
+
+    print('DOC TYPE TITLE', proforma_data.get("title"))
+
+    title = (t["titles"].get(proforma_data.get("title"), t["titles"]["proforma"])
+             )
 
     doc = SimpleDocTemplate(
         buffer,
@@ -114,6 +152,11 @@ def generate_proforma_pdf(proforma_data: dict) -> bytes:
         spaceAfter=4,
     ))
     styles.add(ParagraphStyle(
+        name="InvoiceTitleNumber",
+        fontSize=14,
+        spaceAfter=6,
+    ))
+    styles.add(ParagraphStyle(
         name="InvoiceText",
         fontSize=10,
         spaceAfter=2,
@@ -125,34 +168,37 @@ def generate_proforma_pdf(proforma_data: dict) -> bytes:
     # TITLE
     # ======================
     elements.append(
-        Paragraph(proforma_data.get("title", "Invoice"),
+        Paragraph(title,
                   styles["InvoiceTitle"])
     )
+
+    elements.append(Spacer(1, 12))
 
     # ======================
     # FROM + META
     # ======================
     from_block = [
-        Paragraph("<b>Vanzator:</b>", styles["InvoiceSectionTitle"]),
+        Paragraph(f"<b>{t['seller']}:</b>", styles["InvoiceSectionTitle"]),
         Paragraph(proforma_data["from"]["name"], styles["InvoiceText"]),
     ]
     for line in proforma_data["from"]["address"]:
         from_block.append(Paragraph(line, styles["InvoiceText"]))
 
     from_block.append(Paragraph(
-        f"<b>IBAN #:</b> {proforma_data['from']['iban']}", styles["InvoiceText"])),
+        f"<b>{t['iban']}:</b> {proforma_data['from']['iban']}", styles["InvoiceText"])),
 
     meta = proforma_data["meta"]
     meta_block = [
         Paragraph(
-            f"<b>Cont de plata #</b> {meta['number']}", styles["InvoiceText"]),
-        Paragraph(f"<b>Data:</b> {meta['date']}", styles["InvoiceText"]),
+            f"<b>{t['invoice_number']}</b> {meta['number']}", styles["InvoiceTitleNumber"]),
+        Paragraph(f"<b>{t['date']}:</b> {meta['date']}",
+                  styles["InvoiceText"]),
+        Paragraph(f"<b>{t['due_date']}:</b> {meta['due_date']}",
+                  styles["InvoiceText"]),
         Paragraph(
-            f"<b>Scadenta:</b> {meta['due_date']}", styles["InvoiceText"]),
-        Paragraph(
-            f"<b>Ref. client:</b> {meta['customer_ref']}", styles["InvoiceText"]),
-        Paragraph(
-            f"<b>Valuta:</b> {meta['currency']}", styles["InvoiceText"]),
+            f"<b>{t['customer_ref']}:</b> {meta['customer_ref']}", styles["InvoiceText"]),
+        Paragraph(f"<b>{t['currency']}:</b> {meta['currency']}",
+                  styles["InvoiceText"]),
     ]
 
     header_table = Table(
@@ -174,8 +220,8 @@ def generate_proforma_pdf(proforma_data: dict) -> bytes:
     # ======================
     # TO
     # ======================
-    elements.append(Paragraph("<b>Cumparator:</b>",
-                    styles["InvoiceSectionTitle"]))
+    elements.append(
+        Paragraph(f"<b>{t['buyer']}:</b>", styles["InvoiceSectionTitle"]))
     elements.append(
         Paragraph(proforma_data["to"]["name"], styles["InvoiceText"]))
     for line in proforma_data["to"]["address"]:
@@ -185,7 +231,12 @@ def generate_proforma_pdf(proforma_data: dict) -> bytes:
     # ======================
     # ITEMS TABLE
     # ======================
-    table_data = [["Serviciu", "Cantitatea", "Pret unitar", "Valoarea"]]
+    table_data = [[
+        t["service"],
+        t["quantity"],
+        t["unit_price"],
+        t["amount"]
+    ]]
 
     for row in proforma_data["rows"]:
         table_data.append([
@@ -241,7 +292,19 @@ def generate_proforma_pdf(proforma_data: dict) -> bytes:
     # ======================
     # NOTES
     # ======================
-    elements.append(Paragraph("Nota", styles["InvoiceSectionTitle"]))
+    elements.append(Spacer(1, 24))
+    line_width = GRID[0] + GRID[1] + GRID[2] + GRID[3]
+
+    line = Table([[""]], colWidths=[line_width], hAlign="LEFT")
+    line.setStyle(TableStyle([
+        ("LINEABOVE", (0, 0), (-1, -1), 0.25, colors.black),
+        ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    ]))
+
+    elements.append(line)
+
+    elements.append(Paragraph(t["notes"], styles["InvoiceSectionTitle"]))
     elements.append(
         Paragraph(proforma_data.get("notes") or "-", styles["InvoiceText"])
     )
@@ -253,125 +316,234 @@ def generate_proforma_pdf(proforma_data: dict) -> bytes:
     return pdf
 
 
-# def generate_order_pdf(order_data: dict) -> bytes:
-#     buffer = BytesIO()
+def generate_act_pdf(proforma_data: dict, lang: str, inv_type: str) -> bytes:
+    buffer = BytesIO()
 
-#     doc = SimpleDocTemplate(
-#         buffer,
-#         pagesize=A4,
-#         rightMargin=28,
-#         leftMargin=28,
-#         topMargin=28,
-#         bottomMargin=28,
-#     )
+    t = TRANSLATIONS.get(lang, TRANSLATIONS["en"])
 
-#     styles = getSampleStyleSheet()
-#     styles.add(ParagraphStyle(
-#         name="OrderTitle",
-#         fontSize=16,
-#         fontName="Helvetica-Bold",
-#         spaceAfter=14,
-#     ))
-#     styles.add(ParagraphStyle(
-#         name="OrderSection",
-#         fontSize=10,
-#         fontName="Helvetica-Bold",
-#         spaceAfter=6,
-#     ))
-#     styles.add(ParagraphStyle(
-#         name="OrderText",
-#         fontSize=10,
-#         spaceAfter=6,
-#         leading=14,
-#     ))
+    print('def generate_act_pdf:', inv_type)
 
-#     elements = []
-
-#     # ======================
-#     # TITLE
-#     # ======================
-#     elements.append(Paragraph(order_data["title"], styles["OrderTitle"]))
-
-#     # ======================
-#     # FROM + META
-#     # ======================
-#     from_block = [
-#         Paragraph("<b>Transportator:</b>", styles["OrderSection"]),
-#         Paragraph(order_data["from"]["name"], styles["OrderText"]),
-#     ]
-#     for line in order_data["from"]["address"]:
-#         from_block.append(Paragraph(line, styles["OrderText"]))
-
-#     meta_block = [
-#         Paragraph(
-#             f"<b>Nr. comanda:</b> {order_data['meta']['number']}", styles["OrderText"]),
-#         Paragraph(
-#             f"<b>Data:</b> {order_data['meta']['date']}", styles["OrderText"]),
-#     ]
-
-#     header_table = Table(
-#         [[from_block, meta_block]],
-#         colWidths=[doc.width * 0.65, doc.width * 0.35],
-#     )
-#     header_table.setStyle(TableStyle([
-#         ("VALIGN", (0, 0), (-1, -1), "TOP"),
-#         ("LEFTPADDING", (0, 0), (-1, -1), 0),
-#         ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-#         ("TOPPADDING", (0, 0), (-1, -1), 0),
-#         ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
-#     ]))
-
-#     elements.append(header_table)
-#     elements.append(Spacer(1, 16))
-
-#     # ======================
-#     # TO
-#     # ======================
-#     elements.append(Paragraph("<b>Beneficiar:</b>", styles["OrderSection"]))
-#     elements.append(Paragraph(order_data["to"]["name"], styles["OrderText"]))
-#     for line in order_data["to"]["address"]:
-#         elements.append(Paragraph(line, styles["OrderText"]))
-
-#     elements.append(Spacer(1, 20))
-
-#     # ======================
-#     # CONTRACT CONTENT
-#     # ======================
-#     elements.append(
-#         Paragraph("<b>Conditii contractuale</b>", styles["OrderSection"]))
-
-#     paragraphs = html_to_rl_paragraphs(order_data["content"])
-
-#     for p in paragraphs:
-#         elements.append(
-#             Paragraph(p.replace("\n", "<br/>"), styles["OrderText"]))
-#         elements.append(Spacer(1, 6))
-
-#     doc.build(elements)
-
-#     pdf = buffer.getvalue()
-#     buffer.close()
-#     return pdf
-
-
-def generate_order_pdf(order_data: dict) -> bytes:
-    html = render_to_string(
-        "pdf/order_contract.html",
-        {"order": order_data},
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=12,
+        leftMargin=28,
+        topMargin=28,
+        bottomMargin=28,
     )
 
-    pdf = pdfkit.from_string(
-        html,
-        False,
-        configuration=get_pdfkit_config(),
-        options={
-            "page-size": "A4",
-            "margin-top": "20mm",
-            "margin-bottom": "20mm",
-            "margin-left": "20mm",
-            "margin-right": "20mm",
-            "encoding": "UTF-8",
-        },
+    GRID = [
+        doc.width * 0.35,
+        doc.width * 0.10,
+        doc.width * 0.18,
+        doc.width * 0.32,
+    ]
+
+    styles = getSampleStyleSheet()
+    styles.add(ParagraphStyle(
+        name="ActTitleCentered",
+        fontSize=16,
+        fontName="Helvetica-Bold",
+        spaceAfter=12,
+        alignment=1,
+    ))
+    styles.add(ParagraphStyle(
+        name="ActSubtitleCentered",
+        fontSize=12,
+        fontName="Helvetica-Bold",
+        spaceAfter=8,
+        alignment=1,
+    ))
+    styles.add(ParagraphStyle(
+        name="InvoiceSectionTitle",
+        fontSize=10,
+        fontName="Helvetica-Bold",
+        spaceAfter=4,
+    ))
+    styles.add(ParagraphStyle(
+        name="InvoiceTitleNumber",
+        fontSize=14,
+        spaceAfter=6,
+    ))
+    styles.add(ParagraphStyle(
+        name="InvoiceText",
+        fontSize=10,
+        spaceAfter=2,
+    ))
+
+    elements = []
+
+    # ======================
+    # TITLE
+    # ======================
+    elements.append(
+        Paragraph(t["act_title"],
+                  styles["ActTitleCentered"])
     )
 
+    elements.append(Spacer(1, 6))
+
+    # ======================
+    # META
+    # ======================
+
+    meta = proforma_data["meta"]
+
+    meta_text = (
+        f"<b>{t['nr']}:</b> {meta['number']} "
+        f"<b>{t['from']}:</b> {meta['date']}"
+    )
+
+    meta_block = [
+        Paragraph(meta_text, styles["ActSubtitleCentered"])
+    ]
+
+    meta_table = Table([[meta_block]], colWidths=[doc.width], hAlign="CENTER")
+    meta_table.setStyle(TableStyle([
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+    ]))
+
+    elements.append(meta_table)
+    elements.append(Spacer(1, 18))
+
+    # ======================
+    # FROM + TO
+    # ======================
+
+    from_block = [
+        Paragraph(f"<b>{t['seller']}:</b>", styles["InvoiceSectionTitle"]),
+        Paragraph(proforma_data["from"]["name"], styles["InvoiceText"]),
+    ]
+    for line in proforma_data["from"]["address"]:
+        from_block.append(Paragraph(line, styles["InvoiceText"]))
+
+    from_block.append(Paragraph(
+        f"<b>{t['iban']}:</b> {proforma_data['from']['iban']}", styles["InvoiceText"])),
+
+    to_block = [
+        Paragraph(f"<b>{t['buyer']}:</b>", styles["InvoiceSectionTitle"]),
+        Paragraph(proforma_data["to"]["name"], styles["InvoiceText"]),
+    ]
+
+    for line in proforma_data["to"]["address"]:
+        to_block.append(Paragraph(line, styles["InvoiceText"]))
+
+    header_table = Table(
+        [[from_block, to_block]],
+        colWidths=[doc.width * 0.50, doc.width * 0.50],
+        hAlign="LEFT",
+    )
+    header_table.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+    ]))
+
+    elements.append(header_table)
+    elements.append(Spacer(1, 14))
+
+    # ======================
+    # TO
+    # ======================
+    # elements.append(
+    #     Paragraph(f"<b>{t['buyer']}:</b>", styles["InvoiceSectionTitle"]))
+    # elements.append(
+    #     Paragraph(proforma_data["to"]["name"], styles["InvoiceText"]))
+    # for line in proforma_data["to"]["address"]:
+    #     elements.append(Paragraph(line, styles["InvoiceText"]))
+    # elements.append(Spacer(1, 12))
+
+    # ======================
+    # ITEMS TABLE
+    # ======================
+    table_data = [[
+        t["service"],
+        t["quantity"],
+        t["unit_price"],
+        t["amount"]
+    ]]
+
+    for row in proforma_data["rows"]:
+        table_data.append([
+            row["description"],
+            row["quantity"],
+            row["rate"],
+            row["amount"],
+        ])
+
+    items_table = Table(table_data, colWidths=GRID, hAlign="LEFT")
+    items_table.setStyle(TableStyle([
+        ("FONT", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 10),
+        ("ALIGN", (1, 0), (-1, -1), "RIGHT"),
+        ("ALIGN", (0, 0), (0, -1), "LEFT"),
+        ("LINEBELOW", (0, 0), (-1, 0), 0.5, colors.black),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 2),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    ]))
+
+    elements.append(items_table)
+    elements.append(Spacer(1, 24))
+
+    # ======================
+    # TOTALS
+    # ======================
+    totals_data = []
+    for total in proforma_data["totals"]:
+        totals_data.append([
+            "",
+            "",
+            total["label"],
+            total["amount"],
+        ])
+
+    totals_table = Table(totals_data, colWidths=GRID, hAlign="LEFT")
+    totals_table.setStyle(TableStyle([
+        ("FONTSIZE", (0, 0), (-1, -1), 10),
+        ("ALIGN", (2, 0), (-1, -1), "RIGHT"),
+        ("FONT", (2, -1), (-1, -1), "Helvetica-Bold"),
+        ("LINEABOVE", (2, -1), (-1, -1), 0.5, colors.black),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 2),
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+    ]))
+
+    elements.append(totals_table)
+    elements.append(Spacer(1, 16))
+
+    # ======================
+    # NOTES
+    # ======================
+    elements.append(Spacer(1, 24))
+    line_width = GRID[0] + GRID[1] + GRID[2] + GRID[3]
+
+    line = Table([[""]], colWidths=[line_width], hAlign="LEFT")
+    line.setStyle(TableStyle([
+        ("LINEABOVE", (0, 0), (-1, -1), 0.25, colors.black),
+        ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    ]))
+
+    elements.append(line)
+
+    elements.append(Paragraph(t["notes"], styles["InvoiceSectionTitle"]))
+    elements.append(
+        Paragraph(proforma_data.get("notes") or "-", styles["InvoiceText"])
+    )
+
+    doc.build(elements)
+
+    pdf = buffer.getvalue()
+    buffer.close()
     return pdf
+
+###### END PDF GENERATORS ######

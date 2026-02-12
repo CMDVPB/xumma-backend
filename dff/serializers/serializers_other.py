@@ -207,12 +207,12 @@ class ContactTripListSerializer(WritableNestedModelSerializer):
 
 class ContactBasicReadSerializer(WritableNestedModelSerializer):
     status = ContactStatusSerializer(read_only=True)
-    country_code_post = CountrySerializer(allow_null=True)
+    country_code_legal = CountrySerializer(allow_null=True)
 
     class Meta:
         model = Contact
         fields = ('fiscal_code', 'company_name', 'email', 'zip_code_post', 'city_post', 'address_post', 'lat', 'lon', 'uf',
-                  'country_code_post', 'status',
+                  'country_code_legal', 'status',
                   )
 
 

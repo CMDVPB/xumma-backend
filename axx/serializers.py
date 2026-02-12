@@ -1,12 +1,13 @@
+from decimal import Decimal, ROUND_HALF_UP
 from django.contrib.auth import get_user_model
-from rest_framework import serializers
 from django.utils import timezone
 from django.conf import settings
+from rest_framework import serializers
 
 from abb.models import Currency
 from abb.utils import get_user_company
 from auu.models import PaymentMethod
-from axx.models import Trip, TripAdvancePayment, TripAdvancePaymentStatus
+from axx.models import LoadInv, Trip, TripAdvancePayment, TripAdvancePaymentStatus
 
 User = get_user_model()
 
@@ -187,3 +188,86 @@ class LoadDocumentItemSerializer(serializers.Serializer):
         if not uf:
             return None
         return f"{settings.BACKEND_URL}/api/load-documents/{uf}/"
+
+
+###### START LOAD INV ######
+
+
+class LoadInvListSerializer(serializers.ModelSerializer):
+    company_name = serializers.CharField(
+        source="company.company_name", read_only=True)
+    load_uf = serializers.CharField(source="load.uf", read_only=True)
+    load_sn = serializers.CharField(source="load.sn", read_only=True)
+    customer = serializers.CharField(
+        source="load.bill_to.company_name", read_only=True)
+    status_load_inv = serializers.CharField(
+        source="status", read_only=True)
+    issued_by_name = serializers.SerializerMethodField(read_only=True)
+    original_amount_currency = serializers.SerializerMethodField(
+        read_only=True)
+    amount_mdl = serializers.SerializerMethodField(
+        read_only=True)
+    exchange_rate = serializers.SerializerMethodField(
+        read_only=True)
+
+    class Meta:
+        model = LoadInv
+        fields = [
+            "company",
+            "company_name",
+            "load_uf",
+            "load_sn",
+            "customer",
+            "invoice_number",
+            "issued_date",
+            "amount_mdl",
+            "original_amount_currency",
+            "currency",
+            "exchange_rate",
+            "rate_date",
+            "status_load_inv",
+            "invoice_type",
+            "issued_at",
+            "issued_by",
+            "issued_by_name",
+            "uf",
+        ]
+
+    def get_issued_by_name(self, obj):
+        user = obj.issued_by
+        return user.get_full_name() or user.email
+
+    def get_original_amount_currency(self, obj):
+        if obj.original_amount is None:
+            return None
+
+        amount_rounded = obj.original_amount.quantize(
+            Decimal("0.01"),
+            rounding=ROUND_HALF_UP
+        )
+
+        return f"{amount_rounded} {obj.currency}"
+
+    def get_amount_mdl(self, obj):
+        if obj.amount_mdl is None:
+            return None
+
+        amount_rounded = obj.amount_mdl.quantize(
+            Decimal("0.01"),
+            rounding=ROUND_HALF_UP
+        )
+
+        return f"{amount_rounded}"
+
+    def get_exchange_rate(self, obj):
+        if obj.exchange_rate is None:
+            return None
+
+        amount_rounded = obj.exchange_rate.quantize(
+            Decimal("0.0001"),
+            rounding=ROUND_HALF_UP
+        )
+
+        return f"{amount_rounded}"
+
+###### END LOAD INV ######

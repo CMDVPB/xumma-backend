@@ -13,7 +13,7 @@ from abb.serializers import CurrencySerializer
 from abb.serializers_drf_writable import CustomWritableNestedModelSerializer, CustomUniqueFieldsMixin
 from abb.utils import get_user_company
 from app.models import TypeCost
-from ayy.models import CompanyCard, UserDocument, DocumentType, ItemCost, ItemForItemCost, PhoneNumber
+from ayy.models import CMRStockMovement, CardProvider, CompanyCard, UserDocument, DocumentType, ItemCost, ItemForItemCost, PhoneNumber
 from ayy.services.fuel_sync import sync_fueling_from_item_cost
 
 
@@ -314,6 +314,12 @@ class CompanyCardSerializer(serializers.ModelSerializer):
     current_employee = serializers.SerializerMethodField()
     current_vehicle = serializers.SerializerMethodField()
 
+    provider = serializers.CharField(
+        required=False,
+        allow_null=True,
+        write_only=True,
+    )
+
     class Meta:
         model = CompanyCard
         fields = [
@@ -328,6 +334,17 @@ class CompanyCardSerializer(serializers.ModelSerializer):
             "current_vehicle",
         ]
         read_only_fields = ["uf"]
+
+    def get_provider_data(self, obj):
+        if not obj.provider:
+            return None
+
+        return {
+            "uf": obj.provider.uf,
+            "name": obj.provider.name,
+            "code": obj.provider.code,
+            "is_system": obj.provider.is_system,
+        }
 
     def get_current_employee(self, obj):
         if not obj.current_employee:
@@ -345,10 +362,157 @@ class CompanyCardSerializer(serializers.ModelSerializer):
             "name": str(obj.current_vehicle),
         }
 
+    def validate_provider(self, value):
+        if value in (None, ""):
+            return None
+
+        request = self.context["request"]
+        company = get_user_company(request.user)
+
+        try:
+            provider = CardProvider.objects.get(uf=value)
+        except CardProvider.DoesNotExist:
+            raise serializers.ValidationError("Invalid provider")
+
+        # Multi-tenant safety
+        if not provider.is_system and provider.company_id != company.id:
+            raise serializers.ValidationError("Invalid provider")
+
+        return provider
+
+    def update(self, instance, validated_data):
+        provider = validated_data.pop("provider", None)
+
+        if provider is not None:
+            instance.provider = provider
+
+        return super().update(instance, validated_data)
+
+    def create(self, validated_data):
+        provider = validated_data.pop("provider", None)
+
+        card = CompanyCard(**validated_data)
+        card.provider = provider
+        card.save()
+
+        return card
+
+    # ----------------------------
+    # Output Masking
+    # ----------------------------
+
     def to_representation(self, instance):
         data = super().to_representation(instance)
-        # mask card number
-        data["card_number"] = f"**** {instance.card_number[-4:]}"
+
+        data["provider"] = None
+        if instance.provider:
+            data["provider"] = {
+                "uf": instance.provider.uf,
+                "name": instance.provider.name,
+                "code": instance.provider.code,
+                "is_system": instance.provider.is_system,
+            }
+
+        if instance.card_number:
+            data["card_number"] = f"**** {instance.card_number[-4:]}"
+
         return data
 
+
+class CardProviderSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CardProvider
+        fields = ("code", "name", "is_system", 'uf',
+                  )
+
+    def validate(self, attrs):
+        request = self.context["request"]
+
+        company = get_user_company(request.user)
+
+        is_system = attrs.get("is_system", False)
+        name = attrs.get("name")
+        code = attrs.get("code")
+
+        if is_system and not request.user.is_staff:
+            raise serializers.ValidationError(
+                "Only staff can create system providers"
+            )
+
+        # Prevent duplicate provider inside same company
+        if not is_system:
+            if CardProvider.objects.filter(
+                company=company,
+                name=name,
+                is_system=False
+            ).exists():
+                raise serializers.ValidationError(
+                    {"name": "Provider already exists"}
+                )
+
+        return attrs
+
+    def create(self, validated_data):
+        validated_data.pop("company", None)
+
+        request = self.context["request"]
+        company = get_user_company(request.user)
+
+        if validated_data.get("is_system", False):
+            validated_data["company"] = None
+        else:
+            validated_data["company"] = company
+
+        return super().create(validated_data)
+
+
+class CardProviderUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CardProvider
+        fields = ("name", "code")
+
+    def validate(self, attrs):
+        instance = self.instance
+        request = self.context["request"]
+        user_company = get_user_company(request.user)
+
+        # Prevent editing system providers
+        if instance.is_system:
+            raise serializers.ValidationError(
+                "System providers cannot be modified")
+
+        name = attrs.get("name", instance.name)
+        code = attrs.get("code", instance.code)
+
+        # Per-company uniqueness check (better UX than DB crash)
+        if CardProvider.objects.filter(
+            company=user_company,
+            name=name
+        ).exclude(pk=instance.pk).exists():
+            raise serializers.ValidationError(
+                {"name": "Provider already exists"})
+
+        if CardProvider.objects.filter(
+            company=user_company,
+            code=code
+        ).exclude(pk=instance.pk).exists():
+            raise serializers.ValidationError({"code": "Code already exists"})
+
+        return attrs
 ###### END CARD SERIALIZERS ######
+
+
+class CMRStockMovementSerializer(serializers.ModelSerializer):
+    batch_uf = serializers.CharField(source="batch.uf", read_only=True)
+    load_uf = serializers.CharField(source="load.uf", read_only=True)
+
+    class Meta:
+        model = CMRStockMovement
+        fields = [
+            "uf",
+            "batch_uf",
+            "series",
+            "number_from",
+            "number_to",
+            "load_uf",
+        ]

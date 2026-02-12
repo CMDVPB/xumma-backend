@@ -6,16 +6,23 @@ from django.db.models import QuerySet, Q
 from requests import get
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
+from rest_framework.generics import ListAPIView, CreateAPIView, UpdateAPIView, DestroyAPIView
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import generics, permissions
 from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.exceptions import ValidationError
 
 from abb.utils import get_user_company
 from att.models import Contact, Vehicle
 from axx.models import Load
-from .models import CMRHolder, CMRStockBatch, CMRStockMovement, CardAssignment, CompanyCard, DocumentType
+from ayy.mixins import CardProviderAccessMixin
+from .models import CMRHolder, CMRStockBatch, CMRStockMovement, CardAssignment, CardProvider, CompanyCard, DocumentType
 from .serializers import (
+    CMRStockMovementSerializer,
+    CardProviderSerializer,
+    CardProviderUpdateSerializer,
     CompanyCardSerializer,
     DocumentTypeSerializer,
     DocumentTypeCreateSerializer
@@ -199,6 +206,57 @@ class CompanyCardUnassignView(APIView):
             status=status.HTTP_200_OK,
         )
 
+
+class CardProviderListAPIView(ListAPIView):
+    serializer_class = CardProviderSerializer
+
+    def get_queryset(self):
+        user = self.request.user
+        company = get_user_company(user)
+
+        queryset = CardProvider.objects.filter(
+            Q(is_system=True) | Q(company=company)
+        )
+
+        search = self.request.query_params.get("search")
+
+        if search:
+            queryset = queryset.filter(
+                Q(name__icontains=search) |
+                Q(code__icontains=search)
+            )
+
+        return queryset.order_by("name")
+
+
+class CardProviderCreateAPIView(CreateAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = CardProviderSerializer
+    queryset = CardProvider.objects.all()
+
+
+class CardProviderUpdateAPIView(CardProviderAccessMixin, UpdateAPIView):
+    serializer_class = CardProviderUpdateSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self):
+        return self.get_provider()
+
+
+class CardProviderDeleteAPIView(CardProviderAccessMixin, DestroyAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self):
+        provider = self.get_provider()
+
+        if provider.is_system:
+            raise ValidationError("System providers cannot be deleted")
+
+        # Prevent deletion if used
+        if provider.provider_cards.exists():
+            raise ValidationError("Provider is used by cards")
+
+        return provider
 
 ###### END CARDS ######
 
@@ -761,7 +819,7 @@ class CMRConsumeView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        CMRStockMovement.objects.create(
+        movement = CMRStockMovement.objects.create(
             batch=batch,
             series=batch.series,
             number_from=number,
@@ -774,6 +832,37 @@ class CMRConsumeView(APIView):
             notes=f"Consumed for load {load.uf}",
         )
 
-        return Response({"status": "ok"}, status=status.HTTP_201_CREATED)
+        serializer = CMRStockMovementSerializer(movement)
+
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class CmrUnconsumeView(APIView):
+    """
+    Unassign / unconsume CMR from a load
+    """
+
+    def patch(self, request, load_uf):
+        load = get_object_or_404(Load, uf=load_uf)
+
+        # 🔎 find consumed movement
+        movement = CMRStockMovement.objects.filter(
+            load=load,
+            movement_type=CMRStockMovement.CONSUMED,
+        ).first()
+
+        if not movement:
+            return Response(
+                {"detail": "No CMR assigned to this load"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # 🗑️ remove consumption
+        movement.delete()
+
+        return Response(
+            {"detail": "CMR unassigned successfully"},
+            status=status.HTTP_200_OK,
+        )
 
 ###### END CMR TRANSFER ######

@@ -13,7 +13,7 @@ from rest_framework_simplejwt.authentication import JWTAuthentication  # used fo
 from rest_framework_simplejwt.exceptions import InvalidToken  # used for FBV
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework import permissions, status
-from rest_framework.permissions import IsAuthenticated
+
 
 from abb.models import Country, Currency
 from abb.serializers import CountrySerializer, CurrencySerializer

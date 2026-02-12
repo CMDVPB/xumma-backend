@@ -1,7 +1,10 @@
+import os
+import tempfile
 from datetime import datetime, timedelta
 from smtplib import SMTPException
 from webbrowser import get
 from django.utils import timezone
+from django.conf import settings
 from django.forms.models import model_to_dict
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError
@@ -9,6 +12,7 @@ from django.db.models import Exists, OuterRef, Sum, Prefetch, Q, Case, When
 from django.db.models.deletion import RestrictedError
 from django.views.decorators.cache import cache_page
 from django.http import HttpResponse
+from django.urls import reverse
 from rest_framework.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
 from rest_framework import status, exceptions
@@ -20,14 +24,20 @@ from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser  # JSONParser
 from rest_framework.decorators import authentication_classes, api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated  # used for FBV
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.filters import OrderingFilter
+from PyPDF2 import PdfMerger
+
 
 from abb.constants import LOAD_DOCUMENT_TYPES
+from abb.pagination import CustomInfiniteCursorPagination, CustomInfiniteCursorPaginationLoadInv
 from abb.permissions import IsSubscriptionActiveOrReadOnly
 from abb.utils import get_user_company
 from att.models import BankAccount, Contact, Contract, Person, VehicleUnit
-from axx.models import Load, LoadDocument, TripAdvancePayment
-from axx.serializers import LoadDocumentItemSerializer, TripAdvancePaymentChangeStatusSerializer, TripAdvancePaymentCreateSerializer, TripAdvancePaymentListSerializer
+from axx.models import Load, LoadDocument, LoadInv, TripAdvancePayment
+from axx.serializers import LoadDocumentItemSerializer, LoadInvListSerializer, TripAdvancePaymentChangeStatusSerializer, TripAdvancePaymentCreateSerializer, TripAdvancePaymentListSerializer
 from axx.service import LoadDocumentService
+from axx.utils import get_load_document_paths, resolve_inv_type_title
 from dff.serializers.serializers_other import ContactSerializer, ContractFKSerializer, ContractListSerializer
 
 import logging
@@ -255,20 +265,26 @@ class GenerateLoadDocumentView(APIView):
             "amount": request.data.get("amount"),
             "notes": request.data.get("notes"),
             "currency_code": request.data.get("currencyCode"),
+            "document_lang": request.data.get("documentLang"),
+
         }
+
+        # print('REQUEST DATA 3500', request.data)
 
         doc = LoadDocumentService.generate(
             load=load,
-            doc_type=doc_type,
             user=request.user,
-            runtime_data=generation_data
+            runtime_data=generation_data,
+            doc_type=doc_type,
         )
 
         return Response({
             "id": doc.id,
             "doc_type": doc.doc_type,
             "version": doc.version,
-            "url": doc.file.url,
+            "url": request.build_absolute_uri(
+                reverse("load-document-proxy", args=[doc.uf])
+            )
         })
 
 
@@ -326,6 +342,93 @@ class LoadDocumentProxyView(APIView):
         return FileResponse(
             document.file.open("rb"),
             content_type="application/pdf",
-            as_attachment=True,
+            as_attachment=False,
             filename=document.file.name.split("/")[-1],
         )
+
+
+###### START LOAD INV ######
+
+class LoadInvListView(ListAPIView):
+    permission_classes = [IsAuthenticated]
+    pagination_class = CustomInfiniteCursorPaginationLoadInv
+    serializer_class = LoadInvListSerializer
+
+    filter_backends = [DjangoFilterBackend, OrderingFilter]
+    filterset_fields = ["status", "invoice_type", "issued_date"]
+    ordering_fields = ["issued_at", "issued_date", "amount_mdl"]
+
+    def get_queryset(self):
+        user = self.request.user
+
+        user_company = get_user_company(user)
+
+        qs = (LoadInv.objects
+              .filter(company=user_company)
+              .select_related("company", "load", "issued_by")
+
+              )
+
+        start_date = self.request.query_params.get("startDate")
+        end_date = self.request.query_params.get("endDate")
+
+        if start_date and end_date:
+            qs = qs.filter(issued_date__range=[start_date, end_date])
+
+        return qs.order_by("-issued_at")
+
+
+###### END LOAD INV ######
+
+class LoadMergedPdfView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, load_uf):
+        try:
+            load = Load.objects.get(uf=load_uf)
+        except Load.DoesNotExist:
+            raise Http404("Load not found")
+
+        # Retrieve actual FILE PATHS (not URLs)
+        docs = get_load_document_paths(load)
+
+        pdf_paths = [
+            docs.get("order"),
+            docs.get("proforma"),
+            docs.get("act"),
+        ]
+
+        pdf_paths = [p for p in pdf_paths if p and os.path.exists(p)]
+
+        if not pdf_paths:
+            return Response(
+                {"detail": "No PDFs available for merge"},
+                status=400,
+            )
+
+        merger = PdfMerger()
+
+        try:
+            for path in pdf_paths:
+                merger.append(path)
+
+            temp_file = tempfile.NamedTemporaryFile(
+                delete=False, suffix=".pdf")
+            merger.write(temp_file.name)
+            merger.close()
+
+            print('3580', f"Comanda_{load.sn}_merged.pdf")
+
+            return FileResponse(
+                open(temp_file.name, "rb"),
+                as_attachment=False,
+                filename=f"load_{load.uf}_merged.pdf",
+                content_type="application/pdf",
+            )
+
+        except Exception as e:
+            merger.close()
+            return Response(
+                {"detail": f"Merge failed: {str(e)}"},
+                status=500,
+            )

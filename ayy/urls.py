@@ -15,7 +15,11 @@ urlpatterns = [
     path("cards/<str:uf>/assign/", CompanyCardAssignView.as_view()),
     path("cards/<str:uf>/unassign/",
          CompanyCardUnassignView.as_view()),
-
+    path("card-providers/", CardProviderListAPIView.as_view()),
+    path("card-providers/create/", CardProviderCreateAPIView.as_view()),
+    path("card-providers/<str:uf>/", CardProviderUpdateAPIView.as_view()),
+    path("card-providers/<str:uf>/delete/",
+         CardProviderDeleteAPIView.as_view()),
 
     path("cmrs/available/", CMRAvailableView.as_view(), name="cmr-available"),
     path("cmrs/transfer/", CMRTransferView.as_view(), name="cmr-transfer"),
@@ -24,6 +28,7 @@ urlpatterns = [
     path("cmrs/available/load/", CMRAvailableForLoadView.as_view(),
          name="cmr-available-load"),
     path("cmrs/consume/", CMRConsumeView.as_view(), name="cmr-consume"),
+    path('cmrs/unconsume/<str:load_uf>/', CmrUnconsumeView.as_view()),
 
 ]
 

@@ -30,7 +30,7 @@ from abb.permissions import AssignedUserManagerOrReadOnlyIfLocked, AssignedUserO
 from abb.utils import get_user_company, is_valid_queryparam
 from app.utils import is_user_member_group
 from axx.models import Ctr, Exp, Inv, Load, LoadInv, Tor
-from axx.service import issue_invoice
+from axx.service import LoadDocumentService, issue_invoice
 from ayy.models import CMR, Comment, Entry, ImageUpload, ItemInv
 
 
@@ -679,6 +679,8 @@ class LoadListForTripView(ListAPIView):
             return queryset
 
 
+###### START LOAD INV ######
+
 class IssueInvoiceView(GenericAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = IssueInvoiceSerializer
@@ -709,6 +711,18 @@ class IssueInvoiceView(GenericAPIView):
 
         # Create invoice snapshot
         invoice = issue_invoice(load, user, data)
+
+        LoadDocumentService.generate(
+            load=load,
+            doc_type='proforma',
+            user=user,
+            runtime_data={
+                "amount": load.freight_price,
+                "notes": '',
+                "currency_code": load.currency.currency_code or 'MDL',
+                "invoice_number": invoice.invoice_number
+            }
+        )
 
         load.is_invoiced = True
         load.date_invoiced = load.date_cleared
@@ -774,3 +788,6 @@ class CancelInvoiceView(GenericAPIView):
             },
             status=status.HTTP_200_OK
         )
+
+
+###### END LOAD INV ######

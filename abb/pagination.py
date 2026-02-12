@@ -25,6 +25,12 @@ class CustomInfiniteCursorPagination(CursorPagination):
     ordering = "-date_order"            # MUST be deterministic
 
 
+class CustomInfiniteCursorPaginationLoadInv(CursorPagination):
+    page_size = 12
+    page_size_query_param = "limit"
+    max_page_size = 30
+    ordering = "-issued_at"   # ✅ correct field
+
 # class StandardResultsSetPagination(PageNumberPagination):
 #     page_size = 15
 #     page_size_query_param = 'page_size'

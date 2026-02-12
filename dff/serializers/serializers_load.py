@@ -585,47 +585,17 @@ class LoadPatchSerializer(WritableNestedModelSerializer):
 
         return attrs
 
-    # def update(self, instance, validated_data):
-    #     # print('6464', validated_data)
-
-    #     # ✅ business rule
-    #     now = timezone.now()
-
-    #     for flag_field, date_field in self.AUTO_DATE_FIELDS.items():
-    #         if (
-    #             validated_data.get(flag_field) is True
-    #             and date_field not in validated_data
-    #             and getattr(instance, date_field) is None
-    #         ):
-    #             validated_data[date_field] = now
-    #         elif (
-    #             validated_data.get(flag_field) is False
-    #             and date_field not in validated_data
-    #         ):
-    #             validated_data[date_field] = None
-
-    #     relations, reverse_relations = self._extract_relations(validated_data)
-
-    #     # Create or update direct relations (foreign key, one-to-one)
-    #     self.update_or_create_direct_relations(
-    #         validated_data,
-    #         relations,
-    #     )
-
-    #     # Update instance with atomic
-    #     with transaction.atomic():
-    #         instance = super(NestedUpdateMixin, self).update(
-    #             instance,
-    #             validated_data,
-    #         )
-    #         self.update_or_create_reverse_relations(
-    #             instance, reverse_relations)
-    #         self.delete_reverse_relations_if_need(instance, reverse_relations)
-    #         instance.refresh_from_db()
-    #         return instance
-
     def update(self, instance, validated_data):
         now = timezone.now()
+
+        if validated_data.get("date_loaded") is not None:
+            validated_data["is_loaded"] = True
+
+        if validated_data.get("date_cleared") is not None:
+            validated_data["is_cleared"] = True
+
+        if validated_data.get("date_unloaded") is not None:
+            validated_data["is_unloaded"] = True
 
         # 🔹 extract event flags
         event_type = None

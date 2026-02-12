@@ -4,20 +4,25 @@ from django.utils import timezone
 from django.core.files.base import ContentFile
 
 from axx.models import LoadDocument, LoadInv
-from axx.utils_generate import generate_order_pdf, generate_proforma_pdf
+from axx.translations import resolve_language
+from axx.utils import resolve_inv_type_title
+from axx.utils_generate import generate_act_pdf, generate_order_pdf, generate_proforma_pdf
 
 
 @transaction.atomic
 def issue_invoice(load, user, data):
     last_number = (
         LoadInv.objects
-        .filter(company=load.company, status='issued')
+        .filter(company=load.company)
         .select_for_update()
         .aggregate(Max('invoice_number'))
         .get('invoice_number__max')
     )
 
-    next_number = None
+    try:
+        next_number = int(last_number) + 1
+    except (TypeError, ValueError):
+        next_number = 1
 
     invoice = LoadInv.objects.create(
         load=load,
@@ -66,9 +71,11 @@ def safe_fk(obj, fk_attr, field, default="-"):
         return default
 
 
-def build_proforma_data(load, runtime_data) -> dict:
+def build_proforma_data(load, runtime_data=None) -> dict:
     company = getattr(load, "company", None)
     bill_to = getattr(load, "bill_to", None)
+
+    runtime_data = runtime_data or {}
 
     # currency override
     currency = safe_str(
@@ -77,12 +84,16 @@ def build_proforma_data(load, runtime_data) -> dict:
         "",
     )
 
+    title = resolve_inv_type_title(load)
+
+    # print('6648', title)
+
     # amount override (string or number safe)
     raw_amount = runtime_data.get("amount") or getattr(
         load, "freight_price", None)
 
     return {
-        "title": "Cont de plata",
+        "title": title or "Cont de plata",
 
         "from": {
             "name": safe_str(getattr(company, "company_name", "")),
@@ -117,7 +128,7 @@ def build_proforma_data(load, runtime_data) -> dict:
         },
 
         "meta": {
-            "number": safe_str(getattr(load, "invoice_number", None)),
+            "number": safe_str(runtime_data.get("invoice_number")),
             "date": safe_date(getattr(load, "date_cleared", None)),
             "due_date": safe_date(getattr(load, "invoice_due_date", None)),
             "customer_ref": safe_str(getattr(load, "customer_ref", None)),
@@ -165,7 +176,10 @@ def build_proforma_data(load, runtime_data) -> dict:
 def build_order_data(load, runtime_data) -> dict:
     bill_to = getattr(load, "bill_to", None)
 
+    runtime_data = runtime_data or {}
+
     contract = None
+
     if bill_to:
         contract = (
             bill_to.contact_contracts
@@ -177,7 +191,7 @@ def build_order_data(load, runtime_data) -> dict:
         "title": safe_str(getattr(contract, "title", None), "Comandă de transport"),
 
         "meta": {
-            "number": safe_str(getattr(contract, "number", None)),
+            "number": safe_str(runtime_data.get("invoice_number")),
             "date": safe_date(getattr(contract, "date", None)),
         },
 
@@ -213,9 +227,22 @@ def build_act_data(load, runtime_data) -> dict:
 
 
 DOCUMENT_GENERATORS = {
-    "proforma": {"builder": build_proforma_data, "generator": generate_proforma_pdf, "filename": "Proforma", },
-    "order": {"builder": build_order_data, "generator": generate_order_pdf, "filename": "Customer Order", },
-    "act": {"builder": build_act_data, "generator": generate_proforma_pdf, "filename": "Act of Execution of Services", },
+    "proforma": {
+        "builder": build_proforma_data,
+        "generator": generate_proforma_pdf,
+        "filename": "Proforma",
+        "doc_type": "proforma",
+    },
+    "order": {
+        "builder": build_order_data,
+        "generator": generate_order_pdf,
+        "filename": "Customer Order",
+    },
+    "act": {
+        "builder": build_act_data,
+        "generator": generate_act_pdf,
+        "filename": "Act of Execution of Services",
+    },
 }
 
 
@@ -223,7 +250,7 @@ class LoadDocumentService:
 
     @staticmethod
     @transaction.atomic
-    def generate(load, doc_type: str, user, runtime_data=None):
+    def generate(load, user, runtime_data=None, doc_type=None):
         if doc_type not in DOCUMENT_GENERATORS:
             raise ValueError(f"Unsupported document type: {doc_type}")
 
@@ -238,11 +265,17 @@ class LoadDocumentService:
 
         new_version = (old_doc.version + 1) if old_doc else 1
 
+        print('5080', doc_type)
+
         # 2. Build data
-        invoice_data = config["builder"](load, runtime_data)
+        document_data = config["builder"](load, runtime_data)
 
         # 3. Generate PDF bytes
-        pdf_bytes = config["generator"](invoice_data)
+        lang = resolve_language(
+            user, load.bill_to, runtime_data.get('document_lang'))
+        document_data = config["builder"](load, runtime_data)
+
+        pdf_bytes = config["generator"](document_data, lang, doc_type)
 
         # 4. Deactivate old
         if old_doc:
