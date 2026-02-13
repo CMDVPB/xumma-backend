@@ -126,6 +126,8 @@ def get_exchange_rates_task(national_bank, *args, **kwargs):
                 huf = _find_dict_in_list(currency_data_dict, 'CharCode', 'HUF')
                 bgn = _find_dict_in_list(currency_data_dict, 'CharCode', 'BGN')
                 trl = _find_dict_in_list(currency_data_dict, 'CharCode', 'TRY')
+                pln = _find_dict_in_list(currency_data_dict, 'CharCode', 'PLN')
+                czk = _find_dict_in_list(currency_data_dict, 'CharCode', 'CZK')
 
                 list_data_for_json = [
                     {'currency_code': 'ron',
@@ -142,6 +144,10 @@ def get_exchange_rates_task(national_bank, *args, **kwargs):
                         'currency_numeric': huf['NumCode'], 'value': float(huf['Value'])/100},
                     {'currency_code': 'try',
                         'currency_numeric': trl['NumCode'], 'value': trl['Value']},
+                    {'currency_code': 'pln',
+                     'currency_numeric': pln['NumCode'], 'value': pln['Value']},
+                    {'currency_code': 'czk',
+                     'currency_numeric': czk['NumCode'], 'value': czk['Value']},
                 ]
 
             elif national_bank == 'nbu':

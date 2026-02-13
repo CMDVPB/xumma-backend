@@ -34,7 +34,7 @@ from abb.pagination import CustomInfiniteCursorPagination, CustomInfiniteCursorP
 from abb.permissions import IsSubscriptionActiveOrReadOnly
 from abb.utils import get_user_company
 from att.models import BankAccount, Contact, Contract, Person, VehicleUnit
-from axx.models import Load, LoadDocument, LoadInv, TripAdvancePayment
+from axx.models import Load, LoadDocument, LoadInv, Trip, TripAdvancePayment
 from axx.serializers import LoadDocumentItemSerializer, LoadInvListSerializer, TripAdvancePaymentChangeStatusSerializer, TripAdvancePaymentCreateSerializer, TripAdvancePaymentListSerializer
 from axx.service import LoadDocumentService
 from axx.utils import get_load_document_paths, resolve_inv_type_title
@@ -432,3 +432,19 @@ class LoadMergedPdfView(APIView):
                 {"detail": f"Merge failed: {str(e)}"},
                 status=500,
             )
+
+
+class LastKmForVehicle(APIView):
+    def get(self, request, vehicle_uf):
+        print('6090', vehicle_uf)
+        trip = (
+            Trip.objects
+            .filter(vehicle_tractor__uf=vehicle_uf)
+            .exclude(km_arrival__isnull=True)
+            .order_by('-date_departure')
+            .first()
+        )
+
+        return Response({
+            "km_arrival": trip.km_arrival if trip else None
+        })

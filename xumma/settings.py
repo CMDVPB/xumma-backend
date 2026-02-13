@@ -80,6 +80,7 @@ INSTALLED_APPS = [
     'azz',
     'baa',
     'bab',
+    'bbo',
     'bch',
     'cld',
     'dff',

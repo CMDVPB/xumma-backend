@@ -1,7 +1,7 @@
 from django.urls import path
 from rest_framework.urlpatterns import format_suffix_patterns
 
-from .views import ContactListCreate, ContactDetail, ContractListView, GenerateLoadDocumentView, LoadDocumentProxyView, LoadDocumentsView, LoadInvListView, LoadMergedPdfView, TripAdvancePaymentChangeStatusView, TripAdvancePaymentCreateView, TripAdvancePaymentDeleteView, TripAdvancePaymentListView
+from .views import ContactListCreate, ContactDetail, ContractListView, GenerateLoadDocumentView, LastKmForVehicle, LoadDocumentProxyView, LoadDocumentsView, LoadInvListView, LoadMergedPdfView, TripAdvancePaymentChangeStatusView, TripAdvancePaymentCreateView, TripAdvancePaymentDeleteView, TripAdvancePaymentListView
 
 
 urlpatterns = [
@@ -20,6 +20,7 @@ urlpatterns = [
     path('advance-payments/<str:uf>/', TripAdvancePaymentDeleteView.as_view(),
          name='advance-payment-delete'
          ),
+    path('trips/last-km/<str:vehicle_uf>/', LastKmForVehicle.as_view()),
 
 
     path("loads/<str:load_uf>/documents/<str:doc_type>/generate/",

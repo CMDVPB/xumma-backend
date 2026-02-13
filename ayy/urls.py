@@ -20,6 +20,10 @@ urlpatterns = [
     path("card-providers/<str:uf>/", CardProviderUpdateAPIView.as_view()),
     path("card-providers/<str:uf>/delete/",
          CardProviderDeleteAPIView.as_view()),
+    path("cards/<str:card_uf>/periods/",
+         CardPeriodsView.as_view(),
+         name="card-periods",
+         ),
 
     path("cmrs/available/", CMRAvailableView.as_view(), name="cmr-available"),
     path("cmrs/transfer/", CMRTransferView.as_view(), name="cmr-transfer"),

@@ -27,6 +27,7 @@ urlpatterns = [
     path('api/', include('azz.urls')),
     path('api/', include('baa.urls')),
     path('api/', include('bab.urls')),
+    path('api/', include('bbo.urls')),
     path('api/', include('bch.urls')),
     path('api/', include('cld.urls')),
     path('api/', include('dff.urls')),

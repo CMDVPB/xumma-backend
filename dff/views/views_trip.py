@@ -65,7 +65,7 @@ class TripListView(ListAPIView):
                 Prefetch('drivers', queryset=drivers)
             )
 
-            print('2828', len(queryset))
+            # print('2828', len(queryset))
 
             return queryset.distinct()
 
@@ -77,7 +77,7 @@ class TripListView(ListAPIView):
         queryset = super().filter_queryset(queryset=queryset, **kwargs)
         order_by = 'date_order'
 
-        print("2010", len(queryset))
+        # print("2010", len(queryset))
 
         try:
             myitems = self.request.query_params.get('myitems', None)
@@ -90,7 +90,7 @@ class TripListView(ListAPIView):
                     assigned_user__id=self.request.user.id)
 
             if text_query is not None:
-                print('2036', text_query, type(text_query))
+                # print('2036', text_query, type(text_query))
                 queryset = queryset.filter(Q(rn__icontains=text_query)
                                            | Q(carrier__company_name__icontains=text_query)
                                            | Q(trip_loads__sn__icontains=text_query)
@@ -246,7 +246,7 @@ class TripListView(ListAPIView):
                     queryset = queryset.filter(
                         date_order__lt=dte + timedelta(days=1))
 
-            print('3048', len(queryset))
+            # print('3048', len(queryset))
 
             return queryset.order_by(F(order_by).desc(nulls_first=True), '-date_order')
 

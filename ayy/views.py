@@ -18,6 +18,7 @@ from abb.utils import get_user_company
 from att.models import Contact, Vehicle
 from axx.models import Load
 from ayy.mixins import CardProviderAccessMixin
+from ayy.utils import build_periods
 from .models import CMRHolder, CMRStockBatch, CMRStockMovement, CardAssignment, CardProvider, CompanyCard, DocumentType
 from .serializers import (
     CMRStockMovementSerializer,
@@ -257,6 +258,49 @@ class CardProviderDeleteAPIView(CardProviderAccessMixin, DestroyAPIView):
             raise ValidationError("Provider is used by cards")
 
         return provider
+
+
+class CardPeriodsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, card_uf):
+        user_company = get_user_company(request.user)
+        card = get_object_or_404(
+            CompanyCard.objects.select_related(
+                "current_employee",
+                "current_vehicle"
+            ),
+            uf=card_uf,
+            company=user_company
+        )
+
+        periods = build_periods(card)
+
+        data = []
+
+        for p in periods:
+            data.append({
+                "start": p["start"],
+                "end": p["end"],
+                "employee": (
+                    {
+                        "id": p["employee"].id,
+                        "name": p["employee"].get_full_name()
+                    } if p["employee"] else None
+                ),
+                "vehicle": (
+                    {
+                        "id": p["vehicle"].id,
+                        "plate": p["vehicle"].reg_number
+                    } if p["vehicle"] else None
+                ),
+                "assigned_by": (
+                    p["assigned_by"].get_full_name()
+                    if p["assigned_by"] else None
+                )
+            })
+
+        return Response(data)
 
 ###### END CARDS ######
 

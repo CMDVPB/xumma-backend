@@ -238,6 +238,7 @@ class DocumentTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = DocumentType
         fields = [
+            'id',
             'code',
             'name',
             'description',
@@ -254,10 +255,9 @@ class UserDocumentSerializer(CustomUniqueFieldsMixin, CustomWritableNestedModelS
     # READ (expanded)
     document_type = DocumentTypeSerializer(read_only=True)
 
-    document_type_uf = serializers.SlugRelatedField(
-        source='document_type',
-        slug_field='uf',
+    document_type_id = serializers.PrimaryKeyRelatedField(
         queryset=DocumentType.objects.all(),
+        source='document_type',
         write_only=True
     )
 
@@ -266,7 +266,7 @@ class UserDocumentSerializer(CustomUniqueFieldsMixin, CustomWritableNestedModelS
         lookup_field = 'uf'
         fields = ('document_number', 'date_issued', 'date_expiry', 'notes', 'uf',
                   'document_type',      # read
-                  'document_type_uf',   # write
+                  'document_type_id',   # write
                   )
 
     def validate_document_type(self, value):

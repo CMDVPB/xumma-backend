@@ -252,10 +252,9 @@ class UserDocumentSerializer(serializers.ModelSerializer):
 
     document_type = DocumentTypeSerializer(read_only=True)
 
-    document_type_uf = serializers.SlugRelatedField(
-        source='document_type',
-        slug_field='uf',
+    document_type_id = serializers.PrimaryKeyRelatedField(
         queryset=DocumentType.objects.all(),
+        source='document_type',
         write_only=True
     )
 
@@ -263,7 +262,7 @@ class UserDocumentSerializer(serializers.ModelSerializer):
         model = UserDocument
         fields = ('user', 'document_number', 'date_issued', 'date_expiry', 'notes', 'uf',
                   'document_type',      # read
-                  'document_type_uf',   # write
+                  'document_type_id',   # write
                   )
         read_only_fields = ('id', 'uf')
 

@@ -1337,9 +1337,76 @@ class CardAssignment(models.Model):
     def clean(self):
         targets = [self.employee, self.vehicle]
 
-        if self.action == self.ASSIGN and sum(t is not None for t in targets) != 1:
+        # ---------------------------------------------------------
+        # 1. Exactly one target required for BOTH actions
+        # ---------------------------------------------------------
+        if sum(t is not None for t in targets) != 1:
             raise ValidationError(
-                "ASSIGN must target exactly one of employee or vehicle."
-            )
+                "Exactly one of employee or vehicle must be set.")
 
+        if not self.card_id:
+            return  # card not yet attached
+
+        card = self.card
+
+        # ---------------------------------------------------------
+        # 2. Determine current holder
+        # ---------------------------------------------------------
+        current_employee = card.current_employee
+        current_vehicle = card.current_vehicle
+
+        target_employee = self.employee
+        target_vehicle = self.vehicle
+
+        # ---------------------------------------------------------
+        # 3. ASSIGN validation
+        # ---------------------------------------------------------
+        if self.action == self.ASSIGN:
+
+            # Prevent double assignment
+            if current_employee or current_vehicle:
+
+                # Same holder → illegal duplicate assign
+                if current_employee and target_employee:
+                    if current_employee.pk == target_employee.pk:
+                        raise ValidationError(
+                            "Card already assigned to this employee.")
+
+                if current_vehicle and target_vehicle:
+                    if current_vehicle.pk == target_vehicle.pk:
+                        raise ValidationError(
+                            "Card already assigned to this vehicle.")
+
+                raise ValidationError(
+                    "Card is already assigned. Unassign first before assigning again."
+                )
+
+        # ---------------------------------------------------------
+        # 4. UNASSIGN validation
+        # ---------------------------------------------------------
+        elif self.action == self.UNASSIGN:
+
+            # Cannot unassign if card is not assigned
+            if not current_employee and not current_vehicle:
+                raise ValidationError("Card is not currently assigned.")
+
+            # Must unassign from actual holder
+            if target_employee:
+                if not current_employee:
+                    raise ValidationError(
+                        "Card is not assigned to any employee.")
+                if current_employee.pk != target_employee.pk:
+                    raise ValidationError(
+                        "UNASSIGN target does not match current employee.")
+
+            if target_vehicle:
+                if not current_vehicle:
+                    raise ValidationError(
+                        "Card is not assigned to any vehicle.")
+                if current_vehicle.pk != target_vehicle.pk:
+                    raise ValidationError(
+                        "UNASSIGN target does not match current vehicle.")
+
+        else:
+            raise ValidationError("Invalid action.")
 ###### END CARDS ######
