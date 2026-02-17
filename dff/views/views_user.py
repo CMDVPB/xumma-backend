@@ -7,6 +7,8 @@ from django.conf import settings
 from django.db import IntegrityError
 from django.db.models import QuerySet, Prefetch, Q, F
 from django.core.exceptions import PermissionDenied
+from django.http import FileResponse, Http404
+from django.shortcuts import get_object_or_404
 from djoser import signals
 from djoser.compat import get_user_email
 from djoser.email import ActivationEmail, ConfirmationEmail
@@ -17,14 +19,18 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated  # used for FBV
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.exceptions import ValidationError
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from rest_framework.views import APIView
 
 
 import logging
 
 from abb.constants import ALLOWED_TYPE_ACCOUNT_GROUPS_TO_ADD
 from abb.permissions import AddNewUserPermission, IsManager
+from abb.utils import get_user_company
 from app.djoser_serializers import UserBaseCreateSerializer
-from app.serializers import UserSerializer
+from app.models import UserProfile
+from app.serializers import UserBasicPlusSerializer, UserSerializer
 from app.utils import is_user_member_group
 from dff.serializers.serializers_user import UserCompleteSerializer
 logger = logging.getLogger(__name__)
@@ -100,10 +106,12 @@ class UserCreate(CreateAPIView):
 
 class UserDetailSelfView(generics.GenericAPIView, mixins.RetrieveModelMixin, mixins.UpdateModelMixin, mixins.DestroyModelMixin):
     """ self get/update/delete user """
-    serializer_class = UserSerializer
     permission_classes = [IsAuthenticated]
+    serializer_class = UserSerializer
+    parser_classes = (MultiPartParser, FormParser)
 
     def get_object(self):
+        # print('6150')
         # Directly return the current user
         return self.request.user
 
@@ -194,8 +202,6 @@ class UserDetailSelfOrByManagerView(RetrieveUpdateDestroyAPIView):
 
 
 class UserCompleteView(RetrieveUpdateDestroyAPIView):
-    """ 
-    """
     permission_classes = [IsAuthenticated]
     serializer_class = UserCompleteSerializer
     lookup_field = 'uf'
@@ -246,3 +252,34 @@ class UserCompleteView(RetrieveUpdateDestroyAPIView):
                 'refresh', domain=settings.AUTH_COOKIE_DOMAIN, path=settings.AUTH_COOKIE_PATH)
 
         return response
+
+
+class UserAvatarView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, uf):
+        profile = get_object_or_404(UserProfile, uf=uf)
+
+        if not profile.avatar:
+            raise Http404("Avatar not found")
+
+        return FileResponse(profile.avatar.open(), content_type='image/jpeg')
+
+
+class CompanyUsersView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = UserBasicPlusSerializer
+
+    def get_queryset(self):
+        user = self.request.user
+
+        print('2494', user)
+
+        company = get_user_company(user)
+
+        qs = User.objects.filter(
+            companyuser__company=company,
+            is_archived=False
+        )
+
+        return qs.order_by('-id')

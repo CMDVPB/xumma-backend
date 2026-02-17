@@ -4,9 +4,12 @@ from rest_framework.urlpatterns import format_suffix_patterns
 from app.views import (
     CustomProviderAuthView,
     CustomTokenObtainPairView,
+    CustomCookieTokenRefreshView,
+    CustomCookieVerifyView,
     CustomTokenRefreshView,
     CustomTokenVerifyView,
-    LogoutView,
+    LogoutCookieView,
+    LogoutTokenView,
     UserProfileView,
     get_exchange_rates_multi_view,
 )
@@ -18,9 +21,17 @@ urlpatterns = [
         name='provider-auth'
     ),
     path('jwt/create/', CustomTokenObtainPairView.as_view()),
-    path('jwt/refresh/', CustomTokenRefreshView.as_view()),
-    path('jwt/verify/', CustomTokenVerifyView.as_view()),
-    path('logout/', LogoutView.as_view()),
+    path('jwt/refresh/', CustomCookieTokenRefreshView.as_view()),
+    path('jwt/verify/', CustomCookieVerifyView.as_view()),
+    path('logout/', LogoutCookieView.as_view()),
+
+
+    # token / mobile app
+    path('jwt/token/verify/', CustomTokenVerifyView.as_view()),
+    path('jwt/token/refresh/', CustomTokenRefreshView.as_view()),
+    path('token/logout/', LogoutTokenView.as_view()),
+
+
 
 
     path('ex-rates-multi/', get_exchange_rates_multi_view,

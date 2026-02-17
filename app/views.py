@@ -104,7 +104,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
         return response
 
 
-class CustomTokenRefreshView(TokenRefreshView):
+class CustomCookieTokenRefreshView(TokenRefreshView):
 
     def post(self, request, *args, **kwargs):
         refresh_token = request.COOKIES.get('refresh')
@@ -214,7 +214,7 @@ class CustomTokenRefreshView(TokenRefreshView):
             return Response({'error': 'Token is expired or invalid', }, status=status.HTTP_400_BAD_REQUEST)
 
 
-class CustomTokenVerifyView(TokenVerifyView):
+class CustomCookieVerifyView(TokenVerifyView):
 
     def post(self, request, *args, **kwargs):
         # Extract tokens from cookies
@@ -290,7 +290,7 @@ class CustomTokenVerifyView(TokenVerifyView):
         return Response(status=status.HTTP_401_UNAUTHORIZED)
 
 
-class LogoutView(APIView):
+class LogoutCookieView(APIView):
     def post(self, request, *args, **kwargs):
         response = Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -303,6 +303,115 @@ class LogoutView(APIView):
 
         return response
 
+
+###### START TOKEN / MOBILE APP ######
+class CustomTokenVerifyView(TokenVerifyView):
+
+    def post(self, request, *args, **kwargs):
+
+        body_token = request.data.get("token")  # ✅ ADD THIS
+
+        if body_token:
+            try:
+                UntypedToken(body_token)
+                return Response(status=status.HTTP_200_OK)
+            except Exception:
+                return Response(status=status.HTTP_401_UNAUTHORIZED)
+
+        # fallback to cookies (for web)
+        access_token = request.COOKIES.get('access')
+        refresh_token = request.COOKIES.get('refresh')
+
+        if access_token:
+            try:
+                UntypedToken(access_token)
+                return Response(status=status.HTTP_200_OK)
+            except Exception:
+                pass
+
+        if refresh_token:
+            try:
+                UntypedToken(refresh_token)
+                return Response(status=status.HTTP_200_OK)
+            except Exception:
+                pass
+
+        return Response(status=status.HTTP_401_UNAUTHORIZED)
+
+
+class CustomTokenRefreshView(TokenRefreshView):
+
+    def post(self, request, *args, **kwargs):
+
+        refresh_token = request.data.get("refresh")
+
+        if not refresh_token:
+            logger.warning("No refresh token provided")
+            return Response(
+                {"detail": "Refresh token is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            refresh = RefreshToken(refresh_token)
+
+            user_id = refresh["user_id"]
+            logger.info(f"Refreshing token for user_id={user_id}")
+
+            response = super().post(request, *args, **kwargs)
+
+            if response.status_code != 200:
+                logger.warning(f"Refresh failed: {response.data}")
+                return response
+
+            # ✅ OPTIONAL: Refresh rotation logic
+            # Only if you enabled ROTATE_REFRESH_TOKENS = True
+            try:
+                if getattr(refresh, "check_exp", None):
+                    refresh.check_exp()
+
+            except Exception:
+                pass
+
+            logger.info(f"Token refresh success for user_id={user_id}")
+
+            return response
+
+        except InvalidToken as e:
+            logger.warning(f"Invalid refresh token: {str(e)}")
+            return Response(
+                {"detail": "Invalid refresh token"},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        except TokenError as e:
+            logger.warning(f"Token error: {str(e)}")
+            return Response(
+                {"detail": "Refresh token expired or invalid"},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        except Exception as e:
+            logger.exception("Unexpected refresh failure")
+            return Response(
+                {"detail": "Token refresh failed"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+class LogoutTokenView(APIView):
+    def post(self, request):
+        try:
+            token = RefreshToken(request.data["refresh"])
+
+            # print('2490', token)
+
+            token.blacklist()
+            return Response(status=status.HTTP_205_RESET_CONTENT)
+        except Exception:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+
+###### END TOKEN / MOBILE APP ######
 
 ###### OTHER VIEWS ######
 

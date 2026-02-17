@@ -1,16 +1,19 @@
-from xumma.translation_manager import TranslationManager
-from dotenv import load_dotenv
 import os
+from dotenv import load_dotenv
+from xumma.translation_manager import TranslationManager
 from pathlib import Path
 from datetime import timedelta
 from kombu import Queue, Exchange
 
-
 load_dotenv(override=True)
+
+GDAL_LIBRARY_PATH = os.getenv('GDAL_LIBRARY_PATH')
+GEOS_LIBRARY_PATH = os.getenv('GEOS_LIBRARY_PATH')
 
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
 
 TRANSLATIONS_PATH = os.path.join(BASE_DIR, "translations")
 TRANSLATION_MANAGER = TranslationManager(translations_path="translations")
@@ -66,9 +69,11 @@ INSTALLED_APPS = [
     'django_celery_results',
     'django_celery_beat',
     'phonenumber_field',
+    'leaflet',
 
     'rest_framework',
     'rest_framework_simplejwt',
+    'rest_framework_simplejwt.token_blacklist',
 
     'abb',
     'app',
@@ -84,6 +89,7 @@ INSTALLED_APPS = [
     'bch',
     'cld',
     'dff',
+    'driver',
     'dtt',
     'eff',
     'eml',

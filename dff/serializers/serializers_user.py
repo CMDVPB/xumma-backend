@@ -2,13 +2,14 @@ import logging
 from django.contrib.auth.models import Group
 from django.contrib.auth import get_user_model
 from django.db import transaction
+from django.conf import settings
 from rest_framework import serializers
 from drf_writable_nested.serializers import WritableNestedModelSerializer
 from drf_writable_nested.mixins import NestedCreateMixin, NestedUpdateMixin, UniqueFieldsMixin
 
 from abb.models import Currency
 from abb.utils import get_company_manager, get_company_users, get_user_company
-from app.models import UserCompensationSettings
+from app.models import UserCompensationSettings, UserProfile
 from app.serializers import CompanyUserSerializer, UserBasicPlusSerializer
 from att.models import UserBaseSalary, UserDailyAllowance, UserLoadingPointRate, UserUnloadingPointRate, UserVehicleKmRateOverride, Vehicle
 from ayy.serializers import PhoneNumberSerializer, UserDocumentSerializer
@@ -113,6 +114,8 @@ class UserCompleteSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
 
     company = CompanyUserSerializer(read_only=True)
 
+    avatar = serializers.SerializerMethodField()  # read
+
     user_documents = UserDocumentSerializer(
         many=True, context={'request': 'request'})
     user_phone_numbers = PhoneNumberSerializer(
@@ -172,10 +175,12 @@ class UserCompleteSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
 
     class Meta:
         model = User
-        fields = ('email', 'first_name', 'last_name', 'personal_id', 'phone', 'messanger', 'comment', 'image', 'lang', 'uf',
+        fields = ('email', 'first_name', 'last_name', 'personal_id', 'phone', 'messanger', 'comment', 'lang', 'uf',
                   'date_registered', 'date_of_birth', 'date_termination', 'is_archived',
                   'company',
+
                   'user_documents', 'user_phone_numbers', 'user_imageuploads',
+
                   ### compensation ###
                   'user_base_salaries',
                   'user_daily_allowances',
@@ -183,4 +188,17 @@ class UserCompleteSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
                   'user_loading_point_rates',
                   'user_unloading_point_rates',
                   "compensation_settings",
+
+                  'avatar',
                   )
+
+    def get_avatar(self, obj):
+        try:
+            profile = obj.user_profile
+        except UserProfile.DoesNotExist:
+            return None
+
+        if profile.avatar:
+            return f"{settings.BACKEND_URL}/api/users-avatar/{profile.uf}/"
+
+        return None

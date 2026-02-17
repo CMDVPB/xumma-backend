@@ -31,6 +31,7 @@ urlpatterns = [
     path('api/', include('bch.urls')),
     path('api/', include('cld.urls')),
     path('api/', include('dff.urls')),
+    path('api/', include('driver.urls')),
     path('api/', include('dtt.urls')),
     path('api/', include('eff.urls')),
     path('api/', include('eml.urls')),

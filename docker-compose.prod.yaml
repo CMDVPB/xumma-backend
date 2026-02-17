@@ -1,3 +1,101 @@
+# ### THIS IS THE docker-compose.yaml from droplet ###
+
+# services:
+#   nginx:
+#     restart: always
+#     image: xumma-nginx
+#     container_name: nginx
+#     ports:
+#       - "80:80"
+#       - "443:443"
+#     depends_on:
+#       - backend
+#       - redis
+#     volumes:
+#       - static_data:/usr/src/app/staticfiles:ro
+#       - media_data:/usr/src/app/media:ro
+
+#   backend:
+#     restart: unless-stopped
+#     image: xumma-backend
+#     command: daphne -b 0.0.0.0 -p 8000 xumma.asgi:application
+#     deploy:
+#       mode: replicated
+#       replicas: 2
+#     env_file:
+#       - .env
+#     expose:
+#       - "8000"
+#     depends_on:
+#       - redis
+#       - postgres
+#     volumes:
+#       - ~/app/.env:/django/.env # additing the .env just because dotenv() is manage.py is looking for it and not sure yet why
+#       - static_data:/usr/src/app/staticfiles
+#       - media_data:/usr/src/app/media
+#       - ./uploads:/uploads
+
+#   redis:
+#     restart: unless-stopped
+#     image: redis:latest
+#     container_name: redis
+#     command: ["--bind", "0.0.0.0"]
+#     volumes:
+#       - ~/app/redis:/var/lib/redis
+#       - ~/app/redis/data:/data
+#     expose:
+#       - "6379"
+
+#   celery:
+#     restart: always
+#     image: xumma-backend
+#     command: celery -A xumma worker -l info --uid=1 -E -Q celery -n celery@%h
+#     container_name: celery
+#     env_file:
+#       - .env
+#     depends_on:
+#       - backend
+#       - postgres
+#       - redis
+#     volumes:
+#       - ~/app/.env:/django/.env
+#       - media_data:/usr/src/app/media
+#       - ./uploads:/uploads
+
+#   celery_beat:
+#     restart: always
+#     image: xumma-backend
+#     command: celery -A xumma beat -l info --uid=1 --scheduler django_celery_beat.schedulers:DatabaseScheduler
+#     container_name: celery_beat
+#     env_file:
+#       - .env
+#     depends_on:
+#       - backend
+#       - postgres
+#       - celery
+#       - redis
+#     volumes:
+#       - ~/app/.env:/django/.env
+
+#   postgres:
+#     image: postgres:16
+#     container_name: postgres16
+#     restart: unless-stopped
+#     environment:
+#       POSTGRES_USER: postgres
+#       POSTGRES_PASSWORD: postgres
+#       POSTGRES_DB: postgresdb
+#     ports:
+#       - "55432:5432" # exposes PostgreSQL to Windows host
+#     volumes:
+#       - ./postgres-data:/var/lib/postgresql/data
+
+# volumes:
+#   redis_data:
+#   postgres_data:
+#   static_data:
+#   media_data:
+
 ### THIS IS THE docker-compose.yaml from droplet ###
 
 services:
@@ -27,13 +125,16 @@ services:
     expose:
       - "8000"
     depends_on:
-      - redis
-      - postgres
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
     volumes:
       - ~/app/.env:/django/.env # additing the .env just because dotenv() is manage.py is looking for it and not sure yet why
       - static_data:/usr/src/app/staticfiles
       - media_data:/usr/src/app/media
       - ./uploads:/uploads
+      - ./email_attachments:/email_attachments
 
   redis:
     restart: unless-stopped
@@ -78,27 +179,23 @@ services:
       - ~/app/.env:/django/.env
 
   postgres:
-    image: postgres:16
+    image: postgis/postgis:16-3.4
     container_name: postgres16
     restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: postgresdb
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
     ports:
       - "55432:5432" # exposes PostgreSQL to Windows host
     volumes:
       - ./postgres-data:/var/lib/postgresql/data
-
-  # pgadmin:
-  #   image: dpage/pgadmin4
-  #   container_name: pgadmin
-  #   restart: unless-stopped
-  #   environment:
-  #     PGADMIN_DEFAULT_EMAIL: admin@admin.com
-  #     PGADMIN_DEFAULT_PASSWORD: admin248519078
-  #   ports:
-  #     - "127.0.0.1:5050:80"
+      - ./postgres-init:/docker-entrypoint-initdb.d
 
 volumes:
   redis_data:

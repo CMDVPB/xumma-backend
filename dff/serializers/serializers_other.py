@@ -148,6 +148,9 @@ class ContractFKSerializer(CustomUniqueFieldsMixin, CustomWritableNestedModelSer
     reference_date = SlugRelatedField(
         allow_null=True, slug_field='code', queryset=ContractReferenceDate.objects.all(), required=True)
 
+    invoice_date = SlugRelatedField(
+        allow_null=True, slug_field='code', queryset=ContractReferenceDate.objects.all(), required=True)
+
     def create(self, validated_data):
         # print('5618:', validated_data)
 
@@ -176,7 +179,7 @@ class ContractFKSerializer(CustomUniqueFieldsMixin, CustomWritableNestedModelSer
         model = Contract
         lookup_field = 'uf'
         fields = ("title", "is_active", "is_signed", "signed_at", "days_to_pay", 'number', 'date', 'title', 'content', "created_at", 'uf',
-                  "reference_date",
+                  "reference_date", "invoice_date",
                   )
 
 

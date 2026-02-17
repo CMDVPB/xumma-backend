@@ -20,6 +20,16 @@ User = get_user_model()
 
 
 class ContractReferenceDate(models.Model):
+    USAGE_CONTRACT = "contract"
+    USAGE_INVOICE = "invoice"
+    USAGE_BOTH = "both"
+
+    USAGE_CHOICES = [
+        (USAGE_CONTRACT, "Contract"),
+        (USAGE_INVOICE, "Invoice"),
+        (USAGE_BOTH, "Both"),
+    ]
+
     uf = models.CharField(max_length=36, default=hex_uuid,
                           db_index=True, unique=True)
     company = models.ForeignKey(
@@ -46,6 +56,13 @@ class ContractReferenceDate(models.Model):
     order = models.PositiveSmallIntegerField(default=0)
 
     is_system = models.BooleanField(default=False)
+
+    usage = models.CharField(
+        max_length=10,
+        choices=USAGE_CHOICES,
+        default=USAGE_BOTH,
+        db_index=True
+    )
 
     class Meta:
         verbose_name = "Contract reference date"
@@ -334,13 +351,20 @@ class Contract(models.Model):
     title = models.CharField(max_length=100, blank=True, null=True)
     content = models.TextField()
 
+    days_to_pay = models.PositiveSmallIntegerField(default=0)
+
     reference_date = models.ForeignKey(
         ContractReferenceDate,
         on_delete=models.PROTECT,
         related_name="reference_date_contracts",
     )
 
-    days_to_pay = models.PositiveSmallIntegerField(default=0)
+    invoice_date = models.ForeignKey(
+        ContractReferenceDate,
+        on_delete=models.PROTECT,
+        blank=True, null=True,
+        related_name="invoice_date_contracts",
+    )
 
     is_active = models.BooleanField(default=True)
     is_signed = models.BooleanField(default=False)

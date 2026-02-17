@@ -80,7 +80,6 @@ class User(AbstractUser):
     personal_id = models.CharField(max_length=50, null=True, blank=True)
     messanger = models.CharField(max_length=100, null=True, blank=True)
     comment = models.CharField(max_length=500, null=True, blank=True)
-    image = models.CharField(max_length=1000, blank=True, null=True)
 
     lang = models.CharField(max_length=2, blank=True, null=True)
     base_country = models.CharField(choices=BASE_COUNTRIES,

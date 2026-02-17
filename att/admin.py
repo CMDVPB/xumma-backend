@@ -81,7 +81,8 @@ class ContractAdmin(admin.ModelAdmin):
 
 @admin.register(ContractReferenceDate)
 class ContractReferenceDateAdmin(admin.ModelAdmin):
-    list_display = ('id', 'company', 'code', 'label', 'order', 'is_system')
+    list_display = ('id', 'company', 'code', 'label',
+                    'usage', 'order', 'is_system')
 
     search_fields = ('company', 'uf')
 

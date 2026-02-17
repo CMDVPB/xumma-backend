@@ -5,7 +5,7 @@ from dff.views.views_inv import InvCreateView, InvDetailView, InvListView
 from dff.views.views_load import CancelInvoiceView, IssueInvoiceView, LoadCreateView, LoadDetailView, LoadListForTripView, LoadListView
 from dff.views.views_quote import QuoteCreateView, QuoteDetailView, QuoteListView
 from dff.views.views_trip import TripCreateView, TripDetailView, TripListView, get_trips_trucks_view
-from dff.views.views_user import UserCreate, UserDetailSelfOrByManagerView, UserDetailSelfView, UserCompleteView, UserManagerCreate
+from dff.views.views_user import CompanyUsersView, UserAvatarView, UserCreate, UserDetailSelfOrByManagerView, UserDetailSelfView, UserCompleteView, UserManagerCreate
 
 urlpatterns = [
 
@@ -17,7 +17,8 @@ urlpatterns = [
          name='user_details'),
     path('employees/<str:uf>/', UserCompleteView.as_view(),
          name='user_complete_details'),
-
+    path('users-avatar/<str:uf>/', UserAvatarView.as_view(), name='users-avatar'),
+    path('users/company/', CompanyUsersView.as_view(), name='company-users'),
 
     path('loads/', LoadListView.as_view(), name='loads'),
     path('loads/create/', LoadCreateView.as_view(), name='load_create'),

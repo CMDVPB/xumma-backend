@@ -356,8 +356,11 @@ class Load(models.Model):
                                  blank=True, null=True, related_name='incoterm_loads')
     currency = models.ForeignKey(
         Currency, on_delete=models.SET_NULL, blank=True, null=True, related_name='currency_loads')
-    payment_term = models.ForeignKey(
-        PaymentTerm, on_delete=models.SET_NULL, blank=True, null=True, related_name='payment_term_loads')
+
+    payment_reference_date = models.ForeignKey(
+        'att.ContractReferenceDate', on_delete=models.SET_NULL, blank=True, null=True, related_name='payment_reference_date_loads')
+    invoice_reference_date = models.ForeignKey(
+        'att.ContractReferenceDate', on_delete=models.SET_NULL, blank=True, null=True, related_name='invoice_reference_date_loads')
 
     bill_to = models.ForeignKey(
         Contact, on_delete=models.RESTRICT, blank=True, null=True, related_name='bill_to_loads')
@@ -549,6 +552,7 @@ class LoadDocument(models.Model):
     is_active = models.BooleanField(default=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
+
     generated_by = models.ForeignKey(
         User,
         null=True,

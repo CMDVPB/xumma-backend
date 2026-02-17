@@ -161,7 +161,9 @@ class ContractListView(ListAPIView):
             queryset = (queryset.select_related(
                 'company',
                 'contact',
-                'reference_date'
+                'reference_date',
+                'invoice_date',
+
             ))
 
             return queryset.order_by('-created_at')

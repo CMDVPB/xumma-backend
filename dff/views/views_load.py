@@ -67,7 +67,6 @@ class LoadListView(ListAPIView):
                 'currency',
                 'status',
                 'incoterm',
-                'payment_term',
                 'carrier',
                 'carrier__country_code_post',
                 'vehicle_tractor',
@@ -495,7 +494,6 @@ class LoadDetailView(RetrieveUpdateDestroyAPIView):
                 "driver",
                 "vehicle_tractor",
                 "vehicle_trailer",
-                "payment_term",
                 "person",
             )
 
@@ -681,6 +679,21 @@ class LoadListForTripView(ListAPIView):
 
 ###### START LOAD INV ######
 
+DATE_FIELD_MAP = {
+    "date_loaded": "date_loaded",
+    "date_cleared": "date_cleared",
+    "date_unloaded": "date_unloaded",
+    "date_signed": "date_signed",
+}
+
+LABEL_MAP = {
+    "date_loaded": "loaded",
+    "date_cleared": "cleared",
+    "date_unloaded": "unloaded",
+    "date_signed": "signed",
+}
+
+
 class IssueInvoiceView(GenericAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = IssueInvoiceSerializer
@@ -690,12 +703,45 @@ class IssueInvoiceView(GenericAPIView):
         user = request.user
         load = get_object_or_404(Load, uf=load_uf)
 
-        # Guard conditions
-        if not load.date_cleared:
+        DEFAULT_CODE = "date_cleared"
+
+        contract = load.bill_to.contact_contracts.first()
+
+        selected_ref = (
+            contract.invoice_date
+            if contract and contract.invoice_date
+            else None
+        )
+
+        selected_code = (
+            selected_ref.code
+            if selected_ref
+            else DEFAULT_CODE
+        )
+        # selected_code = selected_code.lower().replace(" ", "_")
+        date_field = DATE_FIELD_MAP.get(selected_code)
+
+        # print('6180', contract.invoice_date)
+
+        if not date_field:
             return Response(
-                {'detail': 'Load is not cleared'},
+                {'detail': f'Unsupported reference date "{selected_code}"'},
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+        if not getattr(load, date_field):
+            return Response(
+                {'detail': f'Load is not {LABEL_MAP.get(selected_code, selected_code)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        invoicing_date = getattr(load, date_field, None)
+        if not invoicing_date:
+            return Response(
+                {'detail': f'Reference date "{LABEL_MAP.get(selected_code, selected_code)}" is missing on load'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        print('3580', selected_code)
 
         if load.issued_load_invs.filter(status='issued').exists():
             return Response(
@@ -707,10 +753,10 @@ class IssueInvoiceView(GenericAPIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
-        print('4148', load)
+        # print('4148', load)
 
         # Create invoice snapshot
-        invoice = issue_invoice(load, user, data)
+        invoice = issue_invoice(load, user, data, issued_date=invoicing_date)
 
         LoadDocumentService.generate(
             load=load,

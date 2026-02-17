@@ -86,10 +86,16 @@ def html_to_rl_paragraphs(html: str):
 ###### START PDF GENERATORS ######
 
 
-def generate_order_pdf(order_data: dict) -> bytes:
+def generate_order_pdf(order_data: dict, lang: str, doc_type: str) -> bytes:
+
+    print('GENERATE ORDER PDF', lang, doc_type)
+
     html = render_to_string(
         "pdf/order_contract.html",
-        {"order": order_data},
+        {
+        "order": order_data,
+        "signatures": order_data.get("signatures"),
+    },
     )
 
     pdf = pdfkit.from_string(

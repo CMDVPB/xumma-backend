@@ -27,6 +27,47 @@
     .block {
       margin-bottom: 16px;
     }
+
+   .signatures-wrapper {
+    margin-top: 80px;
+    width: 100%;
+    font-size: 12px;
+  }
+
+  .signatures-title {
+      font-weight: bold;
+      margin-bottom: 20px;
+  }
+
+  .signatures {
+      display: flex;
+      justify-content: space-between;
+  }
+
+  .signature-block {
+      width: 45%;
+  }
+
+  .party-title {
+      font-weight: bold;
+      margin-bottom: 15px;
+  }
+
+  .signature-row {
+      display: flex;
+      align-items: center;
+      margin-bottom: 10px;
+  }
+
+  .signature-row span:first-child {
+      width: 90px;
+  }
+
+  .line {
+      flex-grow: 1;
+      border-bottom: 1px solid black;
+      height: 14px;
+  }
   </style>
 </head>
 <body>
@@ -58,6 +99,55 @@
 
 <!-- 🔥 CONTRACT BODY FROM DB -->
 {{ order.content_html|safe }}
+
+<div class="signatures-wrapper">
+
+    <div class="signatures-title">
+        SEMNATURILE PARTILOR:
+    </div>
+
+    <div class="signatures">
+
+        <div class="signature-block">
+            <div class="party-title">Prestator</div>
+
+            <div class="signature-row">
+                <span>Nume:</span>
+                <span class="line"></span>
+            </div>
+
+            <div class="signature-row">
+                <span>Semnătură:</span>
+                <span class="line"></span>
+            </div>
+
+            <div class="signature-row">
+                <span>Ștampilă:</span>
+                <span class="line"></span>
+            </div>
+        </div>
+
+        <div class="signature-block">
+            <div class="party-title">Beneficiar</div>
+
+            <div class="signature-row">
+                <span>Nume:</span>
+                <span class="line"></span>
+            </div>
+
+            <div class="signature-row">
+                <span>Semnătură:</span>
+                <span class="line"></span>
+            </div>
+
+            <div class="signature-row">
+                <span>Ștampilă:</span>
+                <span class="line"></span>
+            </div>
+        </div>
+
+    </div>
+</div>
 
 </body>
 </html>

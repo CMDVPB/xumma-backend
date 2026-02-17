@@ -238,6 +238,10 @@ class LoadSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
         allow_null=True, slug_field='uf', queryset=BodyType.objects.all())
     incoterm = serializers.SlugRelatedField(
         allow_null=True, slug_field='uf', queryset=Incoterm.objects.all())
+    payment_reference_date = serializers.SlugRelatedField(source='payment_reference_date',
+                                                          allow_null=True, slug_field='code')
+    invoice_reference_date = serializers.SlugRelatedField(source='invoice_reference_date',
+                                                          allow_null=True, slug_field='code')
 
     category = serializers.SlugRelatedField(
         allow_null=True, slug_field='uf', queryset=CategoryGeneral.objects.none())

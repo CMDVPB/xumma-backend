@@ -154,6 +154,6 @@ class ContractReferenceDateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ContractReferenceDate
-        fields = ("id", "code", "label", "is_active", "order", 'uf',
+        fields = ("id", "code", "label", "is_active", "order", "usage", 'uf',
                   'company',
                   )

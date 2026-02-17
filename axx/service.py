@@ -10,7 +10,7 @@ from axx.utils_generate import generate_act_pdf, generate_order_pdf, generate_pr
 
 
 @transaction.atomic
-def issue_invoice(load, user, data):
+def issue_invoice(load, user, data, issued_date):
     last_number = (
         LoadInv.objects
         .filter(company=load.company)
@@ -29,7 +29,7 @@ def issue_invoice(load, user, data):
         company=load.company,
         invoice_number=next_number,
         issued_by=user,
-        issued_date=load.date_cleared,
+        issued_date=issued_date,
 
         amount_mdl=data['invoice_amount'],
         exchange_rate=data['exchange_rate'],
@@ -69,6 +69,71 @@ def safe_fk(obj, fk_attr, field, default="-"):
         return getattr(getattr(obj, fk_attr), field)
     except Exception:
         return default
+
+
+def build_order_data(load, runtime_data) -> dict:
+    bill_to = getattr(load, "bill_to", None)
+
+    runtime_data = runtime_data or {}
+
+    contract = None
+
+    if bill_to:
+        contract = (
+            bill_to.contact_contracts
+            .order_by("-date")
+            .first()
+        )
+
+    company = load.company
+
+    return {
+        "title": safe_str(getattr(contract, "title", None), "Comandă de transport"),
+
+        "meta": {
+            "number": safe_str(runtime_data.get("invoice_number")),
+            "date": safe_date(getattr(contract, "date", None)),
+        },
+
+        "from": {
+            "name": safe_str(getattr(company, "name", None)),
+            "address": [
+                safe_str(getattr(company, "address_line1", None)),
+                safe_str(
+                    f"{getattr(company, 'postcode', '')} {getattr(company, 'city', '')}".strip()),
+                safe_str(getattr(company, "country", None)),
+            ],
+        },
+
+        "to": {
+            "name": safe_str(getattr(bill_to, "name", None)),
+            "address": [
+                safe_str(getattr(bill_to, "address_line1", None)),
+                safe_str(
+                    f"{getattr(bill_to, 'postcode', '')} {getattr(bill_to, 'city', '')}".strip()),
+                safe_str(safe_fk(bill_to, "country_code_legal", "country_code")),
+            ],
+        },
+
+        # 🔥 IMPORTANT: raw HTML, DO NOT TOUCH
+        "content_html": getattr(contract, "content", "") or "",
+
+        # ✅ SIGNATURES BLOCK
+        "signatures": {
+            "party_a": {
+                "company_name": safe_str(getattr(company, "name", None)),
+                "signatory": safe_str(getattr(company, "director_name", None)),
+                "signature_image": safe_str(getattr(company, "signature_image", None)),
+                "stamp_image": safe_str(getattr(company, "stamp_image", None)),
+            },
+            "party_b": {
+                "company_name": safe_str(getattr(bill_to, "name", None)),
+                "signatory": safe_str(getattr(bill_to, "director_name", None)),
+                "signature_image": safe_str(getattr(bill_to, "signature_image", None)),
+                "stamp_image": safe_str(getattr(bill_to, "stamp_image", None)),
+            },
+        },
+    }
 
 
 def build_proforma_data(load, runtime_data=None) -> dict:
@@ -173,53 +238,6 @@ def build_proforma_data(load, runtime_data=None) -> dict:
     }
 
 
-def build_order_data(load, runtime_data) -> dict:
-    bill_to = getattr(load, "bill_to", None)
-
-    runtime_data = runtime_data or {}
-
-    contract = None
-
-    if bill_to:
-        contract = (
-            bill_to.contact_contracts
-            .order_by("-date")
-            .first()
-        )
-
-    return {
-        "title": safe_str(getattr(contract, "title", None), "Comandă de transport"),
-
-        "meta": {
-            "number": safe_str(runtime_data.get("invoice_number")),
-            "date": safe_date(getattr(contract, "date", None)),
-        },
-
-        "from": {
-            "name": safe_str(getattr(load.company, "name", None)),
-            "address": [
-                safe_str(getattr(load.company, "address_line1", None)),
-                safe_str(
-                    f"{getattr(load.company, 'postcode', '')} {getattr(load.company, 'city', '')}".strip()),
-                safe_str(getattr(load.company, "country", None)),
-            ],
-        },
-
-        "to": {
-            "name": safe_str(getattr(bill_to, "name", None)),
-            "address": [
-                safe_str(getattr(bill_to, "address_line1", None)),
-                safe_str(
-                    f"{getattr(bill_to, 'postcode', '')} {getattr(bill_to, 'city', '')}".strip()),
-                safe_str(safe_fk(bill_to, "country_code_legal", "country_code")),
-            ],
-        },
-
-        # 🔥 IMPORTANT: raw HTML, DO NOT TOUCH
-        "content_html": getattr(contract, "content", "") or "",
-    }
-
-
 def build_act_data(load, runtime_data) -> dict:
     data = build_proforma_data(load, runtime_data)
     data["title"] = "Act of Execution of Services"
@@ -227,16 +245,16 @@ def build_act_data(load, runtime_data) -> dict:
 
 
 DOCUMENT_GENERATORS = {
+    "order": {
+        "builder": build_order_data,
+        "generator": generate_order_pdf,
+        "filename": "Customer Order",
+    },
     "proforma": {
         "builder": build_proforma_data,
         "generator": generate_proforma_pdf,
         "filename": "Proforma",
         "doc_type": "proforma",
-    },
-    "order": {
-        "builder": build_order_data,
-        "generator": generate_order_pdf,
-        "filename": "Customer Order",
     },
     "act": {
         "builder": build_act_data,
@@ -273,7 +291,8 @@ class LoadDocumentService:
         # 3. Generate PDF bytes
         lang = resolve_language(
             user, load.bill_to, runtime_data.get('document_lang'))
-        document_data = config["builder"](load, runtime_data)
+
+        # document_data = config["builder"](load, runtime_data)
 
         pdf_bytes = config["generator"](document_data, lang, doc_type)
 

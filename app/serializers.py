@@ -43,6 +43,7 @@ class UserBasicSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
 class UserBasicPlusSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
     from ayy.serializers import PhoneNumberSerializer, UserDocumentSerializer
 
+    avatar = serializers.SerializerMethodField()  # read
     avatar_url = serializers.SerializerMethodField()
 
     user_documents = UserDocumentSerializer(
@@ -70,9 +71,11 @@ class UserBasicPlusSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
         model = User
         fields = ('email', 'first_name', 'last_name', 'personal_id', 'uf',
                   'comment', 'date_registered', 'date_of_birth', 'date_termination', 'is_archived',
-                  'image', 'phone', 'messanger',
+                  'phone', 'messanger',
                   'avatar_url',
                   'user_documents', 'user_phone_numbers', 'user_imageuploads',
+
+                  'avatar',
                   )
 
     def get_avatar_url(self, obj):
@@ -84,11 +87,26 @@ class UserBasicPlusSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
             pass
         return None
 
+    def get_avatar(self, obj):
+        try:
+            profile = obj.user_profile
+        except UserProfile.DoesNotExist:
+            return None
+
+        if profile.avatar:
+            return f"{settings.BACKEND_URL}/api/users-avatar/{profile.uf}/"
+
+        return None
+
 
 class UserSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
     from ayy.serializers import PhoneNumberSerializer, UserDocumentSerializer
 
     company = CompanyUserSerializer(read_only=True)
+
+    avatar = serializers.SerializerMethodField()  # read
+    avatar_upload = serializers.ImageField(
+        write_only=True, required=False)  # write
 
     user_documents = UserDocumentSerializer(
         many=True, context={'request': 'request'})
@@ -96,6 +114,18 @@ class UserSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
         many=True, context={'request': 'request'})
     user_imageuploads = ImageUploadOutSerializer(
         many=True, context={'request': 'request'}, read_only=True)
+
+    def update(self, instance, validated_data):
+        avatar = validated_data.pop('avatar_upload', None)
+
+        instance = super().update(instance, validated_data)
+
+        if avatar is not None:
+            profile, _ = UserProfile.objects.get_or_create(user=instance)
+            profile.avatar = avatar
+            profile.save()
+
+        return instance
 
     def to_representation(self, instance):
         response = super().to_representation(instance)
@@ -145,13 +175,26 @@ class UserSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
 
     class Meta:
         model = User
-        fields = ('email', 'first_name', 'last_name', 'personal_id', 'phone', 'messanger', 'comment', 'image', 'lang', 'uf',
+        fields = ('email', 'first_name', 'last_name', 'personal_id', 'phone', 'messanger', 'comment', 'lang', 'uf',
                   'date_registered', 'date_of_birth', 'date_termination', 'is_archived',
                   'company',
                   'user_documents', 'user_phone_numbers', 'user_imageuploads',
 
+                  'avatar', 'avatar_upload',
+
 
                   )
+
+    def get_avatar(self, obj):
+        try:
+            profile = obj.user_profile
+        except UserProfile.DoesNotExist:
+            return None
+
+        if profile.avatar:
+            return f"{settings.BACKEND_URL}/api/users-avatar/{profile.uf}/"
+
+        return None
 
 
 class UserSettingsSerializer(serializers.ModelSerializer):
