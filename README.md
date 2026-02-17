@@ -10,7 +10,7 @@
 
 - start in development:
   - python -m daphne -v 2 xumma.asgi:application \*\*\* -v 2 allows logging even of info logs, hot reload not supported \*\*\*
-  - uvicorn xumma.asgi:application --reload \*\*\* use uvicorn for hot reload \*\*\*
+  - uvicorn xumma.asgi:application --reload --host 0.0.0.0 --port 8000 \*\*\* use uvicorn for hot reload \*\*\*
 - start in production:
   docker compose (use file docker-compose.prod.yaml at root directory)
 

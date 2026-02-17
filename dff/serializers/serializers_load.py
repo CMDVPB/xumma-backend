@@ -17,7 +17,7 @@ from abb.serializers import CurrencySerializer
 from abb.utils import get_user_company
 from app.models import CategoryGeneral
 from app.serializers import UserBasicSerializer, UserSerializer
-from att.models import Contact, PaymentTerm, Person, Vehicle, VehicleUnit
+from att.models import Contact, ContractReferenceDate, PaymentTerm, Person, Vehicle, VehicleUnit
 from att.serializers import BodyTypeSerializer, IncotermSerializer, ModeTypeSerializer, StatusTypeSerializer, VehicleSerializer
 from axx.models import Ctr, Exp, Inv, Load, LoadEvent, Tor, Trip
 from ayy.models import CMR, CMRStockMovement
@@ -216,8 +216,6 @@ class LoadSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
                 Q(is_system=True) |
                 Q(company_id=user_company.id)
             )
-            self.fields['payment_term'].queryset = PaymentTerm.objects.filter(
-                company=user_company)
 
     assigned_user = serializers.SlugRelatedField(
         allow_null=True, slug_field='uf', queryset=User.objects.all())
@@ -225,9 +223,6 @@ class LoadSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
         allow_null=True, slug_field='uf', queryset=Contact.objects.all(), write_only=True)
     person = SlugRelatedGetOrCreateField(
         allow_null=True, slug_field='uf', queryset=Person.objects.all(), write_only=True)
-    payment_term = SlugRelatedField(
-        allow_null=True, slug_field='uf', queryset=PaymentTerm.objects.none(), write_only=True)
-
     currency = serializers.SlugRelatedField(
         allow_null=True, slug_field='uf', queryset=Currency.objects.all())
     status = serializers.SlugRelatedField(
@@ -238,10 +233,10 @@ class LoadSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
         allow_null=True, slug_field='uf', queryset=BodyType.objects.all())
     incoterm = serializers.SlugRelatedField(
         allow_null=True, slug_field='uf', queryset=Incoterm.objects.all())
-    payment_reference_date = serializers.SlugRelatedField(source='payment_reference_date',
-                                                          allow_null=True, slug_field='code')
-    invoice_reference_date = serializers.SlugRelatedField(source='invoice_reference_date',
-                                                          allow_null=True, slug_field='code')
+    payment_reference_date = serializers.SlugRelatedField(
+        allow_null=True, slug_field='code', queryset=ContractReferenceDate.objects.all())
+    invoice_reference_date = serializers.SlugRelatedField(
+        allow_null=True, slug_field='code', queryset=ContractReferenceDate.objects.all())
 
     category = serializers.SlugRelatedField(
         allow_null=True, slug_field='uf', queryset=CategoryGeneral.objects.none())
@@ -294,11 +289,6 @@ class LoadSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
             pass
         try:
             data['status'] = data['status'].get('uf', None)
-        except:
-            pass
-
-        try:
-            data['payment_term'] = data['payment_term'].get('uf', None)
         except:
             pass
         try:
@@ -393,8 +383,6 @@ class LoadSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
             data['customer'] = None
         if 'invs' in data and data['invs'] == '':
             data['invs'] = None
-        if 'payment_term' in data and data['payment_term'] == '':
-            data['payment_term'] = None
         if 'load_ctrs' in data and data['load_ctrs'] == '':
             data['load_ctrs'] = None
 
@@ -412,8 +400,6 @@ class LoadSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
             instance.bill_to).data if instance.bill_to else None
         response['person'] = PersonSerializer(
             instance.person).data if instance.person else None
-        response['payment_term'] = PaymentTermSerializer(
-            instance.payment_term).data if instance.payment_term else None
         response['trip'] = instance.trip.uf if instance.trip else None
         response['trip_num'] = instance.trip.rn if instance.trip else None
 
@@ -512,9 +498,9 @@ class LoadSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
                   'date_loaded', 'date_cleared', 'date_unloaded', 'date_invoiced', 'date_signed',
                   'hb', 'mb', 'booking_number', 'comment1',
                   'category', 'bill_to', 'person', 'currency', 'mode', 'bt', 'status', 'incoterm', 'cmr',
-                  'load_comments', 'payment_term', 'entry_loads', 'load_iteminvs', 'load_tors', 'load_ctrs', 'load_imageuploads', 'load_invs',
+                  'load_comments', 'entry_loads', 'load_iteminvs', 'load_tors', 'load_ctrs', 'load_imageuploads', 'load_invs',
                   'load_histories', 'load_exps',
-                  'trip', 'carrier', 'person_carrier', 'driver', 'vehicle_tractor', 'vehicle_trailer',
+                  'trip', 'carrier', 'person_carrier', 'driver', 'vehicle_tractor', 'vehicle_trailer', 'payment_reference_date', 'invoice_reference_date',
                   'load_events',
 
                   'cmr_consumed',

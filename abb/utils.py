@@ -526,6 +526,9 @@ def image_upload_path(instance, filename):
     if model == "LoadDocument":
         return f"{base}/loads/{instance.load.uf}/documents/{new_name}"
 
+    if model == "LoadEvidence":
+        return f"{base}/loads/{instance.load.uf}/evidence/{new_name}"
+
     if model == "UserProfile":
         return f"{base}/users/{instance.user.id}/avatar/{new_name}"
 

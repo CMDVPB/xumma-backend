@@ -129,6 +129,9 @@ class Trip(models.Model):
     load_order = ArrayField(ArrayField(models.CharField(
         max_length=36, null=True, blank=True), null=True, blank=True), null=True, blank=True)
 
+    driver_load_order = ArrayField(models.CharField(
+        max_length=36), blank=True, null=True)
+
     drivers = models.ManyToManyField(
         User, through="TripDriver", related_name="drivers_trip",  blank=True)
 
@@ -362,6 +365,19 @@ class Load(models.Model):
     invoice_reference_date = models.ForeignKey(
         'att.ContractReferenceDate', on_delete=models.SET_NULL, blank=True, null=True, related_name='invoice_reference_date_loads')
 
+    DRIVER_STATUS = [
+        ("pending", "Pending"),
+        ("available", "Available"),
+        ("locked", "Locked"),
+        ("loaded", "Loaded"),
+    ]
+
+    driver_status = models.CharField(
+        max_length=20,
+        choices=DRIVER_STATUS,
+        default="locked"
+    )
+
     bill_to = models.ForeignKey(
         Contact, on_delete=models.RESTRICT, blank=True, null=True, related_name='bill_to_loads')
     person = models.ForeignKey(Person, on_delete=models.SET_NULL,
@@ -571,7 +587,33 @@ class LoadDocument(models.Model):
         ]
 
 
+class LoadEvidence(models.Model):
+    TYPE_CHOICES = [
+        ("cargo", "Cargo"),
+        ("cmr", "CMR"),
+        ("damage", "Damage"),
+        ("seal", "Seal"),
+        ("other", "Other"),
+    ]
+
+    uf = models.CharField(max_length=36, default=hex_uuid,
+                          db_index=True, unique=True)
+    load = models.ForeignKey(
+        Load, on_delete=models.CASCADE, related_name='load_evidences')
+    type = models.CharField(
+        max_length=20,
+        choices=TYPE_CHOICES,
+        default="cargo"
+    )
+
+    image = models.ImageField(upload_to=image_upload_path)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.load.uf} → {self.type}"
+
 ###### END LOAD ######
+
 
 class Tor(models.Model):
     ''' Carrier transport order '''

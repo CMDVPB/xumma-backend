@@ -51,6 +51,7 @@ DOMAIN = os.getenv('DOMAIN')
 SITE_NAME = os.getenv('SITE_NAME')
 SITE_URL = os.getenv('SITE_URL')
 BACKEND_URL = os.getenv('BACKEND_URL')
+MOBILE_BACKEND_URL = os.getenv('MOBILE_BACKEND_URL')
 
 
 INSTALLED_APPS = [

@@ -131,9 +131,9 @@ class UserCompleteSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
         many=True,)
 
     user_loading_point_rates = UserLoadingPointRateSerializer(many=True,)
-    user_unloading_point_rates = UserUnloadingPointRateSerializer(many=True,)
+    user_unloading_point_rates = UserUnloadingPointRateSerializer(many=True)
 
-    compensation_settings = UserCompensationSettingsSerializer()
+    compensation_settings = UserCompensationSettingsSerializer(allow_null=True)
 
     def to_representation(self, instance):
         response = super().to_representation(instance)

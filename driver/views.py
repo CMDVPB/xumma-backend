@@ -3,14 +3,19 @@ from django.utils.dateparse import parse_datetime
 from datetime import timedelta
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework import status
 from django.contrib.gis.geos import Point, LineString
+from django.utils import timezone
+from django.core.exceptions import ValidationError
+from django.http import FileResponse, Http404
+from rest_framework import status
+from rest_framework.parsers import MultiPartParser, FormParser
 
 
 from abb.utils import get_user_company
-from axx.models import Trip
-from driver.serializers import ActiveTripSerializer
+from axx.models import Load, LoadEvidence, Trip
+from driver.serializers import ActiveTripSerializer, DriverTripSerializer, LoadEvidenceSerializer
 
 from .models import DriverLocation, DriverTrackPoint
 
@@ -147,3 +152,163 @@ class DriverRouteAPIView(APIView):
         ]
 
         return Response(data)
+
+
+###### START DRIVER LOADING ######
+class DriverCurrentTripView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user_company = get_user_company(request.user)
+
+        trip = Trip.objects.filter(
+            company=user_company,
+            drivers=request.user,
+            # status__name="in_progress"  # adjust to your system
+        ).first()
+
+        if not trip:
+            return Response({"detail": "No active trip"})
+
+        return Response(DriverTripSerializer(trip).data)
+
+
+class ConfirmLoadingView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, uf):
+        user_company = get_user_company(request.user)
+
+        try:
+            load = Load.objects.filter(
+                company=user_company).select_related("trip").get(uf=uf)
+        except Load.DoesNotExist:
+            return Response({"detail": "Load not found"}, status=404)
+
+        trip = load.trip
+
+        if not trip:
+            return Response({"detail": "Load not assigned to trip"}, status=400)
+
+        if load.driver_status != "available":
+            return Response(
+                {"detail": "Load is not available"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        order = trip.driver_load_order or []
+
+        print('2282', order)
+
+        if load.uf not in order:
+            return Response({"detail": "Load not in trip order"}, status=400)
+
+        idx = order.index(load.uf)
+
+        # 🚨 Prevent skipping
+        if idx > 0:
+            prev_load = Load.objects.get(uf=order[idx - 1])
+
+            if prev_load.driver_status != "loaded":
+                return Response(
+                    {"detail": "Previous load not completed"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        # ✅ Mark loaded
+        load.driver_status = "loaded"
+        load.is_loaded = True
+        load.date_loaded = timezone.now()
+        load.save()
+
+        # ✅ Unlock next load
+        if idx + 1 < len(order):
+            next_load = Load.objects.get(uf=order[idx + 1])
+            next_load.driver_status = "available"
+            next_load.save()
+
+        return Response({"success": True})
+
+
+class UploadLoadEvidenceView(APIView):
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request, uf):
+
+        try:
+            load = Load.objects.select_related("trip").get(uf=uf)
+        except Load.DoesNotExist:
+            return Response({"detail": "Load not found"}, status=404)
+
+        # ✅ Security check (CRITICAL)
+        if load.trip and request.user not in load.trip.drivers.all():
+            return Response(
+                {"detail": "Not your load"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # ✅ Business rule (VERY IMPORTANT)
+        if load.driver_status != "loaded":
+            return Response(
+                {"detail": "Load not loaded yet"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        serializer = LoadEvidenceSerializer(data=request.data)
+
+        if serializer.is_valid():
+            serializer.save(load=load)
+            return Response(serializer.data)
+
+        return Response(serializer.errors, status=400)
+
+
+class LoadEvidenceDeleteView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, uf):
+
+        user_company = get_user_company(request.user)
+
+        try:
+            evidence = (
+                LoadEvidence.objects
+                .select_related("load__company", "load__trip")
+                .get(uf=uf)
+            )
+        except LoadEvidence.DoesNotExist:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        # HARD MULTI-TENANT SECURITY
+        if evidence.load.company != user_company:
+            return Response(status=status.HTTP_403_FORBIDDEN)
+
+        # DRIVER OWNERSHIP SECURITY (VERY IMPORTANT)
+        if evidence.load.trip and request.user not in evidence.load.trip.drivers.all():
+            return Response(status=status.HTTP_403_FORBIDDEN)
+
+        evidence.image.delete(save=False)   # delete file
+        evidence.delete()                   # delete DB row
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class LoadEvidenceProxyView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request, uf):
+
+        try:
+            photo = (LoadEvidence.objects
+                     .get(uf=uf))
+        except LoadEvidence.DoesNotExist:
+            raise Http404()
+
+        return FileResponse(
+            photo.image.open(),
+            content_type="image/jpeg",
+        )
+
+
+###### END DRIVER LOADING ######

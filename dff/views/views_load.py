@@ -708,9 +708,9 @@ class IssueInvoiceView(GenericAPIView):
         contract = load.bill_to.contact_contracts.first()
 
         selected_ref = (
-            contract.invoice_date
-            if contract and contract.invoice_date
-            else None
+            load.invoice_reference_date
+            if load.invoice_reference_date
+            else contract.invoice_date if contract and contract.invoice_date else None
         )
 
         selected_code = (
@@ -721,7 +721,7 @@ class IssueInvoiceView(GenericAPIView):
         # selected_code = selected_code.lower().replace(" ", "_")
         date_field = DATE_FIELD_MAP.get(selected_code)
 
-        # print('6180', contract.invoice_date)
+        # print('6180', selected_code)
 
         if not date_field:
             return Response(
