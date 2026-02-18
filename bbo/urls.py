@@ -12,6 +12,9 @@ urlpatterns = [
          name="notification-mark-read",
          ),
 
+    path('analytics/top-customers/',
+         TopCustomersView.as_view(), name='top-customers'),
+
 ]
 
 urlpatterns = format_suffix_patterns(urlpatterns)

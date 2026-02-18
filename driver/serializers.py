@@ -2,6 +2,7 @@ from rest_framework import serializers
 from django.conf import settings
 
 from axx.models import Load, LoadEvidence, Trip
+from driver.utils import format_site
 from .models import DriverLocation
 
 
@@ -89,23 +90,6 @@ class ConfirmLoadingSerializer(serializers.Serializer):
     uf = serializers.CharField()
 
 
-class DriverTripSerializer(serializers.ModelSerializer):
-    loads = serializers.SerializerMethodField()
-
-    class Meta:
-        model = Trip
-        fields = [
-            "rn",
-            "date_order",
-            "loads",
-            "uf",
-        ]
-
-    def get_loads(self, obj):
-        loads = obj.trip_loads.all().order_by("date_order")
-        return DriverLoadSerializer(loads, many=True).data
-
-
 class LoadEvidenceSerializer(serializers.ModelSerializer):
     image_url = serializers.SerializerMethodField(read_only=True)
 
@@ -136,19 +120,72 @@ class LoadEvidenceSerializer(serializers.ModelSerializer):
 class DriverLoadSerializer(serializers.ModelSerializer):
     load_evidences = LoadEvidenceSerializer(many=True, read_only=True)
 
+    load_address = serializers.SerializerMethodField()
+    unload_address = serializers.SerializerMethodField()
+    reference = serializers.SerializerMethodField()
+
     class Meta:
         model = Load
         fields = [
             "sn",
+            "driver_status",
+            "uf",
+
             "load_address",
             "unload_address",
-            "load_detail",
-            "driver_status",
-            "date_loaded",
-            "uf",
+            "reference",
 
             "load_evidences",
         ]
+
+    def get_load_address(self, obj):
+        entry = (
+            obj.entry_loads
+            .filter(action="loading")
+            .order_by("order", "id")
+            .select_related("shipper")
+            .first()
+        )
+
+        return format_site(entry.shipper) if entry else None
+
+    def get_unload_address(self, obj):
+        entry = (
+            obj.entry_loads
+            .filter(action="unloading")
+            .order_by("order", "id")
+            .select_related("shipper")
+            .first()
+        )
+
+        return format_site(entry.shipper) if entry else None
+
+    def get_reference(self, obj):
+        entry = (
+            obj.entry_loads
+            .filter(action="loading")
+            .order_by("order", "id")
+            .first()
+        )
+
+        return entry.shipperinstructions1 if entry else None
+
+
+class DriverTripSerializer(serializers.ModelSerializer):
+    loads = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Trip
+        fields = [
+            "rn",
+            "date_order",
+            "loads",
+            "uf",
+        ]
+
+    def get_loads(self, obj):
+        loads = obj.trip_loads.all().order_by("date_order")
+        return DriverLoadSerializer(loads, many=True).data
 
 
 ###### END DRIVER LOADING ######

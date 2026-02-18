@@ -364,8 +364,8 @@ class CustomTokenRefreshView(TokenRefreshView):
                 logger.warning(f"Refresh failed: {response.data}")
                 return response
 
-            # ✅ OPTIONAL: Refresh rotation logic
-            # Only if you enabled ROTATE_REFRESH_TOKENS = True
+            # OPTIONAL: Refresh rotation logic
+            # Only if enabled ROTATE_REFRESH_TOKENS = True
             try:
                 if getattr(refresh, "check_exp", None):
                     refresh.check_exp()

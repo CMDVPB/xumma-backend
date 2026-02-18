@@ -1,5 +1,4 @@
 ### Important ! Use Auto Save in order to keep the order of the imports ###
-
 import django
 import os
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'xumma.settings')
@@ -20,3 +19,4 @@ application = ProtocolTypeRouter({
         CookieAuthMiddleware(URLRouter(bch.routing.websocket_urlpatterns))
     )
 })
+

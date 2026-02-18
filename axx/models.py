@@ -367,9 +367,16 @@ class Load(models.Model):
 
     DRIVER_STATUS = [
         ("pending", "Pending"),
-        ("available", "Available"),
         ("locked", "Locked"),
+
+        ("arrived_pickup", "Arrived at Pickup"),
+        ("loading", "Loading"),
         ("loaded", "Loaded"),
+        ("departed", "Departed"),
+
+        ("arrived_delivery", "Arrived at Delivery"),
+        ("unloading", "Unloading"),
+        ("completed", "Completed"),
     ]
 
     driver_status = models.CharField(
@@ -509,6 +516,7 @@ class LoadInv(models.Model):
     class Meta:
         indexes = [
             models.Index(fields=['issued_date']),
+            models.Index(fields=['invoice_type']),
             models.Index(fields=['company']),
             models.Index(fields=['status']),
         ]

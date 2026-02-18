@@ -705,7 +705,15 @@ class IssueInvoiceView(GenericAPIView):
 
         DEFAULT_CODE = "date_cleared"
 
-        contract = load.bill_to.contact_contracts.first()
+        bill_to = load.bill_to
+
+        if not bill_to:
+            return Response(
+                {'detail': 'Load has no customer assigned'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        contract = bill_to.contact_contracts.first()
 
         selected_ref = (
             load.invoice_reference_date

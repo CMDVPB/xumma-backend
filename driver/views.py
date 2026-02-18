@@ -4,12 +4,12 @@ from datetime import timedelta
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
-from rest_framework import status
 from django.contrib.gis.geos import Point, LineString
 from django.utils import timezone
 from django.core.exceptions import ValidationError
 from django.http import FileResponse, Http404
 from rest_framework import status
+from django.shortcuts import get_object_or_404
 from rest_framework.parsers import MultiPartParser, FormParser
 
 
@@ -310,5 +310,22 @@ class LoadEvidenceProxyView(APIView):
             content_type="image/jpeg",
         )
 
+
+class UpdateDriverStatus(APIView):
+    def patch(self, request, uf):
+        new_status = request.data.get("status")
+
+        if not new_status:
+            return Response(
+                {"detail": "Missing status"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        load = get_object_or_404(Load, uf=uf)
+
+        load.driver_status = new_status
+        load.save(update_fields=["driver_status"])
+
+        return Response({"success": True})
 
 ###### END DRIVER LOADING ######
