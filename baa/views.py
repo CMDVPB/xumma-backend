@@ -15,6 +15,7 @@ from rest_framework.parsers import MultiPartParser, FormParser
 
 from abb.utils import get_user_company
 from att.models import Vehicle
+from axx.models import Trip
 from baa.models import VehicleChecklist, VehicleChecklistAnswer, VehicleChecklistItem, VehicleChecklistPhoto, VehicleEquipment
 from baa.serializers import VehicleChecklistAnswerSerializer, VehicleChecklistItemSerializer, VehicleChecklistListSerializer, VehicleChecklistPhotoSerializer, VehicleChecklistSerializer, VehicleEquipmentSerializer
 
@@ -47,7 +48,37 @@ class StartVehicleChecklistAPIView(APIView):
     def post(self, request, vehicle_uf):
         vehicle = get_object_or_404(Vehicle, uf=vehicle_uf)
 
+        inspection_type = request.data.get("inspection_type")
+
+        if inspection_type not in ["departure", "arrival"]:
+            return Response(
+                {"error": "Invalid inspection_type"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        trip = Trip.objects.filter(
+            drivers=request.user, date_end__isnull=True).first()
+
+        if not trip:
+            return Response({"error": "No active trip"}, status=400)
+
+        existing = VehicleChecklist.objects.filter(
+            trip=trip,
+            vehicle=vehicle,
+            driver=request.user,
+            inspection_type=inspection_type,
+            is_completed=False,
+        ).order_by("-started_at").first()
+
+        if existing:
+            return Response(
+                VehicleChecklistSerializer(
+                    existing, context={"request": request}).data,
+                status=status.HTTP_200_OK,
+            )
+
         checklist = VehicleChecklist.objects.create(
+            trip=trip,
             vehicle=vehicle,
             driver=request.user,
             company=vehicle.company,
@@ -98,6 +129,21 @@ class FinishChecklistAPIView(APIView):
         checklist.mileage = request.data.get("mileage")
         checklist.general_comment = request.data.get("general_comment")
         checklist.save()
+
+        print('3872', checklist.trip)
+
+        if checklist.trip:
+
+            if checklist.inspection_type == "departure":
+                checklist.trip.departure_inspection_completed = True
+
+            if checklist.inspection_type == "arrival":
+                checklist.trip.arrival_inspection_completed = True
+
+            checklist.trip.save(update_fields=[
+                "departure_inspection_completed",
+                "arrival_inspection_completed",
+            ])
 
         return Response({"status": "completed"})
 

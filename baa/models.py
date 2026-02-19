@@ -5,6 +5,7 @@ from django.contrib.auth import get_user_model
 import logging
 
 from app.models import Company
+from axx.models import Trip
 logger = logging.getLogger(__name__)
 
 User = get_user_model()
@@ -65,6 +66,14 @@ class VehicleChecklist(models.Model):
     general_comment = models.CharField(max_length=1000, blank=True, null=True)
 
     is_completed = models.BooleanField(default=False)
+
+    trip = models.ForeignKey(
+        Trip,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="trip_checklists",
+    )
 
     class Meta:
         ordering = ["-started_at"]

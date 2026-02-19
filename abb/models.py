@@ -124,8 +124,8 @@ class StatusType(models.Model):
     code = models.CharField(max_length=10, blank=True, null=True, unique=True)
 
     class Meta:
-        verbose_name = "Status"
-        verbose_name_plural = "Statuses"
+        verbose_name = "Status Type"
+        verbose_name_plural = "Status Types"
         ordering = ['serial_number']
 
     def __str__(self):

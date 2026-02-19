@@ -127,13 +127,16 @@ class Trip(models.Model):
         StatusType, on_delete=models.SET_NULL, blank=True, null=True, related_name='statustype_trips')
 
     load_order = ArrayField(ArrayField(models.CharField(
-        max_length=36, null=True, blank=True), null=True, blank=True), null=True, blank=True)
-
-    driver_load_order = ArrayField(models.CharField(
-        max_length=36), blank=True, null=True)
+        max_length=36, null=True, blank=True), null=True, blank=True), null=True, blank=True)  # used on the dispatcher side
 
     drivers = models.ManyToManyField(
         User, through="TripDriver", related_name="drivers_trip",  blank=True)
+
+    driver_load_order = ArrayField(models.CharField(
+        max_length=36), blank=True, null=True)  # used on the driver side
+
+    departure_inspection_completed = models.BooleanField(default=False)
+    arrival_inspection_completed = models.BooleanField(default=False)
 
     def save(self, *args, **kwargs):
         if self.rn == None or self.rn == '':

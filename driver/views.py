@@ -315,6 +315,8 @@ class UpdateDriverStatus(APIView):
     def patch(self, request, uf):
         new_status = request.data.get("status")
 
+        print('3570', new_status)
+
         if not new_status:
             return Response(
                 {"detail": "Missing status"},

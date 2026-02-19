@@ -13,7 +13,7 @@ urlpatterns = [
          DriverLocationAPIView.as_view(),  name='driver-location'),
 
     path("driver/trips/current/", DriverCurrentTripView.as_view()),
-    path("driver/trips/<str>:uf/status/", UpdateDriverStatus.as_view()),
+    path("driver/trips/<str:uf>/status/", UpdateDriverStatus.as_view()),
     path("driver/loads/<str:uf>/confirm-loading/", ConfirmLoadingView.as_view()),
     path("driver/loads/<str:uf>/upload-evidence/",
          UploadLoadEvidenceView.as_view(), name="upload-load-evidence"),

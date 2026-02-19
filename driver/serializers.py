@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from django.conf import settings
 
+from att.models import Vehicle
 from axx.models import Load, LoadEvidence, Trip
 from driver.utils import format_site
 from .models import DriverLocation
@@ -171,16 +172,32 @@ class DriverLoadSerializer(serializers.ModelSerializer):
         return entry.shipperinstructions1 if entry else None
 
 
+class DriverVehicleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Vehicle
+        fields = [
+            "reg_number",
+            "uf",
+        ]
+
+
 class DriverTripSerializer(serializers.ModelSerializer):
     loads = serializers.SerializerMethodField()
+
+    vehicle_tractor = DriverVehicleSerializer(read_only=True)
+    vehicle_trailer = DriverVehicleSerializer(read_only=True)
 
     class Meta:
         model = Trip
         fields = [
             "rn",
             "date_order",
+            "vehicle_tractor",
+            "vehicle_trailer",
             "loads",
             "uf",
+
+            "departure_inspection_completed",
         ]
 
     def get_loads(self, obj):
