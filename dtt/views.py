@@ -23,7 +23,7 @@ from rest_framework.parsers import MultiPartParser, FormParser
 import mimetypes
 from django.http import FileResponse, Http404
 from rest_framework.views import APIView
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 
 from abb.utils import assign_new_num, get_company_manager, get_user_company
 from app.models import SMTPSettings, UserSettings
@@ -716,7 +716,7 @@ class MediaProxyView(APIView):
         if not file_field or not os.path.exists(file_field.path):
             raise Http404()
 
-        print('3232', uf)
+        # print('3232', uf)
 
         # Ownership check
         if image.company != get_user_company(request.user):
@@ -765,6 +765,68 @@ class MediaProxyView(APIView):
             raise Http404()
 
         file_field = image.file_obj
+
+        # delete physical file first
+        if file_field and os.path.exists(file_field.path):
+            try:
+                os.remove(file_field.path)
+            except OSError:
+                # optional: log error
+                pass
+
+        # delete DB record
+        image.delete()
+
+        return Response(
+            {"detail": "File deleted successfully"},
+            status=status.HTTP_204_NO_CONTENT,
+        )
+
+
+class MediaProxyNoAuthView(APIView):
+
+    permission_classes = [AllowAny]
+
+    def get(self, request, uf):
+        print('4280', uf)
+
+        # try driver report images first
+        image = DriverReportImage.objects.filter(uf=uf).first()
+
+        if image:
+            # in case found DriverReportImage
+            file_field = image.image
+
+        else:
+            # fallback to generic uploads
+            image = get_object_or_404(ImageUpload, uf=uf)
+
+            file_field = image.file_obj
+
+        if not file_field or not os.path.exists(file_field.path):
+            raise Http404()
+
+        # print('4284', uf)
+
+        content_type, _ = mimetypes.guess_type(file_field.name)
+
+        return FileResponse(
+            file_field.open("rb"),
+            content_type=content_type or "application/octet-stream",
+        )
+
+    def delete(self, request, uf):
+
+        image = DriverReportImage.objects.filter(uf=uf).first()
+
+        if image:
+            # in case found DriverReportImage
+            file_field = image.image
+
+        else:
+            image = get_object_or_404(ImageUpload, uf=uf)
+            # fallback to generic uploads
+            file_field = image.file_obj
 
         # delete physical file first
         if file_field and os.path.exists(file_field.path):

@@ -3,7 +3,7 @@ from rest_framework.urlpatterns import format_suffix_patterns
 
 from dtt.views import AuthorizationStockBatchDetailsView, AuthorizationStockBatchListCreateView, BankAccountDetailView, BankAccountListCreateView, \
     CMRStockBatchDetailsView, CMRStockBatchListCreateView, CTIRStockBatchDetailsView, CTIRStockBatchListCreateView, ColliTypeListView, ContactSiteCreateView, ContactSiteDetailView, \
-    ContactSiteListView, ContractReferenceDateListCreateView, ImageView, ItemForItemCostDetailView, ItemForItemCostListCreateView, ItemForItemInvDetailView, ItemForItemInvListCreateView, MediaProxyView, NoteDetailView, NoteListCreateView, PaymentTermListCreateView, PaymentTermsDetailView, PersonDetailView, TermDetailView, TermListCreateView, UserSettingsView, \
+    ContactSiteListView, ContractReferenceDateListCreateView, ImageView, ItemForItemCostDetailView, ItemForItemCostListCreateView, ItemForItemInvDetailView, ItemForItemInvListCreateView, MediaProxyNoAuthView, MediaProxyView, NoteDetailView, NoteListCreateView, PaymentTermListCreateView, PaymentTermsDetailView, PersonDetailView, TermDetailView, TermListCreateView, UserSettingsView, \
     get_post_delete_user_smtp_settings, test_smtp_connection_view, validate_or_generate_cmr
 
 urlpatterns = [
@@ -65,6 +65,8 @@ urlpatterns = [
     path('image/', ImageView.as_view(), name='image_upload'),
     path('image/<str:uf>/',
          MediaProxyView.as_view(), name='image_download'),
+    path('snapshot/<str:uf>/',
+         MediaProxyNoAuthView.as_view(), name='image-download-no-auth'),
 
 
     path('contract-reference-dates/', ContractReferenceDateListCreateView.as_view(),

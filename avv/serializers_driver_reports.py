@@ -4,7 +4,6 @@ from django.db.models import Sum
 from django.conf import settings
 from rest_framework import serializers
 
-
 from abb.utils import get_user_company
 from att.models import Vehicle
 from avv.models import DriverReport, DriverReportImage
@@ -32,7 +31,8 @@ class DriverReportImageReadSerializer(serializers.ModelSerializer):
         fields = ["id", "image_url"]
 
     def get_image_url(self, obj):
-        return f"{settings.BACKEND_URL}/api/image/{obj.uf}/"
+        # return f"{settings.BACKEND_URL}/api/image/{obj.uf}/"
+        return f"http://10.0.2.2:8000/api/snapshot/{obj.uf}/"
 
 
 class DriverReportCreateSerializer(serializers.ModelSerializer):
@@ -154,15 +154,3 @@ class DriverReportListSerializer(serializers.ModelSerializer):
         if obj.reviewed_by:
             return obj.reviewed_by.get_full_name()
         return None
-
-
-# class DriverReportDetailSerializer(serializers.ModelSerializer):
-#     images = DriverReportImageSerializer(
-#         source="report_driver_report_images",
-#         many=True,
-#         read_only=True
-#     )
-
-#     class Meta:
-#         model = DriverReport
-#         fields = "__all__"

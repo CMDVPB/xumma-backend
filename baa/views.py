@@ -6,28 +6,30 @@ from django.db.models import Exists, OuterRef, Q
 from django.http import FileResponse, Http404
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
-from rest_framework.generics import CreateAPIView, ListAPIView, ListCreateAPIView, RetrieveAPIView, GenericAPIView, \
-    UpdateAPIView, DestroyAPIView
-from rest_framework.exceptions import PermissionDenied, NotFound
+from rest_framework.generics import (CreateAPIView, ListAPIView, ListCreateAPIView, RetrieveAPIView, GenericAPIView,
+                                     UpdateAPIView, DestroyAPIView)
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.parsers import MultiPartParser, FormParser
 
+from abb.policies import PolicyFilteredQuerysetMixin, VehicleCheckListPolicy
 from abb.utils import get_user_company
 from att.models import Vehicle
 from axx.models import Trip
 from baa.models import VehicleChecklist, VehicleChecklistAnswer, VehicleChecklistItem, VehicleChecklistPhoto, VehicleEquipment
-from baa.serializers import VehicleChecklistAnswerSerializer, VehicleChecklistItemSerializer, VehicleChecklistListSerializer, VehicleChecklistPhotoSerializer, VehicleChecklistSerializer, VehicleEquipmentSerializer
+from baa.serializers import (VehicleChecklistAnswerSerializer, VehicleChecklistItemSerializer, VehicleChecklistListSerializer,
+                             VehicleChecklistPhotoSerializer, VehicleChecklistSerializer, VehicleEquipmentSerializer)
 
 
-class VehicleChecklistListAPIView(ListAPIView):
+class VehicleChecklistListAPIView(PolicyFilteredQuerysetMixin, ListAPIView):
     """
     List all vehicle checklists (history + active).
     """
     serializer_class = VehicleChecklistListSerializer
     permission_classes = [IsAuthenticated]
+    policy_class = VehicleCheckListPolicy
 
-    def get_queryset(self):
+    def get_base_queryset(self):
         user = self.request.user
         user_company = get_user_company(user)
 

@@ -647,9 +647,9 @@ class WorkOrderAttachment(TimeStampedModel):
 class DriverReport(TimeStampedModel):
     class Status(models.TextChoices):
         DRAFT = "DRAFT"
-        SENT = "SENT"          # driver submitted
-        REVIEWED = "REVIEWED"  # manager looked at it
-        IN_EXECUTION = "IN_EXECUTION"  # work order created
+        SENT = "SENT"                   # driver submitted
+        REVIEWED = "REVIEWED"           # manager looked at it
+        IN_EXECUTION = "IN_EXECUTION"   # work order created
         REJECTED = "REJECTED"
         CLOSED = "CLOSED"
 

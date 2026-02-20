@@ -20,10 +20,13 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.exceptions import PermissionDenied
 
 from abb.models import Currency
+from abb.policies import DriverReportPolicy, PolicyFilteredQuerysetMixin
 from abb.utils import get_user_company
-from avv.serializers_driver_reports import DriverReportCreateSerializer, DriverReportDetailsSerializer, DriverReportImageSerializer, DriverReportListSerializer
+from avv.serializers_driver_reports import (
+    DriverReportCreateSerializer, DriverReportDetailsSerializer, DriverReportImageSerializer, DriverReportListSerializer)
 
-from .models import DriverReport, DriverReportImage, IssueDocument, Location, Part, PartAttachment, PartBrand, PartRequest, StockBalance, StockLot, StockMovement, UnitOfMeasure, Warehouse, WorkOrder, WorkOrderAttachment, WorkOrderIssue, WorkType
+from .models import (DriverReport, DriverReportImage, IssueDocument, Location, Part, PartAttachment, PartBrand, PartRequest,
+                     StockBalance, StockLot, StockMovement, UnitOfMeasure, Warehouse, WorkOrder, WorkOrderAttachment, WorkOrderIssue, WorkType)
 from .serializers import (
     IssueDocumentDetailSerializer,
     IssueDocumentListSerializer,
@@ -53,7 +56,8 @@ from .serializers import (
     WorkTypeCreateSerializer,
     WorkTypeSerializer,
 )
-from .services import confirm_issue_document, create_work_order_from_driver_report, issue_from_work_order, receive_stock, reserve_request, issue_request, InventoryError, start_work_order, transfer_stock
+from .services import (confirm_issue_document, create_work_order_from_driver_report, issue_from_work_order,
+                       receive_stock, reserve_request, issue_request, InventoryError, start_work_order, transfer_stock)
 
 
 class UnitOfMeasureListView(ListAPIView):
@@ -882,6 +886,22 @@ class DriverReportCreateView(generics.CreateAPIView):
     serializer_class = DriverReportCreateSerializer
 
 
+class MyDriverReportDetailsView(RetrieveAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = DriverReportDetailsSerializer
+
+    def get_object(self):
+        user = self.request.user
+        company = get_user_company(user)
+
+        return get_object_or_404(
+            DriverReport,
+            pk=self.kwargs["pk"],
+            company=company,
+            driver=user,          # CRITICAL SECURITY FILTER
+        )
+
+
 class DriverReportSendView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -928,11 +948,12 @@ class MyDriverReportListView(generics.ListAPIView):
         )
 
 
-class DriverReportManagerListView(generics.ListAPIView):
+class DriverReportManagerListView(PolicyFilteredQuerysetMixin, generics.ListAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = DriverReportListSerializer
+    policy_class = DriverReportPolicy
 
-    def get_queryset(self):
+    def get_base_queryset(self):
 
         company = get_user_company(self.request.user)
         qs = (

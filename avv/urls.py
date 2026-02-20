@@ -69,6 +69,7 @@ urlpatterns = [
     # Driver
     path("driver-reports/", DriverReportCreateView.as_view()),
     path("driver-reports/my/", MyDriverReportListView.as_view()),
+    path("driver-reports/<int:pk>/", MyDriverReportDetailsView.as_view()),
     path("driver-reports/<int:pk>/send/", DriverReportSendView.as_view()),
 
     # Manager
