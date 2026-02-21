@@ -559,6 +559,9 @@ def image_upload_path(instance, filename):
     if model == "CompanyAttachment":
         return f"{base}/companies/{instance.company.uf}/{new_name}"
 
+    if model == "ItemCost":
+        return f"{base}/trips/{instance.trip.uf}/receipts/{new_name}"
+
     # GENERIC IMAGEUPLOAD (if still use it / not sure)
     if model == "ImageUpload":
         if instance.company:

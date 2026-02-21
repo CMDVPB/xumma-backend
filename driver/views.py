@@ -1,21 +1,28 @@
 from django.utils.timezone import now
 from django.utils.dateparse import parse_datetime
 from datetime import timedelta
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.contrib.gis.geos import Point, LineString
 from django.utils import timezone
 from django.core.exceptions import ValidationError
 from django.http import FileResponse, Http404
-from rest_framework import status
 from django.shortcuts import get_object_or_404
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.generics import (
+    ListCreateAPIView, RetrieveUpdateDestroyAPIView, ListAPIView)
+from rest_framework import status
 from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.exceptions import PermissionDenied
 
 
+from abb.policies import ItemCostPolicy, ItemForItemCostPolicy, PolicyFilteredQuerysetMixin, TypeCostPolicy
 from abb.utils import get_user_company
+from app.models import TypeCost
 from axx.models import Load, LoadEvidence, Trip
-from driver.serializers import ActiveTripSerializer, DriverTripSerializer, LoadEvidenceSerializer
+from ayy.models import ItemCost, ItemForItemCost
+from driver.serializers import (
+    ActiveTripSerializer, DriverTripSerializer, ItemCostDriverSerializer, ItemForItemCostDriverSerializer, LoadEvidenceSerializer, TypeCostSerializer)
 
 from .models import DriverLocation, DriverTrackPoint
 
@@ -331,3 +338,72 @@ class UpdateDriverStatus(APIView):
         return Response({"success": True})
 
 ###### END DRIVER LOADING ######
+
+###### START DRIVER COSTS DURING TRIP ######
+
+
+class TripCostsDriverView(PolicyFilteredQuerysetMixin, ListCreateAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = ItemCostDriverSerializer
+    parser_classes = (MultiPartParser, FormParser)
+    policy_class = ItemCostPolicy
+
+    def get_base_queryset(self):
+        user_company = get_user_company(self.request.user)
+
+        trip = get_object_or_404(Trip, uf=self.kwargs["trip_uf"])
+
+        return ItemCost.objects.filter(company=user_company, trip=trip)
+
+    def get_trip(self):
+        return get_object_or_404(Trip, uf=self.kwargs["trip_uf"])
+
+    def perform_create(self, serializer):
+        trip = self.get_trip()
+        user_company = get_user_company(self.request.user)
+
+        if not self.policy_class.can_create(self.request.user, trip):
+            raise PermissionDenied("Not allowed")
+
+        serializer.save(
+            trip=trip,
+            created_by=self.request.user,
+            company=user_company
+        )
+
+
+class ItemForItemCostDriverList(PolicyFilteredQuerysetMixin, ListAPIView):
+    serializer_class = ItemForItemCostDriverSerializer
+    policy_class = ItemForItemCostPolicy
+
+    def get_base_queryset(self):
+        return ItemForItemCost.objects.all()
+
+
+class ItemCostDetailDriverView(PolicyFilteredQuerysetMixin, RetrieveUpdateDestroyAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = ItemCostDriverSerializer
+    policy_class = ItemCostPolicy
+    lookup_field = "uf"
+
+    def get_base_queryset(self):
+        user_company = get_user_company(self.request.user)
+        return ItemCost.objects.filter(company=user_company)
+
+    def get_object(self):
+        obj = super().get_object()
+
+        if not self.policy_class.can_modify(self.request.user, obj):
+            raise PermissionDenied("Not allowed")
+
+        return obj
+
+
+class TypeCostDriverList(PolicyFilteredQuerysetMixin, ListAPIView):
+    serializer_class = TypeCostSerializer
+    policy_class = TypeCostPolicy
+
+    def get_base_queryset(self):
+        return TypeCost.objects.all().order_by("serial_number")
+
+###### EMD DRIVER COSTS DURING TRIP ######

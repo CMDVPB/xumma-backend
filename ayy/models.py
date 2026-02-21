@@ -550,6 +550,12 @@ class ItemCost(models.Model):
     trip = models.ForeignKey(
         Trip, on_delete=models.CASCADE, null=True, blank=True, related_name='trip_itemcosts')
 
+    receipt_file = models.FileField(
+        null=True,
+        blank=True,
+        upload_to=image_upload_path,
+    )
+
     class Meta:
         verbose_name = "Item cost"
         verbose_name_plural = "Items cost"

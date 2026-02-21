@@ -22,7 +22,14 @@ urlpatterns = [
          LoadEvidenceProxyView.as_view(), name="load-evidence-proxy"),
     path("load-evidences/<str:uf>/delete/", LoadEvidenceDeleteView.as_view(),
          name="delete-load-evidence",
-         )
+         ),
+
+    ###### START DRIVER COSTS DURING TRIP ######
+    path("trips/<str:trip_uf>/costs/", TripCostsDriverView.as_view()),
+    path("costs/<str:uf>/", ItemCostDetailDriverView.as_view()),
+    path("item-for-cost/", ItemForItemCostDriverList.as_view(), name="item-for-cost"),
+    path("typecosts/", TypeCostDriverList.as_view(), name="typecosts"),
+    ###### EMD DRIVER COSTS DURING TRIP ######
 ]
 
 urlpatterns = format_suffix_patterns(urlpatterns)
