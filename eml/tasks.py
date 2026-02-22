@@ -1,5 +1,3 @@
-import email
-import json
 import logging
 from axx.models import Load, LoadEvent
 from ayy.models import UserEmail

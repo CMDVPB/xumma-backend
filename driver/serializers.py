@@ -1,3 +1,4 @@
+from .models import TripStop
 from rest_framework import serializers
 from django.conf import settings
 
@@ -208,6 +209,34 @@ class DriverTripSerializer(serializers.ModelSerializer):
         return DriverLoadSerializer(loads, many=True).data
 
 
+class DriverTripStopSerializer(serializers.ModelSerializer):
+    load_sn = serializers.CharField(source="load.sn", read_only=True)
+    # optional: entry window if exists
+    time_load_min = serializers.DateTimeField(
+        source="entry.time_load_min", read_only=True)
+    time_load_max = serializers.DateTimeField(
+        source="entry.time_load_max", read_only=True)
+
+    class Meta:
+        model = TripStop
+        fields = [
+            "uf",
+            "order",
+            "type",
+            "title",
+            "lat",
+            "lon",
+            "is_completed",
+            "date_completed",
+
+            "load_sn",
+            "time_load_min",
+            "time_load_max",
+
+            "is_visible_to_driver",
+        ]
+        read_only_fields = fields
+
 ###### END DRIVER LOADING ######
 
 
@@ -339,3 +368,60 @@ class TypeCostSerializer(serializers.ModelSerializer):
         ]
 
 ###### EMD DRIVER COSTS DURING TRIP ######
+
+
+###### START TRIP STOPS ######
+
+
+class TripStopSerializer(serializers.ModelSerializer):
+
+    load_sn = serializers.CharField(source="load.sn", read_only=True)
+    time_load_min = serializers.DateTimeField(
+        source="entry.time_load_min", read_only=True)
+    time_load_max = serializers.DateTimeField(
+        source="entry.time_load_max", read_only=True)
+
+    class Meta:
+        model = TripStop
+        fields = [
+            "order",
+            "type",
+            "title",
+            "lat",
+            "lon",
+            "is_visible_to_driver",
+            "is_completed",
+            "date_completed",
+
+            # derived helpers
+            "load_sn",
+            "time_load_min",
+            "time_load_max",
+
+            "uf",
+        ]
+
+
+class TripStopReorderSerializer(serializers.Serializer):
+    orderedUfs = serializers.ListField(
+        child=serializers.CharField()
+    )
+
+
+class TripStopVisibilitySerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = TripStop
+        fields = ["is_visible_to_driver"]
+
+    def validate(self, attrs):
+        stop = self.instance
+
+        if stop.is_completed and attrs.get("is_visible_to_driver") is False:
+            raise serializers.ValidationError(
+                "Completed stops cannot be hidden from driver"
+            )
+
+        return attrs
+
+###### START TRIP STOPS ######

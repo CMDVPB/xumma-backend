@@ -138,6 +138,8 @@ class Trip(models.Model):
     departure_inspection_completed = models.BooleanField(default=False)
     arrival_inspection_completed = models.BooleanField(default=False)
 
+    stops_version = models.PositiveIntegerField(default=1)
+
     def save(self, *args, **kwargs):
         if self.rn == None or self.rn == '':
             items_list_qs, num_new = None, None

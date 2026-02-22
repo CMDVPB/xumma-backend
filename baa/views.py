@@ -49,8 +49,15 @@ class StartVehicleChecklistAPIView(APIView):
 
     def post(self, request, vehicle_uf):
         vehicle = get_object_or_404(Vehicle, uf=vehicle_uf)
-
         inspection_type = request.data.get("inspection_type")
+
+        user_company = get_user_company(request.user)
+
+        # GUARDS
+        if vehicle.company != user_company:
+            return Response({"error": "Invalid vehicle"}, status=403)
+        if not inspection_type:
+            return Response({"error": "inspection_type required"}, status=400)
 
         if inspection_type not in ["departure", "arrival"]:
             return Response(
@@ -84,6 +91,7 @@ class StartVehicleChecklistAPIView(APIView):
             vehicle=vehicle,
             driver=request.user,
             company=vehicle.company,
+            inspection_type=inspection_type,
         )
 
         items = VehicleChecklistItem.objects.filter(is_active=True)
@@ -128,24 +136,34 @@ class FinishChecklistAPIView(APIView):
 
         checklist.finished_at = timezone.now()
         checklist.is_completed = True
-        checklist.mileage = request.data.get("mileage")
-        checklist.general_comment = request.data.get("general_comment")
+
+        mileage = request.data.get("mileage")
+        if mileage is not None:
+            checklist.mileage = mileage
+
+        comment = request.data.get("general_comment")
+        if comment is not None:
+            checklist.general_comment = comment
+
         checklist.save()
 
-        print('3872', checklist.trip)
+        trip = checklist.trip
 
-        if checklist.trip:
+        if trip:
+            update_fields = []
 
             if checklist.inspection_type == "departure":
-                checklist.trip.departure_inspection_completed = True
+                if not trip.departure_inspection_completed:
+                    trip.departure_inspection_completed = True
+                    update_fields.append("departure_inspection_completed")
 
-            if checklist.inspection_type == "arrival":
-                checklist.trip.arrival_inspection_completed = True
+            elif checklist.inspection_type == "arrival":
+                if not trip.arrival_inspection_completed:
+                    trip.arrival_inspection_completed = True
+                    update_fields.append("arrival_inspection_completed")
 
-            checklist.trip.save(update_fields=[
-                "departure_inspection_completed",
-                "arrival_inspection_completed",
-            ])
+            if update_fields:
+                trip.save(update_fields=update_fields)
 
         return Response({"status": "completed"})
 
