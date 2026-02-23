@@ -1,4 +1,4 @@
-from .models import TripStop
+from .models import TripStop, TripStopMessage
 from rest_framework import serializers
 from django.conf import settings
 
@@ -91,6 +91,7 @@ class ActiveTripSerializer(serializers.ModelSerializer):
 
 ###### START DRIVER LOADING ######
 
+
 class ConfirmLoadingSerializer(serializers.Serializer):
     uf = serializers.CharField()
 
@@ -122,6 +123,14 @@ class LoadEvidenceSerializer(serializers.ModelSerializer):
         return f"{settings.MOBILE_BACKEND_URL}/api/load-evidences/{obj.uf}/"
 
 
+class DriverLoadCacheSerializer(serializers.ModelSerializer):
+    load_evidences = LoadEvidenceSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Load
+        fields = ["uf", "sn", "load_evidences"]
+
+
 class DriverLoadSerializer(serializers.ModelSerializer):
     load_evidences = LoadEvidenceSerializer(many=True, read_only=True)
 
@@ -133,7 +142,6 @@ class DriverLoadSerializer(serializers.ModelSerializer):
         model = Load
         fields = [
             "sn",
-            "driver_status",
             "uf",
 
             "load_address",
@@ -217,6 +225,8 @@ class DriverTripStopSerializer(serializers.ModelSerializer):
     time_load_max = serializers.DateTimeField(
         source="entry.time_load_max", read_only=True)
 
+    unread_count = serializers.IntegerField(read_only=True)
+
     class Meta:
         model = TripStop
         fields = [
@@ -228,12 +238,15 @@ class DriverTripStopSerializer(serializers.ModelSerializer):
             "lon",
             "is_completed",
             "date_completed",
+            "status",
 
             "load_sn",
             "time_load_min",
             "time_load_max",
 
             "is_visible_to_driver",
+
+            "unread_count",
         ]
         read_only_fields = fields
 
@@ -381,6 +394,8 @@ class TripStopSerializer(serializers.ModelSerializer):
     time_load_max = serializers.DateTimeField(
         source="entry.time_load_max", read_only=True)
 
+    unread_count = serializers.SerializerMethodField()
+
     class Meta:
         model = TripStop
         fields = [
@@ -398,8 +413,34 @@ class TripStopSerializer(serializers.ModelSerializer):
             "time_load_min",
             "time_load_max",
 
+            "unread_count",
+
             "uf",
         ]
+
+    def get_unread_count(self, obj):
+        request = self.context.get("request")
+        if not request:
+            # WS / background serialization → cannot compute per-user unread count safely
+            return None
+
+        user = request.user
+
+        group_names = getattr(user, "_group_names_cache", None)
+        if group_names is None:
+            group_names = set(user.groups.values_list("name", flat=True))
+            user._group_names_cache = group_names
+
+        if "level_driver" in group_names:
+            return TripStopMessage.objects.filter(
+                trip_stop=obj,
+                is_read_by_driver=False,
+            ).exclude(sender__groups__name="level_driver").count()
+
+        return TripStopMessage.objects.filter(
+            trip_stop=obj,
+            is_read_by_dispatcher=False,
+        ).exclude(sender__groups__name="level_dispatcher").count()
 
 
 class TripStopReorderSerializer(serializers.Serializer):
@@ -423,5 +464,33 @@ class TripStopVisibilitySerializer(serializers.ModelSerializer):
             )
 
         return attrs
+
+
+class TripStopMessageSerializer(serializers.ModelSerializer):
+    sender_name = serializers.CharField(
+        source="sender.get_full_name", read_only=True)
+    trip_stop_uf = serializers.CharField(source="trip_stop.uf", read_only=True)
+
+    class Meta:
+        model = TripStopMessage
+        fields = [
+            "uf",
+            "type",
+            "message",
+            "created_at",
+            "sender",
+            "sender_name",
+            "is_read_by_driver",
+            "is_read_by_dispatcher",
+
+            "trip_stop_uf",
+        ]
+        read_only_fields = [
+            "uf",
+            "created_at",
+            "sender",
+            "is_read_by_driver",
+            "is_read_by_dispatcher",
+        ]
 
 ###### START TRIP STOPS ######

@@ -14,7 +14,13 @@ urlpatterns = [
 
 
     path("driver/trips/<str:uf>/status/", UpdateDriverStatus.as_view()),
-    path("driver/loads/<str:uf>/confirm-loading/", ConfirmLoadingView.as_view()),
+    path("driver/trip-stops/<str:uf>/confirm-arrival/",
+         DriverConfirmArrivalView.as_view()),
+    path("driver/trip-stops/<str:uf>/start/", DriverStartStopView.as_view()),
+    path("driver/trip-stops/<str:uf>/complete/",
+         DriverCompleteStopView.as_view()),
+    path("driver/trip-stops/<str:uf>/skip/", DriverSkipStopView.as_view()),
+
     path("driver/loads/<str:uf>/upload-evidence/",
          UploadLoadEvidenceView.as_view(), name="upload-load-evidence"),
     path("load-evidences/<str:uf>/",
@@ -40,10 +46,17 @@ urlpatterns = [
     ###### START TRIP STOPS MANAGER ######
     path("trips/<str:tripUf>/stops/", trip_stops_list),
     path("trips/<str:tripUf>/stops/reorder/", trip_stops_reorder),
-    path("trip-stops/<str:stopUf>/toggle-completed/", trip_stop_toggle_completed),
+    path("trip-stops/<str:stopUf>/toggle-completed/", trip_stop_complete),
     path("trip-stops/<str:stopUf>/toggle-visibility/",
          trip_stop_toggle_visibility),
     ###### END TRIP STOPS MANAGER ######
+
+    ###### START TRIP STOP MESSAGES ######
+    path("trip-stops/<str:uf>/messages/", TripStopMessageListCreateAPIView.as_view(),
+         name="trip-stop-messages"),
+    path("trip-stops/<str:uf>/messages/read/",
+         TripStopMessageMarkReadAPIView.as_view()),
+    ###### END TRIP STOPS MESSAGES ######
 ]
 
 urlpatterns = format_suffix_patterns(urlpatterns)

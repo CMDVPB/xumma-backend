@@ -10,6 +10,7 @@ from bch.mixins.fuel_tank import FuelTankMixin
 from bch.mixins.load import LoadMixin
 from bch.mixins.trip import TripMixin
 from bch.mixins.trip_stop import TripStopMixin
+from bch.mixins.trip_stop_message import TripStopMessageMixin
 
 
 class AppConsumer(
@@ -21,6 +22,7 @@ class AppConsumer(
     IssueDocumentMixin,
     CalendarEventMixin,
     TripStopMixin,
+    TripStopMessageMixin,
     GenericAsyncAPIConsumer,
 ):
     permission_classes = [IsAuthenticated]

@@ -3,6 +3,7 @@ from django.db import models
 from django.contrib.gis.db import models as gis_models
 from django.contrib.auth import get_user_model
 from django.utils import timezone
+from django.db.models import Q, CheckConstraint
 
 import logging
 
@@ -28,6 +29,8 @@ class TripStop(models.Model):
 
     STOP_STATUS = [
         ("pending", "Pending"),
+        ("arrived", "Arrived"),
+        ("in_progress", "In Progress"),
         ("completed", "Completed"),
         ("skipped", "Skipped"),
     ]
@@ -74,8 +77,6 @@ class TripStop(models.Model):
 
     is_visible_to_driver = models.BooleanField(default=False)
 
-    is_completed = models.BooleanField(default=False)
-
     date_completed = models.DateTimeField(null=True, blank=True)
 
     class Meta:
@@ -83,21 +84,71 @@ class TripStop(models.Model):
         constraints = [
             models.UniqueConstraint(
                 fields=["company", "trip", "order"],
-                name="unique_trip_stop_order"
+                name="unique_trip_stop_order",
             )
-        ]
-        indexes = [
-            models.Index(fields=["trip", "order"]),
         ]
 
     def save(self, *args, **kwargs):
-        if self.is_completed and self.date_completed is None:
+
+        if self.status == "completed" and self.date_completed is None:
             self.date_completed = timezone.now()
 
-        if not self.is_completed:
+        if self.status != "completed":
             self.date_completed = None
 
         super().save(*args, **kwargs)
+
+    @property
+    def is_completed(self):
+        return self.status == "completed"
+
+
+class TripStopMessage(models.Model):
+    MESSAGE_TYPES = [
+        ("text", "Text"),
+        ("system", "System"),
+        ("status", "Status change"),
+        ("photo", "Photo"),
+        ("document", "Document"),
+    ]
+
+    uf = models.CharField(max_length=36, default=hex_uuid, db_index=True)
+
+    company = models.ForeignKey(
+        Company,
+        on_delete=models.CASCADE,
+        related_name="company_trip_stop_messages"
+    )
+
+    trip_stop = models.ForeignKey(
+        TripStop,
+        on_delete=models.CASCADE,
+        related_name="trip_stop_messages"
+    )
+
+    sender = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="sender_trip_stop_messages"
+    )
+
+    type = models.CharField(
+        max_length=20, choices=MESSAGE_TYPES, default="text")
+
+    message = models.TextField(blank=True, null=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    is_read_by_driver = models.BooleanField(default=False)
+    is_read_by_dispatcher = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["created_at"]
+        indexes = [
+            models.Index(fields=["trip_stop", "created_at"]),
+        ]
+
 
 ###### END TRIP STOPS ######
 

@@ -8,12 +8,13 @@ from django.db import transaction
 from django.core.exceptions import ValidationError
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404
+from django.db.models import Count, Q
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.generics import (
     ListCreateAPIView, RetrieveUpdateDestroyAPIView, ListAPIView)
 from rest_framework.parsers import MultiPartParser, FormParser
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import PermissionDenied, NotFound
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
@@ -25,10 +26,10 @@ from app.models import TypeCost
 from axx.models import Load, LoadEvidence, Trip
 from ayy.models import ItemCost, ItemForItemCost
 from driver.serializers import (
-    ActiveTripSerializer, DriverTripSerializer, DriverTripStopSerializer, DriverVehicleSerializer, ItemCostDriverSerializer, ItemForItemCostDriverSerializer, LoadEvidenceSerializer, TripStopReorderSerializer, TripStopSerializer, TripStopVisibilitySerializer, TypeCostSerializer)
-from driver.tasks import broadcast_trip_stop_visibility
+    ActiveTripSerializer, DriverLoadCacheSerializer, DriverTripSerializer, DriverTripStopSerializer, DriverVehicleSerializer, ItemCostDriverSerializer, ItemForItemCostDriverSerializer, LoadEvidenceSerializer, TripStopMessageSerializer, TripStopReorderSerializer, TripStopSerializer, TripStopVisibilitySerializer, TypeCostSerializer)
+from driver.tasks import broadcast_trip_stop_messages_read, broadcast_trip_stop_reorder, broadcast_trip_stop_visibility
 
-from .models import DriverLocation, DriverTrackPoint, TripStop
+from .models import DriverLocation, DriverTrackPoint, TripStop, TripStopMessage
 
 logger = logging.getLogger(__name__)
 
@@ -167,6 +168,101 @@ class DriverRouteAPIView(APIView):
         return Response(data)
 
 
+###### START DRIVER CONFIRMTIONS ######
+class DriverConfirmArrivalView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, uf):
+        company = get_user_company(request.user)
+
+        try:
+            stop = TripStop.objects.get(uf=uf, company=company)
+        except TripStop.DoesNotExist:
+            return Response({"detail": "Stop not found"}, status=404)
+
+        if stop.status != "pending":
+            return Response(
+                {"detail": f"Cannot confirm arrival from state '{stop.status}'"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        stop.status = "arrived"
+        stop.save()
+
+        return Response({"success": True})
+
+
+class DriverStartStopView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, uf):
+        company = get_user_company(request.user)
+
+        try:
+            stop = TripStop.objects.get(uf=uf, company=company)
+        except TripStop.DoesNotExist:
+            return Response({"detail": "Stop not found"}, status=404)
+
+        if stop.status != "arrived":
+            return Response(
+                {"detail": f"Stop must be 'arrived' (current: '{stop.status}')"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        stop.status = "in_progress"
+        stop.save()
+
+        return Response({"success": True})
+
+
+class DriverCompleteStopView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, uf):
+        company = get_user_company(request.user)
+
+        try:
+            stop = TripStop.objects.get(uf=uf, company=company)
+        except TripStop.DoesNotExist:
+            return Response({"detail": "Stop not found"}, status=404)
+
+        if stop.status != "in_progress":
+            return Response(
+                {"detail": f"Stop must be 'in_progress' (current: '{stop.status}')"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        stop.status = "completed"
+        stop.save()
+
+        return Response({"success": True})
+
+
+class DriverSkipStopView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, uf):
+        company = get_user_company(request.user)
+
+        try:
+            stop = TripStop.objects.get(uf=uf, company=company)
+        except TripStop.DoesNotExist:
+            return Response({"detail": "Stop not found"}, status=404)
+
+        if stop.status not in ["pending", "arrived"]:
+            return Response(
+                {"detail": f"Cannot skip stop from state '{stop.status}'"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        stop.status = "skipped"
+        stop.save()
+
+        return Response({"success": True})
+
+
+###### END DRIVER CONFIRMTIONS ######
+
 ###### START DRIVER LOADING ######
 class DriverCurrentTripView(APIView):
     permission_classes = [IsAuthenticated]
@@ -184,63 +280,6 @@ class DriverCurrentTripView(APIView):
             return Response({"detail": "No active trip"})
 
         return Response(DriverTripSerializer(trip).data)
-
-
-class ConfirmLoadingView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request, uf):
-        user_company = get_user_company(request.user)
-
-        try:
-            load = Load.objects.filter(
-                company=user_company).select_related("trip").get(uf=uf)
-        except Load.DoesNotExist:
-            return Response({"detail": "Load not found"}, status=404)
-
-        trip = load.trip
-
-        if not trip:
-            return Response({"detail": "Load not assigned to trip"}, status=400)
-
-        if load.driver_status != "available":
-            return Response(
-                {"detail": "Load is not available"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        order = trip.driver_load_order or []
-
-        print('2282', order)
-
-        if load.uf not in order:
-            return Response({"detail": "Load not in trip order"}, status=400)
-
-        idx = order.index(load.uf)
-
-        # 🚨 Prevent skipping
-        if idx > 0:
-            prev_load = Load.objects.get(uf=order[idx - 1])
-
-            if prev_load.driver_status != "loaded":
-                return Response(
-                    {"detail": "Previous load not completed"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-
-        # ✅ Mark loaded
-        load.driver_status = "loaded"
-        load.is_loaded = True
-        load.date_loaded = timezone.now()
-        load.save()
-
-        # ✅ Unlock next load
-        if idx + 1 < len(order):
-            next_load = Load.objects.get(uf=order[idx + 1])
-            next_load.driver_status = "available"
-            next_load.save()
-
-        return Response({"success": True})
 
 
 class UploadLoadEvidenceView(APIView):
@@ -370,15 +409,34 @@ class DriverCurrentTripView(APIView):
         stops = (
             trip.trip_stops
             .filter(is_visible_to_driver=True)
-            .order_by("order", "id")
             .select_related("load", "entry")
+            .annotate(
+                unread_count=Count(
+                    "trip_stop_messages",
+                    filter=Q(trip_stop_messages__is_read_by_driver=False)
+                    & ~Q(trip_stop_messages__sender__groups__name="level_driver"),
+                    distinct=True,
+                ),
+
+            )
+            .order_by("order", "id")
         )
 
-        print('5554', stops)
+        # print('5554', stops)
 
         # next stop = first not completed
-        next_stop = stops.filter(is_completed=False).order_by(
-            "order", "id").first()
+        next_stop = stops.exclude(status__in=["completed", "skipped"]).first()
+
+        loads = (
+            Load.objects
+            .filter(trip=trip)
+            .prefetch_related("load_evidences")
+        )
+
+        loads_cache = {
+            str(load.sn): DriverLoadCacheSerializer(load).data
+            for load in loads
+        }
 
         return Response({
             "uf": trip.uf,
@@ -389,7 +447,9 @@ class DriverCurrentTripView(APIView):
 
             "stops_version": trip.stops_version,
             "stops": DriverTripStopSerializer(stops, many=True).data,
-            "next_stop": DriverTripStopSerializer(next_stop).data if next_stop else None,
+            "next_stop": DriverTripStopSerializer(next_stop, context={}).data if next_stop else None,
+
+            "loads_cache": loads_cache,
 
             "departure_inspection_completed": trip.departure_inspection_completed,
         })
@@ -424,7 +484,7 @@ class DriverTripStopsSyncView(APIView):
             .order_by("order", "id")
             .select_related("load", "entry")
         )
-        next_stop = stops.filter(is_completed=False).order_by(
+        next_stop = stops.filter(~Q(status='completed')).order_by(
             "order", "id").first()
 
         return Response({
@@ -439,46 +499,60 @@ class DriverCompleteTripStopView(APIView):
     permission_classes = [IsAuthenticated]
 
     @transaction.atomic
-    def patch(self, request, stopUf):
+    def post(self, request, stopUf):
         user_company = get_user_company(request.user)
 
+        # lock ONLY TripStop row (no nullable joins)
         stop = get_object_or_404(
             TripStop.objects.select_for_update().select_related("trip"),
-            uf=stopUf
+            uf=stopUf,
         )
-
         trip = stop.trip
 
         # Multi-tenant + ownership
-        if trip.company != user_company or request.user not in trip.drivers.all():
+        if trip.company_id != user_company.id or not trip.drivers.filter(id=request.user.id).exists():
             return Response({"detail": "Forbidden"}, status=403)
 
-        # Optional: do not allow completing a stop dispatcher hid from driver
         if not stop.is_visible_to_driver:
             return Response({"detail": "Stop not assigned to driver"}, status=400)
 
-        if stop.is_completed:
-            return Response({"status": "ok", "is_completed": True})
+        if stop.status == "completed":
+            return Response({"status": "ok", "stop_status": stop.status, "stops_version": trip.stops_version})
 
-        stop.is_completed = True
+        if stop.status == "skipped":
+            return Response({"detail": "Cannot complete skipped stop"}, status=400)
+
+        if stop.status != "in_progress":
+            return Response({"detail": f"Invalid transition from {stop.status}"}, status=400)
+
+        # complete stop
+        stop.status = "completed"
         stop.date_completed = timezone.now()
-        stop.save(update_fields=["is_completed", "date_completed"])
+        stop.save(update_fields=["status", "date_completed"])
 
-        # bump version so driver UI refreshes (and dispatcher can see change too if using same list endpoint)
+        # bump version
         trip.stops_version += 1
         trip.save(update_fields=["stops_version"])
 
-        # Tie load status updates to stops
-        if stop.load and stop.type == "pickup":
-            stop.load.driver_status = "loaded"
-            stop.load.is_loaded = True
-            stop.load.date_loaded = timezone.now()
-            stop.load.save(
-                update_fields=["driver_status", "is_loaded", "date_loaded"])
+        # optional load side-effects (fetch separately; lock if needed)
+        if stop.load_id:
+            load = Load.objects.select_for_update().get(id=stop.load_id)
 
-        return Response({"status": "ok", "is_completed": True, "stops_version": trip.stops_version})
+            if stop.type == "pickup":
+                load.is_loaded = True
+                load.date_loaded = timezone.now()
+                load.save(update_fields=["is_loaded", "date_loaded"])
 
+            elif stop.type == "delivery":
+                load.is_unloaded = True
+                load.date_unloaded = timezone.now()
+                load.save(update_fields=["is_unloaded", "date_unloaded"])
 
+        return Response({
+            "status": "ok",
+            "stop_status": stop.status,
+            "stops_version": trip.stops_version
+        })
 ###### END DRIVER LOADING ######
 
 ###### START DRIVER COSTS DURING TRIP ######
@@ -608,7 +682,7 @@ def trip_stops_list(request, tripUf):
 
     stops_qs = stops_qs.order_by("order")
 
-    return Response(TripStopSerializer(stops_qs, many=True).data)
+    return Response(TripStopSerializer(stops_qs, many=True, context={"request": request}).data)
 
 
 @api_view(["PATCH"])
@@ -647,29 +721,53 @@ def trip_stops_reorder(request, tripUf):
 
     TripStop.objects.bulk_update(stops_map.values(), ["order"])
 
-    # ✅ Version bump (your logic preserved)
+    # Version bump (your logic preserved)
     trip = Trip.objects.select_for_update().get(uf=tripUf)
     trip.stops_version += 1
     trip.save(update_fields=["stops_version"])
+
+    # Broadcast AFTER commit-safe state
+    transaction.on_commit(
+        lambda: broadcast_trip_stop_reorder.delay(trip.uf)
+    )
 
     return Response({"status": "ok"})
 
 
 @api_view(["PATCH"])
 @transaction.atomic
-def trip_stop_toggle_completed(request, stopUf):
+def trip_stop_complete(request, stopUf):
 
-    stop = TripStop.objects.select_for_update().get(uf=stopUf)
+    stop = get_object_or_404(
+        TripStop.objects.select_for_update(),
+        uf=stopUf
+    )
 
-    stop.is_completed = not stop.is_completed
-    stop.date_completed = timezone.now() if stop.is_completed else None
-    stop.save(update_fields=["is_completed", "date_completed"])
+    if stop.status == "completed":
+        return Response({"status": "ok"})
+
+    if stop.status == "skipped":
+        return Response(
+            {"detail": "Cannot complete skipped stop"},
+            status=400
+        )
+
+    if stop.status != "in_progress":
+        return Response(
+            {"detail": f"Invalid transition from {stop.status}"},
+            status=400
+        )
+
+    stop.status = "completed"
+    stop.is_completed = True
+    stop.date_completed = timezone.now()
+    stop.save(update_fields=["status", "is_completed", "date_completed"])
 
     trip = stop.trip
     trip.stops_version += 1
     trip.save(update_fields=["stops_version"])
 
-    return Response({"status": "ok"})
+    return Response({"status": "ok", "stops_version": trip.stops_version})
 
 
 @api_view(["PATCH"])
@@ -692,12 +790,23 @@ def trip_stop_visibility(request, stopUf):
 @api_view(["PATCH"])
 @transaction.atomic
 def trip_stop_toggle_visibility(request, stopUf):
-    stop = get_object_or_404(
-        TripStop.objects.select_for_update().select_related("trip"), uf=stopUf)
 
-    # business rule: completed cannot be hidden
-    if stop.is_completed and stop.is_visible_to_driver:
-        return Response({"detail": "Completed stops cannot be hidden"}, status=400)
+    stop = get_object_or_404(
+        TripStop.objects.select_for_update().select_related("trip"),
+        uf=stopUf
+    )
+
+    if stop.status in ["arrived", "in_progress"]:
+        return Response(
+            {"detail": f"Cannot change visibility in state {stop.status}"},
+            status=400
+        )
+
+    if stop.status == "completed" and stop.is_visible_to_driver:
+        return Response(
+            {"detail": "Completed stops cannot be hidden"},
+            status=400
+        )
 
     stop.is_visible_to_driver = not stop.is_visible_to_driver
     stop.save(update_fields=["is_visible_to_driver"])
@@ -706,12 +815,99 @@ def trip_stop_toggle_visibility(request, stopUf):
     trip.stops_version += 1
     trip.save(update_fields=["stops_version"])
 
-    # BROADCAST WS EVENT VIA TASK
     broadcast_trip_stop_visibility.delay(
         trip.company_id,
         stop,
     )
 
-    return Response({"status": "ok", "is_visible_to_driver": stop.is_visible_to_driver, "stops_version": trip.stops_version})
+    return Response({
+        "status": "ok",
+        "is_visible_to_driver": stop.is_visible_to_driver,
+        "stops_version": trip.stops_version
+    })
 
 ###### END TRIP STOPS ######
+
+###### START TRIP STOP MESSAGING ######
+
+
+class TripStopMessageListCreateAPIView(ListCreateAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = TripStopMessageSerializer
+
+    def get_trip_stop(self):
+        uf = self.kwargs["uf"]
+
+        try:
+            stop = TripStop.objects.select_related(
+                "trip", "company").get(uf=uf)
+        except TripStop.DoesNotExist:
+            raise NotFound("Trip stop not found")
+
+        user_company = get_user_company(self.request.user)
+
+        if stop.company_id != user_company.id:
+            raise PermissionDenied("Invalid company")
+
+        return stop
+
+    def get_queryset(self):
+        stop = self.get_trip_stop()
+
+        return TripStopMessage.objects.filter(
+            trip_stop=stop
+        ).select_related("sender")
+
+    def perform_create(self, serializer):
+        stop = self.get_trip_stop()
+
+        serializer.save(
+            company=stop.company,
+            trip_stop=stop,
+            sender=self.request.user,
+        )
+
+
+class TripStopMessageMarkReadAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_trip_stop(self, uf):
+        try:
+            stop = TripStop.objects.select_related("company").get(uf=uf)
+        except TripStop.DoesNotExist:
+            raise NotFound("Trip stop not found")
+
+        user_company = get_user_company(self.request.user)
+
+        if stop.company_id != user_company.id:
+            raise PermissionDenied("Invalid company")
+
+        return stop
+
+    def post(self, request, uf):
+        stop = self.get_trip_stop(uf)
+
+        user = request.user
+        user_company = get_user_company(user)
+
+        # Decide which flag to update
+        if self.request.user.groups.filter(name='level_driver').exists():
+            updated = TripStopMessage.objects.filter(
+                trip_stop=stop,
+                is_read_by_driver=False,
+            ).update(is_read_by_driver=True)
+
+        else:  # other than driver
+            updated = TripStopMessage.objects.filter(
+                trip_stop=stop,
+                is_read_by_dispatcher=False,
+            ).update(is_read_by_dispatcher=True)
+
+        broadcast_trip_stop_messages_read.delay(user_company.id, stop.uf)
+
+        return Response({
+            "status": "ok",
+            "updated": updated,
+        })
+
+###### END TRIP STOP MESSAGING ######

@@ -370,26 +370,6 @@ class Load(models.Model):
     invoice_reference_date = models.ForeignKey(
         'att.ContractReferenceDate', on_delete=models.SET_NULL, blank=True, null=True, related_name='invoice_reference_date_loads')
 
-    DRIVER_STATUS = [
-        ("pending", "Pending"),
-        ("locked", "Locked"),
-
-        ("arrived_pickup", "Arrived at Pickup"),
-        ("loading", "Loading"),
-        ("loaded", "Loaded"),
-        ("departed", "Departed"),
-
-        ("arrived_delivery", "Arrived at Delivery"),
-        ("unloading", "Unloading"),
-        ("completed", "Completed"),
-    ]
-
-    driver_status = models.CharField(
-        max_length=20,
-        choices=DRIVER_STATUS,
-        default="locked"
-    )
-
     bill_to = models.ForeignKey(
         Contact, on_delete=models.RESTRICT, blank=True, null=True, related_name='bill_to_loads')
     person = models.ForeignKey(Person, on_delete=models.SET_NULL,
