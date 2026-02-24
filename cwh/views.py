@@ -2,16 +2,21 @@ import logging
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.shortcuts import get_object_or_404
-from rest_framework.generics import GenericAPIView, ListAPIView
+from rest_framework.generics import GenericAPIView, ListAPIView, RetrieveAPIView, CreateAPIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.exceptions import ValidationError, NotFound
 from rest_framework.permissions import IsAuthenticated
+from django.db.models import Count, Q, OuterRef, Subquery, DateTimeField
+from django.db.models.functions import Coalesce
+from django.shortcuts import get_object_or_404
+
 
 from abb.utils import get_user_company
 from app.models import LoadWarehouse
 from axx.models import Load, LoadMovement, Trip
-from cwh.serializers import BulkUnloadSerializer, LoadReloadSerializer, LoadUnloadSerializer, LoadWarehouseListSerializer
+from cwh.serializers import (BulkUnloadSerializer, LoadReloadSerializer, LoadUnloadSerializer, LoadWarehouseCreateSerializer,
+                             LoadWarehouseDetailSerializer, LoadWarehouseListSerializer, WarehouseLoadListSerializer)
 
 logger = logging.getLogger(__name__)
 
@@ -219,3 +224,116 @@ class LoadReloadToTripView(GenericAPIView):
             )
 
         return Response({"status": "reloaded"}, status=status.HTTP_200_OK)
+
+
+class LoadWarehouseCreateView(CreateAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = LoadWarehouseCreateSerializer
+
+    def perform_create(self, serializer):
+        company = get_user_company(self.request.user)
+        if not company:
+            raise ValidationError("User has no company.")
+        serializer.save(company=company)
+
+###### START LOADS IN THE WAREHOUSE ######
+
+
+class LoadWarehouseDetailView(RetrieveAPIView):
+    """
+    GET /api/load-warehouses/<warehouseUf>/
+    """
+    permission_classes = [IsAuthenticated]
+    serializer_class = LoadWarehouseDetailSerializer
+    lookup_field = "uf"
+    lookup_url_kwarg = "warehouseUf"
+
+    def get_queryset(self):
+        company = get_user_company(self.request.user)
+        if not company:
+            return LoadWarehouse.objects.none()
+
+        return (
+            LoadWarehouse.objects.filter(company=company)
+            .select_related("country_warehouse")
+            .annotate(
+                loads_count=Count(
+                    "warehouse_loads__id",
+                    filter=Q(warehouse_loads__location_type="warehouse"),
+                    distinct=True,
+                )
+            )
+        )
+
+
+class WarehouseLoadListView(ListAPIView):
+    """
+    GET /api/load-warehouses/<warehouseUf>/loads/
+
+    Query params (optional):
+      - q=search
+      - location_type=warehouse|trip|delivered|all   (default: warehouse)
+    """
+    permission_classes = [IsAuthenticated]
+    serializer_class = WarehouseLoadListSerializer
+
+    def get_warehouse(self):
+        company = get_user_company(self.request.user)
+        if not company:
+            raise ValidationError("User has no company.")
+
+        return get_object_or_404(
+            LoadWarehouse.objects.filter(company=company),
+            uf=self.kwargs["warehouseUf"],
+        )
+
+    def get_queryset(self):
+        company = get_user_company(self.request.user)
+        if not company:
+            return Load.objects.none()
+
+        warehouse = self.get_warehouse()
+
+        location_type = self.request.query_params.get(
+            "location_type", "warehouse")
+        q = (self.request.query_params.get("q") or "").strip()
+
+        qs = Load.objects.filter(company=company, warehouse=warehouse)
+
+        if location_type != "all":
+            qs = qs.filter(location_type=location_type)
+
+        # ✅ annotate "arrived to this warehouse" from last movement
+        last_arrived_subq = (
+            LoadMovement.objects.filter(
+                load_id=OuterRef("pk"),
+                to_location="warehouse",
+                warehouse=warehouse,
+            )
+            .order_by("-date")
+            .values("date")[:1]
+        )
+
+        qs = qs.annotate(
+            warehouse_arrived_at=Subquery(
+                last_arrived_subq, output_field=DateTimeField())
+        )
+
+        if q:
+            qs = qs.filter(
+                Q(sn__icontains=q)
+                | Q(customer_ref__icontains=q)
+                | Q(load_address__icontains=q)
+                | Q(unload_address__icontains=q)
+                | Q(bill_to__company_name__icontains=q)
+                | Q(trip__rn__icontains=q)
+                | Q(trip__trip_number__icontains=q)
+                | Q(warehouse__name_warehouse__icontains=q)
+            )
+
+        return qs.select_related("bill_to", "trip", "warehouse").order_by(
+            "-warehouse_arrived_at",
+            "-date_created",
+        )
+
+###### END LOADS IN THE WAREHOUSE ######

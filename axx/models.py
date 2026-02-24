@@ -286,7 +286,7 @@ class TripAdvancePayment(models.Model):
 
 
 class Load(models.Model):
-    ''' Load model '''
+    ''' Load/Order model '''
 
     LOCATION_TYPES = [
         ("trip", "On Trip / Vehicle"),
