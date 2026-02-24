@@ -9,7 +9,7 @@ from abb.constants import DOCUMENT_TYPES, LOAD_SIZE, DOC_LANG_CHOICES, LOAD_TYPE
 from abb.custom_exceptions import CustomApiException
 from abb.models import Currency, BodyType, ModeType, StatusType, Incoterm
 from abb.utils import assign_new_num_inv, hex_uuid, assign_new_num, image_upload_path, tripLoadsTotals, upload_to
-from app.models import CategoryGeneral, Company
+from app.models import CategoryGeneral, Company, LoadWarehouse
 from att.models import Contact, Person, RouteSheetNumber, Term, Vehicle, VehicleUnit, PaymentTerm
 
 import logging
@@ -287,6 +287,13 @@ class TripAdvancePayment(models.Model):
 
 class Load(models.Model):
     ''' Load model '''
+
+    LOCATION_TYPES = [
+        ("trip", "On Trip / Vehicle"),
+        ("warehouse", "In Warehouse"),
+        ("delivered", "Delivered"),
+    ]
+
     uf = models.CharField(max_length=36, default=hex_uuid,
                           db_index=True, unique=True)
     company = models.ForeignKey(
@@ -376,6 +383,15 @@ class Load(models.Model):
                                blank=True, null=True, related_name='person_loads')
     trip = models.ForeignKey(Trip, on_delete=models.SET_NULL,
                              blank=True, null=True, related_name='trip_loads')
+
+    location_type = models.CharField(
+        max_length=20, choices=LOCATION_TYPES, default="trip"
+    )
+
+    warehouse = models.ForeignKey(
+        LoadWarehouse, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="warehouse_loads"
+    )
 
     def save(self, *args, **kwargs):
         if self.sn == None or self.sn == '':
@@ -604,6 +620,20 @@ class LoadEvidence(models.Model):
 
     def __str__(self):
         return f"{self.load.uf} → {self.type}"
+
+
+class LoadMovement(models.Model):
+    load = models.ForeignKey(
+        Load, on_delete=models.CASCADE, related_name="load_movements")
+    from_location = models.CharField(max_length=20)
+    to_location = models.CharField(max_length=20)
+
+    trip = models.ForeignKey(
+        Trip, null=True, blank=True, on_delete=models.SET_NULL)
+    warehouse = models.ForeignKey(LoadWarehouse, null=True, blank=True,
+                                  on_delete=models.SET_NULL, related_name="warehouse_load_movements")
+
+    date = models.DateTimeField(auto_now_add=True)
 
 ###### END LOAD ######
 

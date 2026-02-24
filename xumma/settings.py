@@ -90,6 +90,7 @@ INSTALLED_APPS = [
     'bbo',
     'bch',
     'cld',
+    'cwh',
     'dff',
     'dpo',
     'driver',

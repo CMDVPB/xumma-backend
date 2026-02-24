@@ -8,10 +8,12 @@ from channels.layers import get_channel_layer
 
 
 @app.task(bind=True, max_retries=10, default_retry_delay=1)
-def broadcast_trip_stop_visibility(self, company_id, stop):
+def broadcast_trip_stop_visibility(self, company_id, stopUf):
     try:
         channel_layer = get_channel_layer()
         group_name = f"company_{company_id}"
+
+        stop = TripStop.objects.get(uf=stopUf)
 
         async_to_sync(channel_layer.group_send)(
             group_name,

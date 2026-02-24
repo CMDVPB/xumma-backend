@@ -25,6 +25,8 @@ class TripStop(models.Model):
         ("delivery", "Delivery"),
         ("parking", "Parking"),
         ("custom", "Custom"),
+        ("warehouse_in", "Warehouse Unload"),
+        ("warehouse_out", "Warehouse Reload"),
     ]
 
     STOP_STATUS = [
@@ -63,7 +65,6 @@ class TripStop(models.Model):
 
     type = models.CharField(max_length=20, choices=STOP_TYPES)
 
-    # Optional but very useful: stop status instead of boolean
     # If later want richer logic (skipped / failed / cancelled), boolean becomes limiting.
     status = models.CharField(
         max_length=20, choices=STOP_STATUS, default="pending")

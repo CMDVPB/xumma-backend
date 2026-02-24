@@ -19,7 +19,7 @@ from app.models import CategoryGeneral
 from app.serializers import UserBasicSerializer, UserSerializer
 from att.models import Contact, ContractReferenceDate, PaymentTerm, Person, Vehicle, VehicleUnit
 from att.serializers import BodyTypeSerializer, IncotermSerializer, ModeTypeSerializer, StatusTypeSerializer, VehicleSerializer
-from axx.models import Ctr, Exp, Inv, Load, LoadEvent, Tor, Trip
+from axx.models import Ctr, Exp, Inv, Load, LoadEvent, LoadMovement, Tor, Trip
 from ayy.models import CMR, CMRStockMovement
 from dff.serializers.serializers_bce import ImageUploadOutSerializer, ImageUploadUFOnlySerializer
 from dff.serializers.serializers_ctr import CtrSerializer
@@ -562,7 +562,7 @@ class LoadPatchSerializer(WritableNestedModelSerializer):
         date_unloaded = attrs.get(
             'date_unloaded', instance.date_unloaded if instance else None)
 
-        # 🔒 Business rules
+        # Business rules
         if date_loaded and date_cleared and date_cleared < date_loaded:
             raise serializers.ValidationError({
                 'date_cleared': 'date_cleared cannot be before date_loaded.'
@@ -587,14 +587,14 @@ class LoadPatchSerializer(WritableNestedModelSerializer):
         if validated_data.get("date_unloaded") is not None:
             validated_data["is_unloaded"] = True
 
-        # 🔹 extract event flags
+        # extract event flags
         event_type = None
         for flag, mapped_event in LOAD_EVENT_FLAG_MAP.items():
             if validated_data.pop(flag, False) is True:
                 event_type = mapped_event
                 break  # ✅ exactly ONE event per request
 
-        # 🔹 auto-date logic (unchanged)
+        # auto-date logic (unchanged)
         for flag_field, date_field in self.AUTO_DATE_FIELDS.items():
             if (
                 validated_data.get(flag_field) is True
@@ -610,7 +610,7 @@ class LoadPatchSerializer(WritableNestedModelSerializer):
 
         relations, reverse_relations = self._extract_relations(validated_data)
 
-        print('5608', event_type)
+        # print('5608', event_type)
 
         with transaction.atomic():
             instance = super(NestedUpdateMixin, self).update(
@@ -622,6 +622,45 @@ class LoadPatchSerializer(WritableNestedModelSerializer):
                 instance, reverse_relations)
             self.delete_reverse_relations_if_need(instance, reverse_relations)
 
+            # LOCATION TRANSITION LOGIC
+
+            if instance.is_unloaded and instance.location_type != "delivered":
+
+                previous_location = instance.location_type
+                previous_warehouse = instance.warehouse
+                previous_trip = instance.trip
+
+                instance.location_type = "delivered"
+                instance.warehouse = None
+                instance.save(update_fields=["location_type", "warehouse"])
+
+                LoadMovement.objects.create(
+                    load=instance,
+                    from_location=previous_location,
+                    to_location="delivered",
+                    trip=previous_trip,
+                    warehouse=previous_warehouse,
+                )
+
+            elif (
+                validated_data.get("is_unloaded") is False
+                and instance.location_type == "delivered"
+            ):
+
+                previous_location = instance.location_type
+
+                instance.location_type = "trip"
+                instance.save(update_fields=["location_type"])
+
+                LoadMovement.objects.create(
+                    load=instance,
+                    from_location=previous_location,
+                    to_location="trip",
+                    trip=instance.trip,
+                    warehouse=None,
+                )
+
+            # LOAD EVENT LOGIC
             # create OR delete LoadEvent (retry-safe)
             if event_type:
                 event = (
@@ -694,6 +733,8 @@ class LoadListForTripSerializer(UniqueFieldsMixin, WritableNestedModelSerializer
     load_comments = CommentSerializer(many=True)
     load_events = LoadEventOutSerializer(many=True)
 
+    warehouse = serializers.SerializerMethodField()
+
     class Meta:
         model = Load
         fields = ('sn', 'customer_ref', 'customer_notes', 'load_detail', 'load_size', 'freight_price', 'load_add_ons', 'uf',
@@ -702,8 +743,19 @@ class LoadListForTripSerializer(UniqueFieldsMixin, WritableNestedModelSerializer
                   'load_address', 'unload_address', 'hb', 'mb', 'booking_number', 'comment1',
                   'bill_to', 'mode', 'bt',
                   'load_comments', 'entry_loads', 'load_iteminvs', 'load_events',
+
+                  "warehouse",
                   )
         read_only_fields = ['load_events']
+
+    def get_warehouse(self, obj):
+        if not obj.warehouse:
+            return None
+        return {
+            "id": obj.warehouse.id,
+            "uf": obj.warehouse.uf,
+            "name_warehouse": obj.warehouse.name_warehouse,
+        }
 
 
 class IssueInvoiceSerializer(serializers.Serializer):

@@ -1,5 +1,5 @@
 from django.contrib.auth.models import Group
-from rest_framework import permissions
+from rest_framework.permissions import BasePermission
 
 from abb.utils import get_company_manager, get_user_company, get_is_company_subscription_active, get_company_users
 
@@ -7,7 +7,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class IsManager(permissions.BasePermission):
+class IsManager(BasePermission):
     """
     Custom permission to only allow only Managers to perform an action.
     """
@@ -17,7 +17,7 @@ class IsManager(permissions.BasePermission):
         return request.user and request.user.groups.filter(name='level_manager').exists()
 
 
-class isTeamLeader(permissions.BasePermission):
+class isTeamLeader(BasePermission):
 
     def has_team_leader_permission(self, request, view, obj):
         if request.user.is_team_leader:
@@ -25,7 +25,7 @@ class isTeamLeader(permissions.BasePermission):
         return False
 
 
-class AddNewUserPermission(permissions.BasePermission):
+class AddNewUserPermission(BasePermission):
 
     def has_permission(self, request, view):
         level_group_name = 'level_manager'
@@ -44,7 +44,7 @@ class AddNewUserPermission(permissions.BasePermission):
             return False
 
 
-class HasGroupPermission(permissions.BasePermission):
+class HasGroupPermission(BasePermission):
     """
     Ensure user is in required groups.
     """
@@ -85,7 +85,7 @@ class HasGroupPermission(permissions.BasePermission):
             return None
 
 
-class IsSubscriptionActiveOrReadOnly(permissions.BasePermission):
+class IsSubscriptionActiveOrReadOnly(BasePermission):
     message = "Your subscription has expired."
 
     def has_object_permission(self, request, view, obj):
@@ -126,7 +126,7 @@ class IsSubscriptionActiveOrReadOnly(permissions.BasePermission):
             return False
 
 
-class AssignedUserOrManagerOrReadOnly(permissions.BasePermission):
+class AssignedUserOrManagerOrReadOnly(BasePermission):
 
     def has_object_permission(self, request, view, obj):
         level_group_name = 'level_manager'
@@ -150,7 +150,7 @@ class AssignedUserOrManagerOrReadOnly(permissions.BasePermission):
             return False
 
 
-class AssignedUserManagerOrReadOnlyIfLocked(permissions.BasePermission):
+class AssignedUserManagerOrReadOnlyIfLocked(BasePermission):
 
     def has_object_permission(self, request, view, obj):
         level_group_name = 'level_manager'
@@ -163,7 +163,7 @@ class AssignedUserManagerOrReadOnlyIfLocked(permissions.BasePermission):
 
             if (not obj.is_locked) or (obj.assigned_user == request.user) or \
                     (obj.is_locked and request.method in permissions.SAFE_METHODS) or (obj.is_locked and obj.assigned_user is None) or \
-                (obj.assigned_user in company_users and request.user.groups.filter(name__exact=level_group_name).exists() ):
+            (obj.assigned_user in company_users and request.user.groups.filter(name__exact=level_group_name).exists() ):
                 # print('5810')
                 return True
 
@@ -172,3 +172,19 @@ class AssignedUserManagerOrReadOnlyIfLocked(permissions.BasePermission):
             logger.error(
                 f'EP573 AssignedUserManagerOrReadOnlyIfLocked, error: {e}')
             return False
+
+
+class NotDriverPermission(BasePermission):
+    """
+    Blocks users belonging to the `level_driver` group.
+    """
+
+    message = "Drivers are not allowed to perform this action."
+
+    def has_permission(self, request, view):
+        user = request.user
+
+        if not user or not user.is_authenticated:
+            return False
+
+        return not user.groups.filter(name="level_driver").exists()

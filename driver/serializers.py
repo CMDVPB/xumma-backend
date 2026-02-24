@@ -405,8 +405,8 @@ class TripStopSerializer(serializers.ModelSerializer):
             "lat",
             "lon",
             "is_visible_to_driver",
-            "is_completed",
             "date_completed",
+            "status",
 
             # derived helpers
             "load_sn",

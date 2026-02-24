@@ -15,11 +15,12 @@ from rest_framework.generics import (
     ListCreateAPIView, RetrieveUpdateDestroyAPIView, ListAPIView)
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.exceptions import PermissionDenied, NotFound
-from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.decorators import api_view, permission_classes
 
 
+from abb.permissions import NotDriverPermission
 from abb.policies import ItemCostPolicy, ItemForItemCostPolicy, PolicyFilteredQuerysetMixin, TypeCostPolicy
 from abb.utils import get_user_company, hex_uuid
 from app.models import TypeCost
@@ -628,7 +629,7 @@ class TypeCostDriverList(PolicyFilteredQuerysetMixin, ListAPIView):
 ###### START TRIP STOPS ######
 
 
-def generate_trip_stops(trip):
+def _generate_trip_stops(trip):
 
     loads = trip.trip_loads.all()
     order = 1
@@ -669,6 +670,7 @@ def generate_trip_stops(trip):
 
 
 @api_view(["GET"])
+@permission_classes([IsAuthenticated, NotDriverPermission])
 @transaction.atomic
 def trip_stops_list(request, tripUf):
 
@@ -677,7 +679,7 @@ def trip_stops_list(request, tripUf):
     stops_qs = TripStop.objects.filter(trip=trip)
 
     if not stops_qs.exists():
-        generate_trip_stops(trip)
+        _generate_trip_stops(trip)
         stops_qs = TripStop.objects.filter(trip=trip)
 
     stops_qs = stops_qs.order_by("order")
@@ -686,6 +688,7 @@ def trip_stops_list(request, tripUf):
 
 
 @api_view(["PATCH"])
+@permission_classes([IsAuthenticated, NotDriverPermission])
 @transaction.atomic
 def trip_stops_reorder(request, tripUf):
 
@@ -735,8 +738,17 @@ def trip_stops_reorder(request, tripUf):
 
 
 @api_view(["PATCH"])
+@permission_classes([IsAuthenticated, NotDriverPermission])
 @transaction.atomic
 def trip_stop_complete(request, stopUf):
+
+    user = request.user
+
+    if user.groups.filter(name="level_driver").exists():
+        return Response(
+            {"detail": "Drivers cannot use this endpoint"},
+            status=status.HTTP_403_FORBIDDEN
+        )
 
     stop = get_object_or_404(
         TripStop.objects.select_for_update(),
@@ -744,6 +756,14 @@ def trip_stop_complete(request, stopUf):
     )
 
     if stop.status == "completed":
+        stop.status = "pending"
+        stop.date_completed = None
+        stop.save(update_fields=["status", "date_completed"])
+
+        trip = stop.trip
+        trip.stops_version += 1
+        trip.save(update_fields=["stops_version"])
+
         return Response({"status": "ok"})
 
     if stop.status == "skipped":
@@ -752,16 +772,9 @@ def trip_stop_complete(request, stopUf):
             status=400
         )
 
-    if stop.status != "in_progress":
-        return Response(
-            {"detail": f"Invalid transition from {stop.status}"},
-            status=400
-        )
-
     stop.status = "completed"
-    stop.is_completed = True
     stop.date_completed = timezone.now()
-    stop.save(update_fields=["status", "is_completed", "date_completed"])
+    stop.save(update_fields=["status", "date_completed"])
 
     trip = stop.trip
     trip.stops_version += 1
@@ -771,6 +784,7 @@ def trip_stop_complete(request, stopUf):
 
 
 @api_view(["PATCH"])
+@permission_classes([IsAuthenticated, NotDriverPermission])
 def trip_stop_visibility(request, stopUf):
 
     stop = TripStop.objects.get(uf=stopUf)
@@ -788,8 +802,9 @@ def trip_stop_visibility(request, stopUf):
 
 
 @api_view(["PATCH"])
+@permission_classes([IsAuthenticated, NotDriverPermission])
 @transaction.atomic
-def trip_stop_toggle_visibility(request, stopUf):
+def trip_stop_toggle_visibility_by_dispatcher(request, stopUf):
 
     stop = get_object_or_404(
         TripStop.objects.select_for_update().select_related("trip"),
@@ -797,10 +812,8 @@ def trip_stop_toggle_visibility(request, stopUf):
     )
 
     if stop.status in ["arrived", "in_progress"]:
-        return Response(
-            {"detail": f"Cannot change visibility in state {stop.status}"},
-            status=400
-        )
+        stop.status = "pending"
+        stop.save(update_fields=["status", "date_completed"])
 
     if stop.status == "completed" and stop.is_visible_to_driver:
         return Response(
@@ -817,7 +830,7 @@ def trip_stop_toggle_visibility(request, stopUf):
 
     broadcast_trip_stop_visibility.delay(
         trip.company_id,
-        stop,
+        stop.uf,
     )
 
     return Response({

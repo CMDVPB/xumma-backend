@@ -5,8 +5,8 @@ from axx.models import Inv, Load, LoadDocument, LoadEvent, LoadEvidence, LoadInv
 
 @admin.register(Load)
 class LoadAdmin(admin.ModelAdmin):
-    list_display = ('id', 'company', 'sn', 'is_loaded',
-                    'is_cleared', 'is_unloaded', 'is_invoiced')
+    list_display = ('id', 'company', 'sn', 'is_loaded', 'is_cleared', 'is_unloaded', 'is_invoiced', 'location_type', 'warehouse',
+                    )
 
 
 @admin.register(LoadInv)

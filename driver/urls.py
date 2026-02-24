@@ -26,8 +26,7 @@ urlpatterns = [
     path("load-evidences/<str:uf>/",
          LoadEvidenceProxyView.as_view(), name="load-evidence-proxy"),
     path("load-evidences/<str:uf>/delete/", LoadEvidenceDeleteView.as_view(),
-         name="delete-load-evidence",
-         ),
+         name="delete-load-evidence"),
 
     path("driver/trips/current/", DriverCurrentTripView.as_view()),
     path("driver/trips/<str:tripUf>/stops/sync/",
@@ -48,7 +47,7 @@ urlpatterns = [
     path("trips/<str:tripUf>/stops/reorder/", trip_stops_reorder),
     path("trip-stops/<str:stopUf>/toggle-completed/", trip_stop_complete),
     path("trip-stops/<str:stopUf>/toggle-visibility/",
-         trip_stop_toggle_visibility),
+         trip_stop_toggle_visibility_by_dispatcher),
     ###### END TRIP STOPS MANAGER ######
 
     ###### START TRIP STOP MESSAGES ######

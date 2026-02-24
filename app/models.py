@@ -333,13 +333,13 @@ class Team(models.Model):
     team_name = models.CharField(max_length=100)
 
 
-class Warehouse(models.Model):
+class LoadWarehouse(models.Model):
     uf = models.CharField(max_length=36, default=hex_uuid, unique=True)
     company = models.ForeignKey(
         Company, on_delete=models.CASCADE, related_name="company_warehouses")
 
     name_warehouse = models.CharField(max_length=255)
-    address_warehouse = models.TextField(blank=True, null=True)
+    address_warehouse = models.CharField(blank=True, null=True)
     city_warehouse = models.CharField(max_length=100, blank=True, null=True)
     zip_code_warehouse = models.CharField(max_length=20, blank=True, null=True)
     country_warehouse = models.ForeignKey(

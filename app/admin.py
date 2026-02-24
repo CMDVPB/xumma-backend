@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import CategoryGeneral, Company, CompanySettings, TypeCost, TypeGeneral, User, DocumentSeries, Membership, Subscription, SMTPSettings, UserProfile, UserSettings
+from .models import CategoryGeneral, Company, CompanySettings, LoadWarehouse, TypeCost, TypeGeneral, User, DocumentSeries, Membership, Subscription, SMTPSettings, UserProfile, UserSettings
 from .admin_utils import DocumentSeriesNumberRangeFilter
 
 
@@ -149,3 +149,10 @@ class TypeCostAdmin(admin.ModelAdmin):
 
     list_display = ('id', 'company', 'serial_number',
                     'code', 'label', 'is_system')
+
+
+@admin.register(LoadWarehouse)
+class LoadWarehouseAdmin(admin.ModelAdmin):
+
+    list_display = ('id', 'company', 'name_warehouse', "country_warehouse", 'is_active', 'uf',
+                    )
