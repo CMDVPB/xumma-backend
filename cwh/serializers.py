@@ -49,6 +49,11 @@ class LoadReloadSerializer(serializers.Serializer):
 
 
 class LoadWarehouseCreateSerializer(serializers.ModelSerializer):
+    country_warehouse = serializers.SlugRelatedField(
+        queryset=Country.objects.all(),
+        slug_field="label"
+    )
+
     class Meta:
         model = LoadWarehouse
         fields = [
@@ -59,6 +64,7 @@ class LoadWarehouseCreateSerializer(serializers.ModelSerializer):
             "country_warehouse",
             "is_active",
         ]
+
 ###### START LOADS IN THE WAREHOUSE ######
 
 
@@ -93,7 +99,7 @@ class LoadWarehouseListSerializer(serializers.ModelSerializer):
         return {
             "id": obj.country_warehouse.id,
             "uf": getattr(obj.country_warehouse, "uf", None),
-            "code": getattr(obj.country_warehouse, "value", None),
+            "value": getattr(obj.country_warehouse, "value", None),
             "label": getattr(obj.country_warehouse, "label", None),
         }
 
@@ -103,12 +109,12 @@ class LoadWarehouseDetailSerializer(LoadWarehouseListSerializer):
     pass
 
 
-class PartnerMiniSerializer(serializers.Serializer):
-    # matches your frontend usage: bill_to.company_name + status dot usage
-    uf = serializers.CharField(required=False)
-    company_name = serializers.CharField(required=False, allow_null=True)
-    status = serializers.JSONField(
-        required=False, allow_null=True)  # keep flexible
+# class PartnerMiniSerializer(serializers.Serializer):
+#     # matches your frontend usage: bill_to.company_name + status dot usage
+#     uf = serializers.CharField(required=False)
+#     company_name = serializers.CharField(required=False, allow_null=True)
+#     status = serializers.CharField(
+#         source="status.name", required=False, allow_null=True)
 
 
 class TripMiniSerializer(serializers.Serializer):
@@ -146,13 +152,16 @@ class WarehouseLoadListSerializer(serializers.ModelSerializer):
         ]
 
     def get_bill_to(self, obj):
-        bt = getattr(obj, "bill_to", None)
+        bt = obj.bill_to
         if not bt:
             return None
+
+        status = bt.status
+
         return {
-            "uf": getattr(bt, "uf", None),
-            "company_name": getattr(bt, "company_name", None),
-            "status": getattr(bt, "status", None),
+            "uf": bt.uf,
+            "company_name": bt.company_name,
+            "status": status.name if status else None,
         }
 
     def get_trip(self, obj):

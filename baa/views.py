@@ -177,14 +177,14 @@ class VehicleChecklistTemplateAPIView(ListAPIView):
 
 
 class VehicleChecklistDetailAPIView(RetrieveAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = VehicleChecklistSerializer
     queryset = VehicleChecklist.objects.select_related(
         "vehicle", "driver"
     ).prefetch_related(
         "checklist_answers__item",
         "checklist_answers__answer_photos"
     )
-    serializer_class = VehicleChecklistSerializer
-    permission_classes = [IsAuthenticated]
 
 
 class VehicleEquipmentListCreateAPIView(ListCreateAPIView):

@@ -7,6 +7,12 @@ urlpatterns = [
 
     path("load-warehouses/", LoadWarehouseListView.as_view(),
          name="load-warehouse-list"),
+    path("load-warehouses/create/", LoadWarehouseCreateView.as_view(),
+         name="load-warehouse-create"),
+    path("load-warehouses/<str:warehouseUf>/",
+         LoadWarehouseDetailView.as_view(), name="load-warehouse-detail"),
+    path("load-warehouses/<str:warehouseUf>/loads/",
+         WarehouseLoadListView.as_view(), name="load-warehouse-loads"),
 
     path("loads/<str:load_uf>/unload-to-warehouse/", LoadUnloadToWarehouseView.as_view(),
          name="load-unload-to-warehouse"),
@@ -16,12 +22,6 @@ urlpatterns = [
          name="load-reload-to-trip"),
 
 
-    path("load-warehouses/", LoadWarehouseListView.as_view(),
-         name="load-warehouse-list"),
-    path("load-warehouses/<str:warehouseUf>/",
-         LoadWarehouseDetailView.as_view(), name="load-warehouse-detail"),
-    path("load-warehouses/<str:warehouseUf>/loads/",
-         WarehouseLoadListView.as_view(), name="load-warehouse-loads"),
 
 
 ]

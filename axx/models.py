@@ -390,7 +390,9 @@ class Load(models.Model):
 
     warehouse = models.ForeignKey(
         LoadWarehouse, on_delete=models.SET_NULL,
-        null=True, blank=True, related_name="warehouse_loads"
+        null=True, blank=True,
+        db_index=True,
+        related_name="warehouse_loads"
     )
 
     def save(self, *args, **kwargs):

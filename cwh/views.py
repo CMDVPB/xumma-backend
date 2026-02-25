@@ -34,13 +34,17 @@ class LoadWarehouseListView(ListAPIView):
         if not user_company:
             return LoadWarehouse.objects.none()
 
-        qs = LoadWarehouse.objects.filter(company=user_company)
+        qs = LoadWarehouse.objects.filter(company=user_company).annotate(
+            loads_count=Count("warehouse_loads")
+        )
 
         active = self.request.query_params.get("active", "1")
         if active in ("1", "true", "True", "yes"):
             qs = qs.filter(is_active=True)
 
-        return qs.select_related("country_warehouse").order_by("name_warehouse")
+        qs = qs.select_related("country_warehouse")
+
+        return qs.order_by("name_warehouse")
 
 
 class LoadUnloadToWarehouseView(GenericAPIView):
@@ -303,7 +307,7 @@ class WarehouseLoadListView(ListAPIView):
         if location_type != "all":
             qs = qs.filter(location_type=location_type)
 
-        # ✅ annotate "arrived to this warehouse" from last movement
+        # annotate "arrived to this warehouse" from last movement
         last_arrived_subq = (
             LoadMovement.objects.filter(
                 load_id=OuterRef("pk"),
