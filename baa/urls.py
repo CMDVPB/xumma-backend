@@ -18,6 +18,11 @@ urlpatterns = [
          name="vehicle-checklist-start",
          ),
 
+    path("vehicles/<str:vehicle_uf>/checklists/active/",
+         ActiveVehicleChecklistAPIView.as_view(),
+         name="vehicle-checklist-active",
+         ),
+
     path("checklists/<int:pk>/", VehicleChecklistDetailAPIView.as_view(),
          name="vehicle-checklist-detail",
          ),

@@ -112,6 +112,42 @@ class StartVehicleChecklistAPIView(APIView):
         )
 
 
+class ActiveVehicleChecklistAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, vehicle_uf):
+        user_company = get_user_company(request.user)
+
+        trip = Trip.objects.filter(
+            drivers=request.user,
+            date_end__isnull=True
+        ).first()
+
+        checklist = (
+            VehicleChecklist.objects
+            .select_related("driver", "trip", "vehicle")
+            .filter(
+                vehicle__uf=vehicle_uf,
+                trip=trip,
+                company=user_company,
+                is_completed=False,
+            )
+            .order_by("-started_at")
+            .first()
+        )
+
+        if not checklist:
+            return Response({"active": False})
+
+        return Response({
+            "active": True,
+            "checklist": VehicleChecklistSerializer(
+                checklist,
+                context={"request": request}
+            ).data
+        })
+
+
 class VehicleChecklistAnswerAPIView(UpdateAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = VehicleChecklistAnswerSerializer
