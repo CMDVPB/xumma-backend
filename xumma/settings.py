@@ -89,6 +89,7 @@ INSTALLED_APPS = [
     'bab',
     'bbo',
     'bch',
+    'broker',
     'cld',
     'cwh',
     'dff',
