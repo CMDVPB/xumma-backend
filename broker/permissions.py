@@ -1,9 +1,9 @@
 from rest_framework.permissions import BasePermission, SAFE_METHODS
 
+from abb.utils import get_user_company
 from broker.helpers import get_user_role_in_point
 from broker.models import Role
 from broker.visibility import visible_points_for_user
-
 
 
 class JobAccessPermission(BasePermission):
@@ -18,7 +18,8 @@ class JobAccessPermission(BasePermission):
 
     def has_object_permission(self, request, view, obj):
         user = request.user
-        company = request.company
+
+        company = get_user_company(user)
 
         # Admin full control
         if user.groups.filter(name__in=["level_admin", "level_manager"]).exists():
@@ -49,3 +50,11 @@ class JobAccessPermission(BasePermission):
             return obj.assigned_to_id == user.id
 
         return False
+    
+
+
+class IsAdminOrManager(BasePermission):
+    def has_permission(self, request, view):
+        return request.user.groups.filter(
+            name__in=["level_admin", "level_manager"]
+        ).exists()

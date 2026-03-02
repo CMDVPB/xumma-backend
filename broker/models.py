@@ -86,10 +86,11 @@ class Job(models.Model):
         null=True, blank=True, related_name="assigned_to_broker_jobs"
     )
 
-    ref = models.CharField(max_length=50, db_index=True)  # internal reference
-    status = models.CharField(max_length=30, default="new", db_index=True)
-
     created_at = models.DateTimeField(auto_now_add=True)
+    comments = models.CharField(blank=True, null=True)
+
+    ref = models.CharField(max_length=50, blank=True, null=True, db_index=True)
+    status = models.CharField(max_length=30, default="new", blank=True, null=True, db_index=True)
 
     class Meta:
         indexes = [
@@ -108,6 +109,7 @@ class ServiceType(models.Model):
     name = models.CharField(max_length=120)
 
     default_price = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    vat_percent = models.DecimalField(max_digits=5, decimal_places=2, default=0)
 
     class Meta:
         unique_together = [("company", "code")]
@@ -129,3 +131,36 @@ class CustomerServicePrice(models.Model):
         constraints = [
             models.UniqueConstraint(fields=["company", "customer", "service_type"], name="uniq_customer_service_price"),            
         ]
+
+
+class JobLine(models.Model):
+    uf = models.CharField(max_length=36, db_index=True, default=hex_uuid, unique=True)
+
+    job = models.ForeignKey(
+        Job,
+        on_delete=models.CASCADE,
+        related_name="job_lines"
+    )
+
+    service_type = models.ForeignKey(
+        ServiceType,
+        on_delete=models.PROTECT,
+        related_name="service_type_job_lines"
+    )
+
+    quantity = models.DecimalField(max_digits=12, decimal_places=2)
+
+    unit_price_net = models.DecimalField(max_digits=12, decimal_places=2)
+    vat_percent = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+
+    @property
+    def total_net(self):
+        return self.quantity * self.unit_price_net
+
+    @property
+    def total_vat(self):
+        return self.total_net * self.vat_percent / 100
+
+    @property
+    def total_gross(self):
+        return self.total_net + self.total_vat
