@@ -19,7 +19,7 @@ from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from djoser.social.views import ProviderAuthView
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.response import Response
-from rest_framework import status
+
 
 import logging
 

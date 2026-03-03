@@ -24,7 +24,7 @@ class JobVisibilityQuerysetMixin:
 
         company = get_user_company(self.request.user)
 
-        if user.groups.filter(name="level_admin").exists():
+        if user.groups.filter(name__in=["level_admin", "level_manager"]).exists():
             return queryset
 
         allowed_points = visible_points_for_user(user, company)

@@ -121,10 +121,12 @@ class ServiceType(models.Model):
 class CustomerServicePrice(models.Model):
     uf = models.CharField(max_length=36, db_index=True, default=hex_uuid, unique=True)
     company = models.ForeignKey("app.Company", on_delete=models.CASCADE, related_name="company_customer_service_prices")
-    customer = models.ForeignKey("att.Contact", on_delete=models.CASCADE, related_name="customer_service_prices")
-    service_type = models.ForeignKey(ServiceType, on_delete=models.CASCADE, related_name="service_type_customer_prices")
 
+    customer = models.ForeignKey("att.Contact", on_delete=models.CASCADE, related_name="customer_service_prices")
+
+    service_type = models.ForeignKey(ServiceType, on_delete=models.CASCADE, related_name="service_type_customer_prices")
     price = models.DecimalField(max_digits=12, decimal_places=2)
+    
     is_active = models.BooleanField(default=True)
 
     class Meta:
@@ -152,6 +154,8 @@ class JobLine(models.Model):
 
     unit_price_net = models.DecimalField(max_digits=12, decimal_places=2)
     vat_percent = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+
+    description = models.CharField(max_length=100, blank=True, null=True)
 
     @property
     def total_net(self):

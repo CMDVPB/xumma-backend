@@ -18,6 +18,16 @@ urlpatterns = [
     
     path("broker/customer-prices/", CustomerServicePriceListCreateView.as_view()),    
 
+
+    path("broker/reports/overview/", BrokerReportsOverviewAPIView.as_view()),
+    path("broker/reports/employee-performance/", BrokerEmployeePerformanceAPIView.as_view()),
+    path("broker/reports/service-price-trends/", BrokerServicePriceTrendsAPIView.as_view()),
+
+    path("broker/pricing/customers/", BrokerSpecialPricingCustomersListAPIView.as_view()),
+    path("broker/partners/<str:partner_uf>/pricing/", BrokerPartnerPricingAPIView.as_view()),
+    path("broker/special-pricing/<int:pk>/", BrokerSpecialPricingDeleteAPIView.as_view()),
+
+
 ]
 
 urlpatterns = format_suffix_patterns(urlpatterns)
