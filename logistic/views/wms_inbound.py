@@ -5,17 +5,23 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework import status
 
+from abb.permissions import IsCompanyUserNotContactUser
 from abb.utils import get_user_company
 from logistic.models import WHInbound
-from logistic.serializers.wms_inbound import WHInboundSerializer
-
+from logistic.serializers.wms_inbound import (WHInboundDetailSerializer, 
+                                              WHInboundSerializer)
 
 
 class WHInboundViewSet(ModelViewSet):
 
-    serializer_class = WHInboundSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]    
     lookup_field = "uf"
+
+    def get_serializer_class(self):
+        print('2588', self.action)
+        if self.action == "retrieve":
+            return WHInboundDetailSerializer
+        return WHInboundSerializer
 
     def get_queryset(self):
         user_company = get_user_company(self.request.user)
@@ -23,6 +29,7 @@ class WHInboundViewSet(ModelViewSet):
             WHInbound.objects
             .filter(company=user_company)
             .select_related("owner")
+            .prefetch_related("inbound_lines")
             .order_by("-created_at")
         )
 
@@ -33,11 +40,13 @@ class WHInboundViewSet(ModelViewSet):
             created_by=self.request.user
         )
 
-    # ----------------------------
-    # RECEIVE INBOUND
-    # ----------------------------
-
-    @action(detail=True, methods=["post"])
+    
+    # RECEIVE INBOUND   
+    @action(
+        detail=True, 
+        methods=["post"], 
+        permission_classes=[IsAuthenticated, IsCompanyUserNotContactUser],
+    )
     def receive(self, request, uf=None):
 
         inbound = self.get_object()

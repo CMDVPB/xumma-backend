@@ -188,3 +188,8 @@ class NotDriverPermission(BasePermission):
             return False
 
         return not user.groups.filter(name="level_driver").exists()
+
+
+class IsCompanyUserNotContactUser(BasePermission):
+    def has_permission(self, request, view):
+        return not hasattr(request.user, "contact")

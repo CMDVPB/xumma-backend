@@ -3,6 +3,7 @@ from rest_framework.urlpatterns import format_suffix_patterns
 
 from rest_framework.routers import DefaultRouter
 
+from logistic.views.wms_billing import WHBillingInvoiceViewSet, WHBillingPeriodViewSet
 from logistic.views.wms_inbound import WHInboundViewSet
 from logistic.views.wms_location import WHLocationViewSet
 from logistic.views.wms_outbound import WHOutboundViewSet
@@ -20,6 +21,8 @@ router.register(r"outbound", WHOutboundViewSet, basename="wms-outbound")
 router.register(r"products", WHProductViewSet, basename="wms-products")
 router.register(r"stock", WHStockViewSet, basename="wms-stock")
 router.register(r"tariffs", WHTariffViewSet, basename="wms-tariffs")
+router.register(r"billing-periods", WHBillingPeriodViewSet, basename="wms-billing-periods")
+router.register(r"billing-invoices", WHBillingInvoiceViewSet, basename="wms-billing-invoices")
 
 
 urlpatterns = router.urls
