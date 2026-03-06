@@ -14,6 +14,7 @@ class WHStockSerializer(serializers.ModelSerializer):
     )
 
     location = serializers.CharField(source="location.uf", read_only=True)
+    location_name = serializers.CharField(source="location.name", read_only=True)
     location_code = serializers.CharField(source="location.code", read_only=True)
 
     class Meta:
@@ -25,6 +26,13 @@ class WHStockSerializer(serializers.ModelSerializer):
             "owner",
             "owner_name",
             "location",
+            "location_name",
             "location_code",
             "quantity",
+            "pallets",
+            "area_m2",
+            "volume_m3",
         ]
+
+        
+

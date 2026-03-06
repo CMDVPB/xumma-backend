@@ -19,6 +19,7 @@ class WHStorageBillingMode(models.TextChoices):
     M2 = "m2"
     VOLUME = "volume"
 
+
 class WHPortalAccount(models.Model):
     """
     Login for a Contact employee (Person) to use the client portal.
@@ -114,6 +115,10 @@ class WHStock(models.Model):
     location = models.ForeignKey("WHLocation", on_delete=models.PROTECT, related_name="location_stock_rows")
 
     quantity = models.DecimalField(max_digits=18, decimal_places=3, default=0)
+    pallets = models.DecimalField(max_digits=18, decimal_places=3, default=0)
+    area_m2 = models.DecimalField(max_digits=18, decimal_places=3, default=0)
+    volume_m3 = models.DecimalField(max_digits=18, decimal_places=3, default=0)
+
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -139,14 +144,21 @@ class WHStockLedger(models.Model):
         INBOUND = "inbound", "Inbound"
         OUTBOUND = "outbound", "Outbound"
         ADJUSTMENT = "adjustment", "Adjustment"
+        TRANSFER = "transfer", "Transfer"
 
     uf = models.CharField(max_length=36, default=hex_uuid, db_index=True, unique=True)
     company = models.ForeignKey("app.Company", on_delete=models.CASCADE, related_name="company_wh_stock_ledger")
 
+    owner = models.ForeignKey("att.Contact",  on_delete=models.CASCADE)
+
     product = models.ForeignKey("WHProduct", on_delete=models.CASCADE, related_name="product_ledger_rows")
     location = models.ForeignKey("WHLocation", on_delete=models.PROTECT, related_name="location_ledger_rows")
 
-    delta = models.DecimalField(max_digits=18, decimal_places=3)  # +in / -out
+    delta_quantity = models.DecimalField(max_digits=18, decimal_places=3, default=0)
+    delta_pallets = models.DecimalField(max_digits=18, decimal_places=3, default=0)
+    delta_area_m2 = models.DecimalField(max_digits=18, decimal_places=3, default=0)
+    delta_volume_m3 = models.DecimalField(max_digits=18, decimal_places=3, default=0)
+    
     source_type = models.CharField(max_length=20, choices=SourceType.choices)
     source_uf = models.CharField(max_length=36, db_index=True)  # inbound.uf / outbound.uf / adjustment.uf
 
@@ -161,14 +173,35 @@ class WHStockLedger(models.Model):
 
     note = models.CharField(max_length=250, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    is_reversed = models.BooleanField(default=False)
+
+    movement_direction = models.CharField(
+                                max_length=10,
+                                choices=[
+                                    ("in", "Inbound"),
+                                    ("out", "Outbound"),        
+                                ],
+                                blank=True,
+                                null=True
+
+                            )
 
     class Meta:
         constraints = [
-            models.CheckConstraint(condition=~Q(delta=0), name="chk_ledger_delta_nonzero"),
+            models.CheckConstraint(
+                            condition=~(
+                                Q(delta_quantity=0)
+                                & Q(delta_pallets=0)
+                                & Q(delta_area_m2=0)
+                                & Q(delta_volume_m3=0)
+                            ),
+                            name="chk_ledger_nonzero_movement",
+                        )
         ]
         indexes = [
             models.Index(fields=["company", "product", "created_at"]),
             models.Index(fields=["company", "source_type", "source_uf"]),
+            models.Index(fields=["company", "product", "location"]),
         ]
 
 
@@ -213,13 +246,25 @@ class WHInboundLine(models.Model):
     inbound = models.ForeignKey("WHInbound", on_delete=models.CASCADE, related_name="inbound_lines")
     product = models.ForeignKey("WHProduct", on_delete=models.PROTECT, related_name="product_inbound_lines")
     location = models.ForeignKey("WHLocation", on_delete=models.PROTECT, related_name="location_inbound_lines")
+    
+    quantity = models.DecimalField(max_digits=18, decimal_places=3, null=True, blank=True)
+    pallets = models.DecimalField(max_digits=18, decimal_places=3, null=True, blank=True)
+    area_m2 = models.DecimalField(max_digits=18, decimal_places=3, null=True, blank=True)
+    volume_m3 = models.DecimalField(max_digits=18, decimal_places=3, null=True, blank=True)
 
-    quantity = models.DecimalField(max_digits=18, decimal_places=3)
     note = models.CharField(max_length=250, blank=True, null=True)
 
     class Meta:
         constraints = [
-            models.CheckConstraint(condition=Q(quantity__gt=0), name="chk_inboundline_qty_gt_0"),
+            models.CheckConstraint(
+                condition=(
+                    Q(quantity__gt=0) |
+                    Q(pallets__gt=0) |
+                    Q(area_m2__gt=0) |
+                    Q(volume_m3__gt=0)
+                ),
+                name="chk_inboundline_measurement_gt_0"
+            )
         ]
         indexes = [
             models.Index(fields=["inbound"]),
@@ -285,12 +330,26 @@ class WHOutboundLine(models.Model):
 
     outbound = models.ForeignKey("WHOutbound", on_delete=models.CASCADE, related_name="outbound_lines")
     product = models.ForeignKey("WHProduct", on_delete=models.PROTECT, related_name="product_outbound_lines")
-    quantity = models.DecimalField(max_digits=18, decimal_places=3)
+    location = models.ForeignKey("WHLocation", on_delete=models.PROTECT, null=True, blank=True)
+
+    quantity = models.DecimalField(max_digits=18, decimal_places=3, null=True, blank=True)
+    pallets = models.DecimalField(max_digits=18, decimal_places=3, null=True, blank=True)
+    area_m2 = models.DecimalField(max_digits=18, decimal_places=3, null=True, blank=True)
+    volume_m3 = models.DecimalField(max_digits=18, decimal_places=3, null=True, blank=True)
+
     note = models.CharField(max_length=250, blank=True, null=True)
 
     class Meta:
         constraints = [
-            models.CheckConstraint(condition=Q(quantity__gt=0), name="chk_outboundline_qty_gt_0"),
+            models.CheckConstraint(
+                condition=(
+                    Q(quantity__gt=0) |
+                    Q(pallets__gt=0) |
+                    Q(area_m2__gt=0) |
+                    Q(volume_m3__gt=0)
+                ),
+                name="chk_outboundline_measurement_gt_0"
+            )
         ]
         indexes = [
             models.Index(fields=["outbound"]),
@@ -408,85 +467,6 @@ class WHContactTariffOverride(models.Model):
         ]
 
 
-class WHPallet(models.Model):
-    class Status(models.TextChoices):
-        ACTIVE = "active"
-        SHIPPED = "shipped"
-        CLOSED = "closed"
-
-    uf = models.CharField(max_length=36, default=hex_uuid, unique=True)
-    company = models.ForeignKey("app.Company", on_delete=models.CASCADE)
-    owner = models.ForeignKey("att.Contact", on_delete=models.CASCADE)
-
-    pallet_code = models.CharField(max_length=80)
-
-    location = models.ForeignKey("WHLocation", on_delete=models.PROTECT)
-
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.ACTIVE)
-
-    # needed to know when pallet stops being billable
-    status_changed_at = models.DateTimeField(default=timezone.now, db_index=True)
-
-    # optional, but convenient to set when status becomes shipped/closed
-    ended_at = models.DateTimeField(null=True, blank=True, db_index=True)
- 
-    def set_status(self, new_status: str, *, ended_at=None):
-        """
-        Use this method everywhere you change pallet status.
-        """
-        self.status = new_status
-        now = timezone.now()
-        self.status_changed_at = now
-        if new_status in (self.Status.SHIPPED, self.Status.CLOSED):
-            self.ended_at = ended_at or now
-        else:
-            self.ended_at = None
-        self.save(update_fields=["status", "status_changed_at", "ended_at"])
-
-
-    class Meta:
-         indexes = [
-                models.Index(fields=["company"]),
-                models.Index(fields=["owner"]),
-         ]
-
-
-class WHPalletItem(models.Model):
-
-    pallet = models.ForeignKey(WHPallet, on_delete=models.CASCADE)
-    product = models.ForeignKey("WHProduct", on_delete=models.PROTECT)
-
-    quantity = models.DecimalField(max_digits=18, decimal_places=3)
-
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                                fields=["pallet", "product"], name="uniq_pallet_product"
-                            )                                   
-        ]
-    
-
-class WHPalletMove(models.Model):
-
-    pallet = models.ForeignKey(WHPallet, null=True, blank=True, on_delete=models.PROTECT, related_name="pallet_moves"
-    )
-
-    from_location = models.ForeignKey(
-        WHLocation,
-        on_delete=models.PROTECT,
-        related_name="from_location_pallet_moves"
-    )
-
-    to_location = models.ForeignKey(
-        WHLocation,
-        on_delete=models.PROTECT,
-        related_name="to_locations_pallet_moves"
-    )
-
-    moved_at = models.DateTimeField()
-
 ###### START WH BILLING ######
 
 class WHBillingPeriod(models.Model):
@@ -527,7 +507,32 @@ class WHBillingCharge(models.Model):
 
     quantity = models.DecimalField(max_digits=18, decimal_places=3)
     unit_price = models.DecimalField(max_digits=12, decimal_places=4)
-    total = models.DecimalField(max_digits=18, decimal_places=4)
+    unit_type = models.CharField(max_length=20,
+            choices=[
+                ("unit", "Unit"),
+                ("pallet", "Pallet"),
+                ("m2", "m2"),
+                ("m3", "m3"),
+                ("day", "Day"),
+                ("order", "Order"),
+                ("line", "Line"),
+            ],
+        )
+    total = models.DecimalField(max_digits=18, decimal_places=4) # calculated in save
+
+    product = models.ForeignKey(
+        "WHProduct",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True
+        )
+
+    location = models.ForeignKey(
+        "WHLocation",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True
+        )
 
     source_model = models.CharField(max_length=50)
     source_uf = models.CharField(max_length=36)
@@ -536,12 +541,24 @@ class WHBillingCharge(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
 
+    locked = models.BooleanField(default=False)
+
     class Meta:
+        constraints = [
+                models.UniqueConstraint(
+                    fields=["company", "contact", "billing_period", "charge_type", "source_model", "source_uf"],
+                    name="uniq_charge_company_contact_period_source_type",
+                )
+        ]
         indexes = [
             models.Index(fields=["company", "billing_period"]),
             models.Index(fields=["contact", "billing_period"]),
             models.Index(fields=["company", "source_model", "source_uf"])
         ]
+
+    def save(self, *args, **kwargs):
+        self.total = self.quantity * self.unit_price
+        super().save(*args, **kwargs)
 
 
 class WHBillingInvoice(models.Model):
@@ -561,13 +578,7 @@ class WHBillingInvoice(models.Model):
         default="draft",
     )
 
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=["company", "contact", "period"],
-                name="uniq_invoice_company_contact_period",
-            )
-        ]
+    class Meta:        
         indexes = [
             models.Index(fields=["company", "period"]),
             models.Index(fields=["contact", "period"]),

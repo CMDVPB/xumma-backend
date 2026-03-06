@@ -40,7 +40,7 @@ class WHBillingInvoiceSerializer(serializers.ModelSerializer):
     )
 
     contact_name = serializers.CharField(
-        source="contact.name",
+        source="contact.company_name",
         read_only=True
     )
 

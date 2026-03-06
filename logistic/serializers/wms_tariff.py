@@ -15,7 +15,6 @@ class WHTariffSerializer(serializers.Serializer):
         ]
     )
 
-
     storage_per_pallet_per_day = serializers.DecimalField(
         max_digits=12,
         decimal_places=4,

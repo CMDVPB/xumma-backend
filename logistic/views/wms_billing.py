@@ -1,5 +1,10 @@
+import calendar
+from datetime import date
+from decimal import Decimal
+from django.utils import timezone
 from django.shortcuts import get_object_or_404
 from django.db.models import Prefetch, Sum
+from django.db import transaction
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.decorators import action
@@ -10,6 +15,40 @@ from att.models import Contact
 from logistic.models import WHBillingCharge, WHBillingInvoice, WHBillingInvoiceLine, WHBillingPeriod
 from logistic.serializers.wms_billing import WHBillingInvoiceSerializer, WHBillingPeriodSerializer
 from logistic.services.wms_billing_engine import generate_pallet_storage_billing_for_period
+
+
+###### HELPER ######
+
+def get_or_create_current_period(company):
+
+    today = timezone.localdate()
+
+    period = (
+        WHBillingPeriod.objects
+        .filter(
+            company=company,
+            start_date__lte=today,
+            end_date__gte=today
+        )
+        .first()
+    )
+
+    if period:
+        return period
+
+    # create monthly period
+    start = today.replace(day=1)
+
+    last_day = calendar.monthrange(today.year, today.month)[1]
+    end = today.replace(day=last_day)
+
+    period = WHBillingPeriod.objects.create(
+        company=company,
+        start_date=start,
+        end_date=end
+    )
+
+    return period
 
 
 
@@ -108,32 +147,64 @@ class WHBillingInvoiceViewSet(viewsets.ReadOnlyModelViewSet):
     
     
     @action(detail=False, methods=["post"], url_path="create-for-contact")
+    @transaction.atomic
     def create_for_contact(self, request):
 
-        user_company = get_user_company(request.user)
+        company = get_user_company(request.user)
 
         contact_uf = request.data.get("contact")
+        contact = get_object_or_404(Contact, uf=contact_uf)
 
-        contact = Contact.objects.get(uf=contact_uf)
+        today = timezone.localdate()
+
+        period = (
+            WHBillingPeriod.objects
+            .filter(
+                company=company,
+                start_date__lte=today,
+                end_date__gte=today,
+                is_closed=False
+            )
+            .first()
+        )
+
+        period = get_or_create_current_period(company)
+
+        if not period:
+            return Response({"detail": "No active billing period"}, status=400)
+
+        if period.is_closed:
+            return Response({"detail": "Billing period closed"}, status=400)
+
+        # Generate storage charges ONLY for this contact
+        generate_pallet_storage_billing_for_period(
+            company=company,
+            period=period,
+            contact_ids=[contact.id],
+        )
 
         charges = WHBillingCharge.objects.filter(
-            company=user_company,
+            company=company,
             contact=contact,
+            billing_period=period,
             invoiced=False
         )
 
         if not charges.exists():
             return Response({"detail": "No charges to invoice"}, status=400)
 
-        total = charges.aggregate(
-            s=Sum("total")
-        )["s"]
+        total = (
+            charges.aggregate(s=Sum("total"))["s"] or Decimal("0")
+        ).quantize(Decimal("0.01"))
 
         invoice = WHBillingInvoice.objects.create(
-            company=user_company,
+            company=company,
             contact=contact,
+            period=period,
             total_amount=total
         )
+
+        lines = []
 
         for charge in charges:
 
@@ -151,5 +222,28 @@ class WHBillingInvoiceViewSet(viewsets.ReadOnlyModelViewSet):
             charge.invoiced = True
             charge.save(update_fields=["invoiced"])
 
-        return Response({"invoice": invoice.uf})
+            lines.append(line)
+
+        return Response({
+            "invoice": invoice.uf,
+            "lines": len(lines),
+            "total": str(total)
+        })
+
+
+    @action(detail=True, methods=["post"])
+    def issue(self, request, uf=None):
+
+        invoice = self.get_object()
+
+        if invoice.status != "draft":
+            return Response({"detail": "Only draft invoices can be issued"}, status=400)
+
+        invoice.status = "issued"
+        invoice.save(update_fields=["status"])
+
+        return Response({"status": "issued"})
     
+    # If view is ReadOnlyModelViewSet must add destroy:
+    def destroy(self, request, *args, **kwargs):
+        return super().destroy(request, *args, **kwargs)

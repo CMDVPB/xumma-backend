@@ -9,8 +9,8 @@ from logistic.serializers.wms_stock import WHStockSerializer
 
 class WHStockViewSet(ReadOnlyModelViewSet):
 
-    serializer_class = WHStockSerializer
     permission_classes = [IsAuthenticated]
+    serializer_class = WHStockSerializer
     lookup_field = "uf"
 
     def get_queryset(self):

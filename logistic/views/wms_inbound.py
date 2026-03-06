@@ -7,7 +7,7 @@ from rest_framework import status
 
 from abb.permissions import IsCompanyUserNotContactUser
 from abb.utils import get_user_company
-from logistic.models import WHInbound
+from logistic.models import WHInbound, WHStock, WHStockLedger
 from logistic.serializers.wms_inbound import (WHInboundDetailSerializer, 
                                               WHInboundSerializer)
 
@@ -19,7 +19,8 @@ class WHInboundViewSet(ModelViewSet):
 
     def get_serializer_class(self):
         print('2588', self.action)
-        if self.action == "retrieve":
+        if self.action == "create" or self.action == "retrieve" or self.action == "partial_update":
+            # print('2592',)
             return WHInboundDetailSerializer
         return WHInboundSerializer
 
@@ -39,7 +40,6 @@ class WHInboundViewSet(ModelViewSet):
             company=user_company,
             created_by=self.request.user
         )
-
     
     # RECEIVE INBOUND   
     @action(
@@ -61,5 +61,37 @@ class WHInboundViewSet(ModelViewSet):
         inbound.received_at = timezone.now()
         inbound.received_by = request.user
         inbound.save(update_fields=["status", "received_at", "received_by"])
+
+
+        for line in inbound.inbound_lines.all():
+
+            stock, _ = WHStock.objects.get_or_create(
+                company=inbound.company,
+                owner=inbound.owner,
+                product=line.product,
+                location=line.location,
+                defaults=dict(quantity=0, pallets=0, area_m2=0, volume_m3=0)
+            )
+
+            stock.quantity += line.quantity or 0
+            stock.pallets += line.pallets or 0
+            stock.area_m2 += line.area_m2 or 0
+            stock.volume_m3 += line.volume_m3 or 0
+            stock.save()
+
+            WHStockLedger.objects.create(
+                company=inbound.company,
+                owner=inbound.owner,
+                product=line.product,
+                location=line.location,
+                delta_quantity=line.quantity or 0,
+                delta_pallets=line.pallets or 0,
+                delta_area_m2=line.area_m2 or 0,
+                delta_volume_m3=line.volume_m3 or 0,
+                source_type=WHStockLedger.SourceType.INBOUND,
+                source_uf=inbound.uf,
+                actor_user=request.user,
+                movement_direction="in"
+            )
 
         return Response({"status": "received"})

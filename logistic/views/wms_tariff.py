@@ -127,6 +127,36 @@ class WHTariffViewSet(ViewSet):
         return Response(serializer.data)
 
 
+    @action(detail=True, methods=["patch"])
+    def update_override(self, request, pk=None):
+
+        company = get_user_company(request.user)
+
+        override, _ = WHContactTariffOverride.objects.get_or_create(
+            company=company,
+            contact__uf=pk,
+        )
+
+        fields = [
+            "storage_mode",
+            "storage_per_pallet_per_day",
+            "storage_per_unit_per_day",
+            "storage_per_m2_per_day",
+            "storage_per_m3_per_day",
+            "storage_min_days",
+            "inbound_per_line",
+            "outbound_per_order",
+            "outbound_per_line",
+        ]
+
+        for field in fields:
+            if field in request.data:
+                setattr(override, field, request.data[field])
+
+        override.save()
+
+        return Response({"status": "ok"}, status=status.HTTP_200_OK)
+
     @action(detail=False, methods=["post"])
     def create_override(self, request):
 
