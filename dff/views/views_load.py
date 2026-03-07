@@ -37,6 +37,7 @@ from ayy.models import CMR, Comment, Entry, ImageUpload, ItemInv
 import logging
 
 from dff.serializers.serializers_load import IssueInvoiceSerializer, LoadListForTripSerializer, LoadListSerializer, LoadPatchSerializer, LoadSerializer
+from lync.models import LoadSecret
 logger = logging.getLogger(__name__)
 
 
@@ -553,6 +554,21 @@ class LoadDetailView(RetrieveUpdateDestroyAPIView):
 
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
+
+        user_company = get_user_company(request.user)
+
+        lync_payload = request.data.get("lync_payload")
+        if lync_payload is not None:
+            secret, _ = LoadSecret.objects.get_or_create(
+                load=instance,
+                company=user_company,
+            )
+
+            print('1186', lync_payload)
+
+            secret.payload = lync_payload
+            secret.updated_by = request.user
+            secret.save()
 
         new_sn = self.request.data.get('sn', None)
         if new_sn:

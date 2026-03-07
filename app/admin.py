@@ -1,15 +1,36 @@
+import logging
+import json
+from django import forms
 from django.contrib import admin
+from django.contrib.auth.hashers import make_password
 
-from .models import CategoryGeneral, Company, CompanySettings, LoadWarehouse, TypeCost, TypeGeneral, User, DocumentSeries, Membership, Subscription, SMTPSettings, UserProfile, UserSettings
+from .models import (CategoryGeneral, Company, CompanySettings, 
+                     LoadWarehouse, TypeCost, TypeGeneral, User, DocumentSeries, 
+                     Membership, Subscription, SMTPSettings, UserProfile, UserSettings)
 from .admin_utils import DocumentSeriesNumberRangeFilter
 
 
-import logging
 logger = logging.getLogger(__name__)
+
+class UserAdminForm(forms.ModelForm):
+    # admin-only helper field (not stored)
+    lync_sequence_plain = forms.CharField(
+        required=False,
+        label="Set Lync sequence",
+        help_text="Example: shift alt l p",
+    )
+
+    class Meta:
+        model = User
+        fields = "__all__"
 
 
 @admin.register(User)
 class UserAdmin(admin.ModelAdmin):
+    form = UserAdminForm
+
+    # # Not expose the hash in admin
+    # exclude = ("lync_key_sequence_hash",)
 
     fieldsets = (
         (None, {'fields': ('email', 'username', 'password')}),
@@ -19,7 +40,7 @@ class UserAdmin(admin.ModelAdmin):
          'is_superuser', 'groups', 'user_permissions')}),
         ('Important dates', {
          'fields': ('last_login', 'date_joined', 'date_registered', 'date_of_birth')}),
-        ('Settings', {'fields': ('lang', 'base_country')}),
+        ('Settings', {'fields': ('lang', 'base_country', 'lync_sequence_plain', 'lync_key_sequence_hash')}),
     )
 
     add_fieldsets = (
@@ -42,6 +63,19 @@ class UserAdmin(admin.ModelAdmin):
                     'get_full_name', 'base_country', 'is_superuser', 'is_staff', 'is_active', 'lang', 'uf')
 
     search_fields = ('id', 'email', 'username', 'groups__name')
+
+    def save_model(self, request, obj, form, change):
+        sequence_plain = form.cleaned_data.get("lync_sequence_plain")
+
+        if sequence_plain:
+            # normalize: split by spaces → list
+            sequence = [k.strip().lower() for k in sequence_plain.split() if k.strip()]
+
+            sequence_str = json.dumps(sequence, separators=(",", ":"))
+
+            obj.lync_key_sequence_hash = make_password(sequence_str)
+
+        super().save_model(request, obj, form, change)
 
 
 @admin.register(UserProfile)

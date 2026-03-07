@@ -22,6 +22,7 @@ class WHProductViewSet(ModelViewSet):
         )
 
         owner = self.request.query_params.get("owner")
+
         is_active = self.request.query_params.get("is_active")
 
         if owner:
@@ -34,6 +35,5 @@ class WHProductViewSet(ModelViewSet):
 
     def perform_create(self, serializer):
         user_company = get_user_company(self.request.user)
-        serializer.save(
-            company=user_company
-        )
+
+        serializer.save(company=user_company)

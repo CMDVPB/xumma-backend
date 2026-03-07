@@ -1,4 +1,5 @@
 from django.db import transaction
+from django.db.models import Sum
 from rest_framework import serializers
 
 from abb.utils import get_user_company
@@ -137,10 +138,16 @@ class WHOutboundDetailSerializer(serializers.ModelSerializer):
         return instance
 
 
-class WHOutboundSerializer(serializers.ModelSerializer):
+class WHOutboundSerializer(serializers.ModelSerializer):    
 
     owner_name = serializers.CharField(
         source="owner.company_name",
+        read_only=True
+    )
+
+    total_primary = serializers.DecimalField(
+        max_digits=18,
+        decimal_places=3,
         read_only=True
     )
 
@@ -155,4 +162,10 @@ class WHOutboundSerializer(serializers.ModelSerializer):
             "planned_pickup_at",
             "shipped_at",
             "created_at",
+
+            # annotated
+            "total_primary",
+           
         ]
+
+    

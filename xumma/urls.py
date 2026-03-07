@@ -39,6 +39,7 @@ urlpatterns = [
     path('api/', include('eff.urls')),
     path('api/', include('eml.urls')),
     path('api/wms/', include('logistic.urls')),
+    path('api/lync/', include('lync.urls')),
 ]
 
 if settings.DEBUG:

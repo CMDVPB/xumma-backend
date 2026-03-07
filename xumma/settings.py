@@ -7,10 +7,6 @@ from kombu import Queue, Exchange
 
 load_dotenv(override=True)
 
-# GDAL_LIBRARY_PATH = os.getenv('GDAL_LIBRARY_PATH')
-# GEOS_LIBRARY_PATH = os.getenv('GEOS_LIBRARY_PATH')
-
-
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -23,6 +19,11 @@ SECRET_KEY = os.environ.get('SECRET_KEY')
 
 ENCRYPTION_KEY = os.environ.get('ENCRYPTION_KEY')
 SIGNED_URL_TTL_SECONDS = 3600*24*7
+SECRET_FIELD_KEYS = [
+    item.strip().encode()
+    for item in os.environ.get("SECRET_FIELD_KEYS", default="").split(",")
+    if item.strip()
+]
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = str(os.environ.get('DEBUG')) == '1'
@@ -99,6 +100,7 @@ INSTALLED_APPS = [
     'eff',
     'eml',
     'logistic',
+    'lync',
 ]
 
 

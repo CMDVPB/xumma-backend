@@ -24,12 +24,14 @@ class WHStockViewSet(ReadOnlyModelViewSet):
                 "product__owner",
                 "location",
             )
+            
         )
 
         # optional filters
         owner = self.request.query_params.get("owner")
         product = self.request.query_params.get("product")
         location = self.request.query_params.get("location")
+        in_stock = self.request.query_params.get("in_stock")
 
         if owner:
             qs = qs.filter(product__owner__uf=owner)
@@ -39,6 +41,9 @@ class WHStockViewSet(ReadOnlyModelViewSet):
 
         if location:
             qs = qs.filter(location__uf=location)
+
+        if in_stock == "true":
+            qs = qs.filter(quantity__gt=0)
 
         return qs.order_by(
             "product__name",

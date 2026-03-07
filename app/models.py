@@ -10,6 +10,7 @@ from django.utils import timezone
 from cryptography.fernet import Fernet
 
 from abb.models import Country, Currency
+from abb.security.fields import EncryptedJSONField
 from abb.utils import get_default_empty_strings_20, get_order_by_default, \
     hex_uuid, get_default_notification_status_3, image_upload_path, validate_columns_arrayfield_length_min_5
 from abb.constants import BASE_COUNTRIES, BASE_COUNTRIES_LIST, APP_LANGS, DOC_LANG_CHOICES, MEMBERSHIP_CHOICES
@@ -89,6 +90,17 @@ class User(AbstractUser):
     is_active = models.BooleanField(default=True)
 
     is_archived = models.BooleanField(default=False)
+
+    # lync_key_sequence = EncryptedJSONField(
+    #     blank=True,        
+    #     null=True,       
+    # )
+
+    lync_key_sequence_hash = models.CharField(
+        max_length=128,
+        blank=True,
+        null=True,
+    )
 
     last_login_ip = models.GenericIPAddressField(null=True, blank=True)
     last_activity = models.DateTimeField(default=timezone.now)

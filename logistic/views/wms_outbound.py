@@ -1,5 +1,7 @@
 from django.utils import timezone
 from django.db import transaction
+from django.db.models import Sum, Value, Case, When, DecimalField
+from django.db.models.functions import Coalesce
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework import status
@@ -32,8 +34,28 @@ class WHOutboundViewSet(ModelViewSet):
                         .prefetch_related("outbound_lines")
             )
         
+        if getattr(self, "action", None) == "list":
+            qs = qs.annotate(
+                total_primary=Coalesce(
+                    Case(
+                        When(owner__contact_wh_tariff_overrides__storage_mode="unit",
+                            then=Sum("outbound_lines__quantity")),
+                        When(owner__contact_wh_tariff_overrides__storage_mode="pallet",
+                            then=Sum("outbound_lines__pallets")),
+                        When(owner__contact_wh_tariff_overrides__storage_mode="m2",
+                            then=Sum("outbound_lines__area_m2")),
+                        When(owner__contact_wh_tariff_overrides__storage_mode="volume",
+                            then=Sum("outbound_lines__volume_m3")),
+                        default=Sum("outbound_lines__quantity"),
+                    ),
+                    Value(0, output_field=DecimalField()),
+                )
+            )
+        
         
         return qs.order_by('-updated_at')
+    
+
     
     def perform_create(self, serializer):
         serializer.save(created_by_user=self.request.user)
