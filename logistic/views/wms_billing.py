@@ -14,42 +14,48 @@ from abb.utils import get_user_company
 from att.models import Contact
 from logistic.models import WHBillingCharge, WHBillingInvoice, WHBillingInvoiceLine, WHBillingPeriod
 from logistic.serializers.wms_billing import WHBillingInvoiceSerializer, WHBillingPeriodSerializer
-from logistic.services.wms_billing_engine import generate_pallet_storage_billing_for_period
+from logistic.services.wms_billing_engine import generate_storage_billing_for_period
 
 
 ###### HELPER ######
-
-def get_or_create_current_period(company):
+def _get_or_create_current_period(company):
 
     today = timezone.localdate()
 
-    period = (
+    last_period = (
         WHBillingPeriod.objects
-        .filter(
-            company=company,
-            start_date__lte=today,
-            end_date__gte=today
-        )
+        .filter(company=company)
+        .order_by("-end_date")
         .first()
     )
 
-    if period:
-        return period
+    if not last_period:
+        return WHBillingPeriod.objects.create(
+            company=company,
+            start_date=today.replace(day=1),
+            end_date=today
+        )
 
-    # create monthly period
-    start = today.replace(day=1)
-
-    last_day = calendar.monthrange(today.year, today.month)[1]
-    end = today.replace(day=last_day)
-
-    period = WHBillingPeriod.objects.create(
+    # if period already invoiced → create new
+    has_invoice = WHBillingInvoice.objects.filter(
         company=company,
-        start_date=start,
-        end_date=end
-    )
+        period=last_period
+    ).exists()
 
-    return period
+    if has_invoice:
+        return WHBillingPeriod.objects.create(
+            company=company,
+            start_date=last_period.end_date,
+            end_date=today
+        )
 
+    if last_period.end_date == today:
+        return last_period
+
+    last_period.end_date = today
+    last_period.save(update_fields=["end_date"])
+
+    return last_period
 
 
 class WHBillingPeriodViewSet(viewsets.ModelViewSet):
@@ -83,7 +89,7 @@ class WHBillingPeriodViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        generate_pallet_storage_billing_for_period(
+        generate_storage_billing_for_period(
             company=user_company,
             period=period
         )
@@ -134,14 +140,25 @@ class WHBillingInvoiceViewSet(viewsets.ReadOnlyModelViewSet):
             .order_by("-created_at")
         )
 
+        # Filters
         period = self.request.query_params.get("period")
         contact = self.request.query_params.get("contact")
+        period_from = self.request.query_params.get("period_from")
+        period_to = self.request.query_params.get("period_to")
+
 
         if period:
             queryset = queryset.filter(period__uf=period)
 
         if contact:
             queryset = queryset.filter(contact__uf=contact)
+      
+        if period_from:
+            queryset = queryset.filter(period__start_date__gte=period_from)
+
+        if period_to:
+            queryset = queryset.filter(period__end_date__lte=period_to)
+             
 
         return queryset
     
@@ -155,20 +172,10 @@ class WHBillingInvoiceViewSet(viewsets.ReadOnlyModelViewSet):
         contact_uf = request.data.get("contact")
         contact = get_object_or_404(Contact, uf=contact_uf)
 
-        today = timezone.localdate()
-
-        period = (
-            WHBillingPeriod.objects
-            .filter(
-                company=company,
-                start_date__lte=today,
-                end_date__gte=today,
-                is_closed=False
-            )
-            .first()
-        )
-
-        period = get_or_create_current_period(company)
+    
+        period = _get_or_create_current_period(company)
+      
+        print('1144', period)
 
         if not period:
             return Response({"detail": "No active billing period"}, status=400)
@@ -177,11 +184,14 @@ class WHBillingInvoiceViewSet(viewsets.ReadOnlyModelViewSet):
             return Response({"detail": "Billing period closed"}, status=400)
 
         # Generate storage charges ONLY for this contact
-        generate_pallet_storage_billing_for_period(
+        generate_storage_billing_for_period(
             company=company,
             period=period,
             contact_ids=[contact.id],
         )
+
+        print('1148', )
+
 
         charges = WHBillingCharge.objects.filter(
             company=company,
@@ -189,6 +199,8 @@ class WHBillingInvoiceViewSet(viewsets.ReadOnlyModelViewSet):
             billing_period=period,
             invoiced=False
         )
+
+        print('1152', charges)
 
         if not charges.exists():
             return Response({"detail": "No charges to invoice"}, status=400)
@@ -211,7 +223,7 @@ class WHBillingInvoiceViewSet(viewsets.ReadOnlyModelViewSet):
             line = WHBillingInvoiceLine.objects.create(
                 invoice=invoice,
                 charge_type=charge.charge_type,
-                description=charge.charge_type,
+                description = f"({period.start_date} → {period.end_date})",
                 quantity=charge.quantity,
                 unit_price=charge.unit_price,
                 total=charge.total
@@ -247,3 +259,6 @@ class WHBillingInvoiceViewSet(viewsets.ReadOnlyModelViewSet):
     # If view is ReadOnlyModelViewSet must add destroy:
     def destroy(self, request, *args, **kwargs):
         return super().destroy(request, *args, **kwargs)
+    
+
+

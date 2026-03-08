@@ -1,6 +1,3 @@
-from django.urls import path
-from rest_framework.urlpatterns import format_suffix_patterns
-
 from rest_framework.routers import DefaultRouter
 
 from logistic.views.wms_billing import WHBillingInvoiceViewSet, WHBillingPeriodViewSet
@@ -10,7 +7,6 @@ from logistic.views.wms_outbound import WHOutboundViewSet
 from logistic.views.wms_product import WHProductViewSet
 from logistic.views.wms_stock import WHStockViewSet
 from logistic.views.wms_tariff import WHTariffViewSet
-
 
 
 router = DefaultRouter()

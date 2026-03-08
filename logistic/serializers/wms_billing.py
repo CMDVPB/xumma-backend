@@ -44,6 +44,8 @@ class WHBillingInvoiceSerializer(serializers.ModelSerializer):
         read_only=True
     )
 
+    period = WHBillingPeriodSerializer(read_only=True)
+
     class Meta:
         model = WHBillingInvoice
         fields = [

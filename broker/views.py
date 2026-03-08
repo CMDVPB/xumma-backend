@@ -16,6 +16,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework import status
 
+
 from abb.utils import get_user_company
 from att.models import Contact
 from broker.helpers import get_user_role_in_point
@@ -156,6 +157,20 @@ class JobListCreateView(CompanyScopedMixin, JobVisibilityQuerysetMixin, ListCrea
         ).filter(company=self.get_company())
 
         qs = self.filter_queryset_by_visibility(qs)
+
+        # Filters
+        customer = self.request.query_params.get("customer")
+        point = self.request.query_params.get("point")
+        assigned_to = self.request.query_params.get("assigned_to")
+
+        if customer:
+            qs = qs.filter(customer__uf=customer)
+
+        if point:
+            qs = qs.filter(point__uf=point)
+
+        if assigned_to:
+            qs = qs.filter(assigned_to__uf=assigned_to)
 
 
         return qs.order_by('-created_at')

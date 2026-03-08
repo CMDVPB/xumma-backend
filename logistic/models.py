@@ -507,17 +507,22 @@ class WHBillingCharge(models.Model):
 
     quantity = models.DecimalField(max_digits=18, decimal_places=3)
     unit_price = models.DecimalField(max_digits=12, decimal_places=4)
-    unit_type = models.CharField(max_length=20,
-            choices=[
-                ("unit", "Unit"),
-                ("pallet", "Pallet"),
-                ("m2", "m2"),
-                ("m3", "m3"),
-                ("day", "Day"),
-                ("order", "Order"),
-                ("line", "Line"),
-            ],
-        )
+    unit_type = models.CharField(
+        max_length=20,
+        choices=[
+            ("unit", "Unit"),
+            ("pallet", "Pallet"),
+            ("m2", "m2"),
+            ("m3", "m3"),
+            ("day", "Day"),
+            ("order", "Order"),
+            ("line", "Line"),
+            ("pallet_day", "Pallet-Day"),
+            ("unit_day", "Unit-Day"),
+            ("m2_day", "m2-Day"),
+            ("m3_day", "m3-Day"),
+        ],
+    )
     total = models.DecimalField(max_digits=18, decimal_places=4) # calculated in save
 
     product = models.ForeignKey(
@@ -608,19 +613,9 @@ class WHBillingInvoiceLine(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
 
-    charges = models.ManyToManyField(
-                                        "WHBillingCharge",
-                                        related_name="invoice_lines",
-                                        blank=True
-                                    )
+    charges = models.ManyToManyField("WHBillingCharge", blank=True, related_name="invoice_lines")
 
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=["invoice", "charge_type"],
-                name="uniq_invoice_charge_type",
-            )
-        ]
+    class Meta:       
         indexes = [
             models.Index(fields=["invoice", "charge_type"]),
             models.Index(fields=["invoice"])
