@@ -21,7 +21,7 @@ from abb.utils import get_user_company
 from att.models import Contact
 from broker.helpers import get_user_role_in_point
 from broker.mixins import CompanyScopedMixin, JobVisibilityQuerysetMixin
-from broker.models import CustomerServicePrice, Job, JobLine, PointMembership, PointOfService, Role, ServiceType
+from broker.models import CustomerServicePrice, CustomerServiceTierPrice, Job, JobLine, PointMembership, PointOfService, Role, ServiceType, ServiceTypeTier
 
 from broker.permissions import IsAdminOrManager, JobAccessPermission
 from broker.serializers import (BrokerEmployeePerformanceSerializer, BrokerReportsOverviewSerializer, CustomerServicePriceSerializer, 
@@ -150,11 +150,10 @@ class JobListCreateView(CompanyScopedMixin, JobVisibilityQuerysetMixin, ListCrea
     serializer_class = JobSerializer
 
     def get_queryset(self):
-        qs = Job.objects.select_related(
-            "point",
-            "customer",
-            "assigned_to"
-        ).filter(company=self.get_company())
+        qs = (Job.objects
+                .select_related("point", "customer", "assigned_to")
+                .prefetch_related("job_lines")
+                .filter(company=self.get_company()))
 
         qs = self.filter_queryset_by_visibility(qs)
 
@@ -200,8 +199,8 @@ class JobRetrieveUpdateDestroyView(
     JobVisibilityQuerysetMixin,
     RetrieveUpdateDestroyAPIView
 ):
-    serializer_class = JobSerializer
     permission_classes = [IsAuthenticated, JobAccessPermission]
+    serializer_class = JobSerializer
     lookup_field = 'uf'
 
     def get_queryset(self):
@@ -218,7 +217,13 @@ class ServiceTypeListCreateView(CompanyScopedMixin, ListCreateAPIView):
     serializer_class = ServiceTypeSerializer
 
     def get_queryset(self):
-        return ServiceType.objects.filter(company=self.get_company())
+        user_company = get_user_company(self.request.user)
+        qs = (ServiceType.objects
+              .filter(company=user_company)
+              .prefetch_related("pricing_tiers")
+              )
+        
+        return qs 
 
     def perform_create(self, serializer):
         serializer.save(company=self.get_company())
@@ -230,7 +235,9 @@ class ServiceTypeDetailView(CompanyScopedMixin, RetrieveUpdateDestroyAPIView):
     lookup_field = "uf"
 
     def get_queryset(self):
-        return ServiceType.objects.filter(company=self.get_company())
+        user_company = get_user_company(self.request.user)
+        qs = ServiceType.objects.filter(company=user_company)
+        return qs
 
 
 class CustomerServicePriceListCreateView(CompanyScopedMixin, ListCreateAPIView):
@@ -511,6 +518,7 @@ class BrokerPartnerPricingAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, partner_uf):
+
         company = get_user_company(request.user)
 
         partner = get_object_or_404(
@@ -519,31 +527,50 @@ class BrokerPartnerPricingAPIView(APIView):
             company=company,
         )
 
-        service_types = ServiceType.objects.filter(company=company)
+        services = ServiceType.objects.filter(company=company).prefetch_related(
+            "pricing_tiers"
+        )
 
         pricing = []
 
-        for service in service_types:
-            special = CustomerServicePrice.objects.filter(
-                company=company,
-                customer=partner,
-                service_type=service,
-            ).first()
+        for service in services:
+
+            tiers = []
+
+            for tier in service.pricing_tiers.all():
+
+                special = CustomerServiceTierPrice.objects.filter(
+                    company=company,
+                    customer=partner,
+                    service_tier=tier,
+                ).first()
+
+                tiers.append(
+                    {
+                        "tier_id": tier.id,
+                        "range": (
+                            f"{tier.from_quantity}-{tier.to_quantity}"
+                            if tier.to_quantity
+                            else f"{tier.from_quantity}+"
+                        ),
+                        "default_price": tier.price,
+                        "special_price": special.price if special else None,
+                        "is_active": special.is_active if special else False,
+                    }
+                )
 
             pricing.append(
                 {
                     "service_type_id": service.id,
                     "service_name": service.name,
-                    "default_price": service.default_price,
-                    "special_price": special.price if special else None,
-                    "is_active": special.is_active if special else False,
+                    "pricing_tiers": tiers,
                 }
             )
 
-        serializer = BrokerCustomerPricingSerializer(pricing, many=True)
-        return Response(serializer.data)
+        return Response(pricing)
 
     def post(self, request, partner_uf):
+
         company = get_user_company(request.user)
 
         partner = get_object_or_404(
@@ -555,20 +582,16 @@ class BrokerPartnerPricingAPIView(APIView):
         serializer = BrokerCustomerPricingUpsertSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        service_type_id = serializer.validated_data["service_type_id"]
+        tier_id = serializer.validated_data["tier_id"]
         price = serializer.validated_data["price"]
         is_active = serializer.validated_data["is_active"]
 
-        service_type = get_object_or_404(
-            ServiceType,
-            id=service_type_id,
-            company=company,
-        )
+        tier = get_object_or_404(ServiceTypeTier, id=tier_id)
 
-        obj, _ = CustomerServicePrice.objects.update_or_create(
+        CustomerServiceTierPrice.objects.update_or_create(
             company=company,
             customer=partner,
-            service_type=service_type,
+            service_tier=tier,
             defaults={
                 "price": price,
                 "is_active": is_active,
@@ -576,7 +599,6 @@ class BrokerPartnerPricingAPIView(APIView):
         )
 
         return Response({"success": True})
-    
 
 class BrokerSpecialPricingDeleteAPIView(DestroyAPIView):
     permission_classes = [IsAuthenticated]

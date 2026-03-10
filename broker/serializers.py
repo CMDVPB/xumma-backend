@@ -150,6 +150,20 @@ class JobLineSerializer(serializers.ModelSerializer):
         read_only=True
     )
 
+    uf = serializers.CharField(required=False)
+
+    parent_line = serializers.PrimaryKeyRelatedField(
+        queryset=JobLine.objects.all(),
+        required=False,
+        allow_null=True
+    )
+
+    service_group = serializers.PrimaryKeyRelatedField(
+        queryset=ServiceGroup.objects.all(),
+        required=False,
+        allow_null=True
+    )
+
     total_amount = serializers.DecimalField(
         max_digits=12,
         decimal_places=4,
@@ -159,26 +173,36 @@ class JobLineSerializer(serializers.ModelSerializer):
     class Meta:
         model = JobLine
         fields = (
-            "id",
+            "uf",
             "service_type",
+            "service_type_uf",
+            "service_group",
+            "parent_line",
             "description",
             "quantity",
-            "total_amount",      # write only
-            "unit_price_net",    # read only
+            "position",
+            "total_amount",
+            "unit_price_net",
             "vat_percent",
-            "service_type_uf",
-            "uf",
+            "other_charges",
         )
         read_only_fields = ("unit_price_net", "vat_percent")
 
+    def validate(self, data):
+        parent = data.get("parent_line")
+        if parent and parent.parent_line:
+            raise serializers.ValidationError(
+                "Only one level of additional services allowed."
+            )
+        return data
 
     def create(self, validated_data):
         return self._save_line(validated_data)
 
     def update(self, instance, validated_data):
-        return self._save_line(validated_data, instance)
+        return self._save_line(validated_data, instance=instance)
 
-    def _save_line(self, validated_data, instance=None):
+    def _save_line(self, validated_data, instance=None, job=None):
         total_amount = validated_data.pop("total_amount")
         quantity = validated_data.get("quantity")
         service_type = validated_data.get("service_type")
@@ -187,11 +211,11 @@ class JobLineSerializer(serializers.ModelSerializer):
 
         if quantity and quantity != 0:
             unit_price_net = (total_amount / quantity).quantize(
-                Decimal("0.0001"),
+                Decimal("0.01"),
                 rounding=ROUND_HALF_UP
             )
         else:
-            unit_price_net = Decimal("0.0000")
+            unit_price_net = Decimal("0.00")
 
         if instance:
             for attr, value in validated_data.items():
@@ -203,14 +227,14 @@ class JobLineSerializer(serializers.ModelSerializer):
             return instance
 
         return JobLine.objects.create(
+            job=job,
             unit_price_net=unit_price_net,
             vat_percent=vat,
             **validated_data
         )
-
+    
 
 class JobSerializer(WritableNestedModelSerializer):
-
     customer = serializers.SlugRelatedField(
         slug_field="uf",
         queryset=Contact.objects.all(),
@@ -225,7 +249,6 @@ class JobSerializer(WritableNestedModelSerializer):
 
     job_lines = JobLineSerializer(many=True)
 
-    # READ ONLY FIELDS
     customer_info = serializers.SerializerMethodField()
     point_info = serializers.SerializerMethodField()
     total_amount = serializers.SerializerMethodField()
@@ -234,8 +257,62 @@ class JobSerializer(WritableNestedModelSerializer):
     class Meta:
         model = Job
         fields = "__all__"
-        read_only_fields = ("company", "created_at", "uf",)
+        read_only_fields = ("company", "created_at", "uf")
 
+    @transaction.atomic
+    def create(self, validated_data):
+        job_lines_data = validated_data.pop("job_lines", [])
+
+        request = self.context["request"]
+        company = get_user_company(request.user)
+
+        job = Job.objects.create(company=company, **validated_data)
+
+        child = self.fields["job_lines"].child
+
+        for line_data in job_lines_data:
+            child._save_line(line_data, job=job)
+
+        return job
+
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        job_lines_data = validated_data.pop("job_lines", None)
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+
+        if job_lines_data is None:
+            return instance
+
+        child = self.fields["job_lines"].child
+
+        existing_lines = {line.uf: line for line in instance.job_lines.all()}
+        incoming_ufs = set()
+
+        for line_data in job_lines_data:
+            line_uf = line_data.get("uf")
+
+            if line_uf and line_uf in existing_lines:
+                incoming_ufs.add(line_uf)
+                child._save_line(
+                    line_data,
+                    instance=existing_lines[line_uf],
+                )
+            else:
+                new_line = child._save_line(
+                    line_data,
+                    job=instance,
+                )
+                incoming_ufs.add(new_line.uf)
+
+        # delete removed lines
+        for uf, line in existing_lines.items():
+            if uf not in incoming_ufs:
+                line.delete()
+
+        return instance
 
     def get_customer_info(self, obj):
         if not obj.customer:
@@ -259,9 +336,44 @@ class JobSerializer(WritableNestedModelSerializer):
 
     def get_total_amount(self, obj):
         return sum(
-            line.quantity * line.unit_price_net
-            for line in obj.job_lines.all()
+            (
+                line.total_net + (line.other_charges or Decimal("0"))
+                for line in obj.job_lines.all()
+            ),
+            Decimal("0"),
         )
+
+    def get_assigned_to_info(self, obj):
+        if not obj.assigned_to:
+            return None
+
+        return {
+            "uf": obj.assigned_to.uf,
+            "name": obj.assigned_to.get_full_name(),
+        }
+
+    def get_customer_info(self, obj):
+        if not obj.customer:
+            return None
+
+        return {
+            "uf": obj.customer.uf,
+            "company_name": obj.customer.company_name,
+            "alias_company_name": obj.customer.alias_company_name,
+        }
+
+    def get_point_info(self, obj):
+        if not obj.point:
+            return None
+
+        return {
+            "uf": obj.point.uf,
+            "name": obj.point.name,
+            "code": obj.point.code,
+        }
+
+    def get_total_amount(self, obj):
+        return sum((line.total_net for line in obj.job_lines.all()), Decimal("0"))
     
     def get_assigned_to_info(self, obj):
         if not obj.assigned_to:
@@ -273,13 +385,77 @@ class JobSerializer(WritableNestedModelSerializer):
         }
 
 
+class ServiceTypeTierSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = ServiceTypeTier
+        fields = ("id", "from_quantity", "to_quantity", "price", "uf",
+                  )
+
+
 class ServiceTypeSerializer(serializers.ModelSerializer):
+    pricing_tiers = ServiceTypeTierSerializer(many=True, required=False)
+
     class Meta:
         model = ServiceType
         fields = "__all__"
         read_only_fields = ("uf", "company")
 
+    def create(self, validated_data):
+        tiers_data = validated_data.pop("pricing_tiers", [])
+
+        service = ServiceType.objects.create(**validated_data)
+
+        for tier in tiers_data:
+            ServiceTypeTier.objects.create(
+                service_type=service,
+                **tier
+            )
+
+        return service
+
+
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        tiers_data = validated_data.pop("pricing_tiers", None)
+
+        # update normal fields
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+
+        instance.save()
+
+        # update tiers
+        if tiers_data is not None:
+            instance.pricing_tiers.all().delete()
+
+            for tier in tiers_data:
+                ServiceTypeTier.objects.create(
+                    service_type=instance,
+                    **tier
+                )
+
+        return instance
     
+
+    def validate_pricing_tiers(self, pricing_tiers):
+
+        pricing_tiers = sorted(pricing_tiers, key=lambda x: x["from_quantity"])
+
+        last_end = 0
+
+        for tier in pricing_tiers:
+
+            if tier["from_quantity"] <= last_end:
+                raise serializers.ValidationError(
+                    "Tier ranges overlap."
+                )
+
+            last_end = tier["to_quantity"] or 999999
+
+        return pricing_tiers
+
+
 class CustomerServicePriceSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomerServicePrice
@@ -327,7 +503,6 @@ class BrokerEmployeePerformanceSerializer(serializers.Serializer):
 ###### END BROKER REPORTS ######
 
 ###### START BROKER PRICING ######
-
 class BrokerCustomerPricingSerializer(serializers.Serializer):
     service_type_id = serializers.IntegerField()
     service_name = serializers.CharField()
@@ -339,7 +514,7 @@ class BrokerCustomerPricingSerializer(serializers.Serializer):
 
 
 class BrokerCustomerPricingUpsertSerializer(serializers.Serializer):
-    service_type_id = serializers.IntegerField()
+    tier_id = serializers.IntegerField()
     price = serializers.DecimalField(max_digits=12, decimal_places=2)
     is_active = serializers.BooleanField()
 

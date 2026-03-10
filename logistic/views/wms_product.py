@@ -3,14 +3,18 @@ from rest_framework.permissions import IsAuthenticated
 
 from abb.utils import get_user_company
 from logistic.models import WHProduct
-from logistic.serializers.wms_product import WHProductSerializer
+from logistic.serializers.wms_product import WHProductDetailsSerializer, WHProductSerializer
 
 
 
 class WHProductViewSet(ModelViewSet):
-    permission_classes = [IsAuthenticated]
-    serializer_class = WHProductSerializer
+    permission_classes = [IsAuthenticated]    
     lookup_field = "uf"
+
+    def get_serializer_class(self):
+        if self.action == "retrieve":
+            return WHProductDetailsSerializer
+        return WHProductSerializer
 
     def get_queryset(self):
         user_company = get_user_company(self.request.user)
@@ -31,7 +35,7 @@ class WHProductViewSet(ModelViewSet):
         if is_active is not None:
             qs = qs.filter(is_active=is_active.lower() == "true")
 
-        return qs.order_by("name")
+        return qs.order_by("-created_at")
 
     def perform_create(self, serializer):
         user_company = get_user_company(self.request.user)

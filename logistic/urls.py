@@ -1,6 +1,8 @@
+from django.urls import path
 from rest_framework.routers import DefaultRouter
 
 from logistic.views.wms_billing import WHBillingInvoiceViewSet, WHBillingPeriodViewSet
+from logistic.views.wms_dashboard import WmsDashboardCustomersSummaryAPIView, WmsStorageOccupancyAPIView
 from logistic.views.wms_inbound import WHInboundViewSet
 from logistic.views.wms_location import WHLocationViewSet
 from logistic.views.wms_outbound import WHOutboundViewSet
@@ -21,4 +23,11 @@ router.register(r"billing-periods", WHBillingPeriodViewSet, basename="wms-billin
 router.register(r"billing-invoices", WHBillingInvoiceViewSet, basename="wms-billing-invoices")
 
 
-urlpatterns = router.urls
+urlpatterns = [
+    path("dashboard/customers-summary/", WmsDashboardCustomersSummaryAPIView.as_view()),
+    path("dashboard/storage-occupancy/", WmsStorageOccupancyAPIView.as_view()),
+]
+
+urlpatterns += router.urls
+
+

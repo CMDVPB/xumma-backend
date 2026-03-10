@@ -1,4 +1,5 @@
 from django.db import transaction
+from django.db.models import Sum
 from rest_framework import serializers
 
 from att.models import Contact
@@ -118,6 +119,11 @@ class WHInboundSerializer(serializers.ModelSerializer):
         read_only=True
     )
 
+    total_pallets = serializers.SerializerMethodField()
+    total_m2 = serializers.SerializerMethodField()
+    total_m3 = serializers.SerializerMethodField()
+    total_units = serializers.SerializerMethodField()
+
     class Meta:
         model = WHInbound
         fields = [
@@ -128,9 +134,35 @@ class WHInboundSerializer(serializers.ModelSerializer):
             "received_at",
             "created_at",
             "uf",
+
+            "total_pallets",
+            "total_m2",
+            "total_m3",
+            "total_units",
         ]
         read_only_fields = [
             "status",
             "received_at",
             "created_at",
         ]
+
+
+    def get_total_pallets(self, obj):
+        return (
+            obj.inbound_lines.aggregate(v=Sum("pallets"))["v"] or 0
+        )
+
+    def get_total_m2(self, obj):
+        return (
+            obj.inbound_lines.aggregate(v=Sum("area_m2"))["v"] or 0
+        )
+
+    def get_total_m3(self, obj):
+        return (
+            obj.inbound_lines.aggregate(v=Sum("volume_m3"))["v"] or 0
+        )
+
+    def get_total_units(self, obj):
+        return (
+            obj.inbound_lines.aggregate(v=Sum("quantity"))["v"] or 0
+        )

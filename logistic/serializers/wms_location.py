@@ -3,6 +3,7 @@ from logistic.models import WHLocation
 
 
 class WHLocationSerializer(serializers.ModelSerializer):
+    
 
     class Meta:
         model = WHLocation

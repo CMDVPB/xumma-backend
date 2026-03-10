@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from logistic.models import WHStock
+from logistic.models import WHStock, WHStockLedger
 
 
 class WHStockSerializer(serializers.ModelSerializer):
@@ -35,4 +35,7 @@ class WHStockSerializer(serializers.ModelSerializer):
         ]
 
         
+
+
+
 

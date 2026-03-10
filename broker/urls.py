@@ -18,7 +18,6 @@ urlpatterns = [
     
     path("broker/customer-prices/", CustomerServicePriceListCreateView.as_view()),    
 
-
     path("broker/reports/overview/", BrokerReportsOverviewAPIView.as_view()),
     path("broker/reports/employee-performance/", BrokerEmployeePerformanceAPIView.as_view()),
     path("broker/reports/service-price-trends/", BrokerServicePriceTrendsAPIView.as_view()),

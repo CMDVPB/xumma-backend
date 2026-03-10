@@ -257,8 +257,27 @@ class WHBillingInvoiceViewSet(viewsets.ReadOnlyModelViewSet):
         return Response({"status": "issued"})
     
     # If view is ReadOnlyModelViewSet must add destroy:
+    @transaction.atomic
     def destroy(self, request, *args, **kwargs):
-        return super().destroy(request, *args, **kwargs)
+        invoice = self.get_object()
+
+        if invoice.status != "draft":
+            return Response(
+                {"detail": "Only draft invoices can be deleted"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # unmark linked charges
+        charge_ids = list(
+            WHBillingCharge.objects.filter(invoice_lines__invoice=invoice).values_list("id", flat=True)
+        )
+
+        if charge_ids:
+            WHBillingCharge.objects.filter(id__in=charge_ids).update(invoiced=False)
+
+        invoice.delete()
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
     
 
 
