@@ -26,6 +26,15 @@ urlpatterns = [
     path("broker/partners/<str:partner_uf>/pricing/", BrokerPartnerPricingAPIView.as_view()),
     path("broker/special-pricing/<int:pk>/", BrokerSpecialPricingDeleteAPIView.as_view()),
 
+    ###### STAFF ######
+    path("broker/staff/", BrokerStaffListAPIView.as_view()),
+    path("broker/staff/<str:uf>/", BrokerStaffDetailsView.as_view()),     
+    path("broker/staff/<str:uf>/compensation/", BrokerStaffCompensationUpdateView.as_view()),
+    path("broker/commission-types/", BrokerCommissionTypeListView.as_view()),
+    path("broker/reports/broker-settlement/", BrokerSettlementReportAPIView.as_view()),
+    path("broker/reports/broker-settlement/export/", BrokerSettlementExportAPIView.as_view()),
+    path("broker/settlements/", BrokerSettlementCreateAPIView.as_view()),
+
 
 ]
 

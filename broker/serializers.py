@@ -266,7 +266,7 @@ class JobSerializer(WritableNestedModelSerializer):
         request = self.context["request"]
         company = get_user_company(request.user)
 
-        job = Job.objects.create(company=company, **validated_data)
+        job = Job.objects.create(**validated_data)
 
         child = self.fields["job_lines"].child
 
@@ -314,43 +314,15 @@ class JobSerializer(WritableNestedModelSerializer):
 
         return instance
 
-    def get_customer_info(self, obj):
-        if not obj.customer:
-            return None
-
-        return {
-            "uf": obj.customer.uf,
-            "company_name": obj.customer.company_name,
-            "alias_company_name": obj.customer.alias_company_name,
-        }
-
-    def get_point_info(self, obj):
-        if not obj.point:
-            return None
-
-        return {
-            "uf": obj.point.uf,
-            "name": obj.point.name,
-            "code": obj.point.code,
-        }
-
     def get_total_amount(self, obj):
-        return sum(
-            (
-                line.total_net + (line.other_charges or Decimal("0"))
-                for line in obj.job_lines.all()
-            ),
-            Decimal("0"),
-        )
+        total = Decimal("0")
 
-    def get_assigned_to_info(self, obj):
-        if not obj.assigned_to:
-            return None
+        for line in obj.job_lines.all():
+            print("LINE DEBUG:", line.total_net, line.other_charges)
 
-        return {
-            "uf": obj.assigned_to.uf,
-            "name": obj.assigned_to.get_full_name(),
-        }
+            total += line.total_net + (line.other_charges or Decimal("0"))
+
+        return total
 
     def get_customer_info(self, obj):
         if not obj.customer:
@@ -372,9 +344,6 @@ class JobSerializer(WritableNestedModelSerializer):
             "code": obj.point.code,
         }
 
-    def get_total_amount(self, obj):
-        return sum((line.total_net for line in obj.job_lines.all()), Decimal("0"))
-    
     def get_assigned_to_info(self, obj):
         if not obj.assigned_to:
             return None
@@ -482,12 +451,6 @@ class JobsByPointSerializer(serializers.Serializer):
     total_jobs = serializers.IntegerField()
 
 
-class BrokerReportsOverviewSerializer(serializers.Serializer):
-    top_customers = RevenueByCustomerSerializer(many=True)
-    revenue_by_point = RevenueByPointSerializer(many=True)
-    jobs_by_point = JobsByPointSerializer(many=True)
-
-
 class BrokerEmployeePerformanceItemSerializer(serializers.Serializer):
     employee_id = serializers.IntegerField()
     name = serializers.CharField()
@@ -503,19 +466,136 @@ class BrokerEmployeePerformanceSerializer(serializers.Serializer):
 ###### END BROKER REPORTS ######
 
 ###### START BROKER PRICING ######
-class BrokerCustomerPricingSerializer(serializers.Serializer):
-    service_type_id = serializers.IntegerField()
-    service_name = serializers.CharField()
-    default_price = serializers.DecimalField(max_digits=12, decimal_places=2)
-    special_price = serializers.DecimalField(
-        max_digits=12, decimal_places=2, allow_null=True
-    )
-    is_active = serializers.BooleanField()
-
-
 class BrokerCustomerPricingUpsertSerializer(serializers.Serializer):
     tier_id = serializers.IntegerField()
     price = serializers.DecimalField(max_digits=12, decimal_places=2)
     is_active = serializers.BooleanField()
 
 ###### END BROKER PRICING ######
+
+###### START STAFF ######
+class BrokerStaffSerializer(serializers.ModelSerializer):
+    name = serializers.SerializerMethodField()
+    phone = serializers.SerializerMethodField()
+    role = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = (
+            "uf",
+            "name",
+            "phone",
+            "email",
+            "role",
+        )
+
+    def get_name(self, obj):
+        return obj.get_full_name()
+    
+    def get_phone(self, obj):
+        return obj.phone
+
+    def get_role(self, obj):
+        if obj.groups.filter(name="level_leader_broker").exists():
+            return "leader"
+        if obj.groups.filter(name="level_broker").exists():
+            return "broker"
+        return None
+
+
+class BrokerBaseSalarySerializer(serializers.ModelSerializer):
+
+    currency = serializers.SlugRelatedField(
+        allow_null=True, slug_field='currency_code', queryset=Currency.objects.all())
+    uf = serializers.CharField(read_only=True)
+    
+    class Meta:
+        model = BrokerBaseSalary
+        fields = [
+            "id",
+            "amount",
+            "currency",
+            "valid_from",
+            "uf",
+        ]
+
+    def create(self, validated_data):
+        validated_data["company"] = self.context["company"]
+        validated_data["user"] = self.context["user"]
+
+        return super().create(validated_data)
+
+
+class BrokerCommissionSerializer(serializers.ModelSerializer):
+
+    customer = serializers.SlugRelatedField(
+        allow_null=True, slug_field='uf', queryset=Contact.objects.all())
+    uf = serializers.CharField(read_only=True)
+
+    class Meta:
+        model = BrokerCommission
+        fields = [
+            "id",
+            "customer",
+            "service_type",
+            "type",     
+            "value",     
+            "valid_from",
+            "valid_to",
+            "uf",
+        ]
+
+    def create(self, validated_data):
+        validated_data["company"] = self.context["company"]
+        validated_data["user"] = self.context["user"]
+
+        return super().create(validated_data)
+
+
+class BrokerStaffDetailsSerializer(serializers.ModelSerializer):
+
+    broker_base_salaries = BrokerBaseSalarySerializer(many=True)
+    broker_commissions = BrokerCommissionSerializer(many=True)
+    role = serializers.SerializerMethodField()
+   
+
+    class Meta:
+        model = User
+        fields = [
+            "id",
+            "first_name",
+            "last_name",
+            "email",
+            "phone",
+            "broker_base_salaries",
+            "broker_commissions",
+            "role",
+            "uf",
+            
+            # Property
+            "get_full_name",
+        ]   
+ 
+
+    def get_role(self, obj):
+        if obj.groups.filter(name="level_leader_broker").exists():
+            return "leader"
+        if obj.groups.filter(name="level_broker").exists():
+            return "broker"
+        return None
+
+
+
+class BrokerStaffCompensationSerializer(WritableNestedModelSerializer):
+
+    broker_base_salaries = BrokerBaseSalarySerializer(many=True)
+    broker_commissions = BrokerCommissionSerializer(many=True)
+
+    class Meta:
+        model = User
+        fields = [
+            "broker_base_salaries",
+            "broker_commissions",
+        ]
+
+###### END STAFF ######

@@ -10,3 +10,36 @@ msgstr "Factura {num} trimisa in SPV are erori"
 
 msgid "error_to_send_inv_to_spv_try_again"
 msgstr "A aparut o eroare la trimiterea facturii numarul {num} in SPV. Te rugam sa incerci s-o trimiti din nou."
+
+msgid "Including VAT"
+msgstr "Inclusiv TVA"
+
+msgid "Excluding VAT"
+msgstr "Fara TVA"
+
+msgid "Date"
+msgstr "Data"
+
+msgid "Customer"
+msgstr "Client"
+
+msgid "Service"
+msgstr "Serviciu"
+
+msgid "Quantity"
+msgstr "Cantitate"
+
+msgid "Revenue"
+msgstr "Venit"
+
+msgid "Commission"
+msgstr "Comision"
+
+msgid "Base salary"
+msgstr "Salariu de bază"
+
+msgid "Commission total"
+msgstr "Total comision"
+
+msgid "Total income"
+msgstr "Venit total"

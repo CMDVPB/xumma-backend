@@ -1,10 +1,12 @@
 import logging
+from django.utils.translation import gettext_lazy as _
 from django.db import models
 from django.conf import settings
 from django.db.models import Q
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 
+from abb.models import Currency
 from abb.utils import hex_uuid
 
 logger = logging.getLogger(__name__)
@@ -382,3 +384,185 @@ class JobLine(models.Model):
         return self.total_net + self.total_vat
     
 
+###### START BROKER COMPENSATION ######
+class BrokerBaseSalary(models.Model):
+    uf = models.CharField(max_length=36, default=hex_uuid, unique=True, db_index=True)
+    company = models.ForeignKey(
+        "app.Company",
+        on_delete=models.CASCADE,
+        related_name="company_broker_base_salaries",
+    )
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="broker_base_salaries"
+    )
+
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+
+    currency = models.ForeignKey(Currency, on_delete=models.PROTECT, related_name="currency_broker_base_salaries")
+
+    valid_from = models.DateField()
+    valid_to = models.DateField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-valid_from"]
+        indexes = [
+            models.Index(fields=["user", "valid_from"]),
+        ]
+
+    def clean(self):
+
+        overlapping = BrokerBaseSalary.objects.filter(
+            user=self.user,
+            company=self.company,
+        ).exclude(pk=self.pk).filter(
+            valid_from__lte=self.valid_to if self.valid_to else self.valid_from,
+            valid_to__gte=self.valid_from
+        )
+
+        if overlapping.exists():
+            raise ValidationError("Salary periods overlap.")
+        
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.user} {self.amount} {self.currency}"
+    
+
+class BrokerCommissionType(models.TextChoices):
+    INCL_VAT = "incl_vat", _("Including VAT")
+    EXCL_VAT = "excl_vat", _("Excluding VAT")
+
+
+class BrokerCommission(models.Model):
+    uf = models.CharField(max_length=36, default=hex_uuid, unique=True, db_index=True)
+    company = models.ForeignKey(
+            "app.Company",
+            on_delete=models.CASCADE,
+            related_name="company_broker_commissions"
+        )
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="broker_commissions"
+    )
+
+    customer = models.ForeignKey(
+        "att.Contact",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="customer_broker_commissions"
+    )
+
+    service_type = models.ForeignKey(
+        "broker.ServiceType",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="service_type_broker_commissions"
+    )
+
+    type = models.CharField(
+            max_length=20,
+            choices=BrokerCommissionType.choices,
+            default=BrokerCommissionType.EXCL_VAT
+        )
+
+    value = models.DecimalField(
+        max_digits=10,
+        decimal_places=2
+    )
+
+    valid_from = models.DateField()
+    valid_to = models.DateField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-valid_from"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["company", "user", "customer", "service_type", "valid_from"],
+                name="unique_broker_commission_rule"
+            )
+        ]
+        indexes = [
+            models.Index(fields=["user", "valid_from"]),
+            models.Index(fields=["company", "user"]),
+        ]
+
+    def clean(self):
+
+        overlapping = BrokerCommission.objects.filter(
+            user=self.user,
+            company=self.company,
+            customer=self.customer,
+            service_type=self.service_type,
+        ).exclude(pk=self.pk).filter(
+            Q(valid_to__isnull=True) | Q(valid_to__gte=self.valid_from)
+        ).filter(
+            Q(valid_from__lte=self.valid_to) if self.valid_to else Q()
+        )
+
+        if overlapping.exists():
+            raise ValidationError("Commission rule overlaps.")
+        
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.user} {self.value} ({self.type})"
+
+
+class BrokerSettlementStatus(models.TextChoices):
+    PENDING = "pending"
+    APPROVED = "approved"
+    PAID = "paid"
+
+
+class BrokerSettlement(models.Model):
+    uf = models.CharField(max_length=36, default=hex_uuid, unique=True)
+    company = models.ForeignKey(
+        "app.Company",
+        on_delete=models.CASCADE,
+        related_name="company_broker_settlements",
+    )
+
+    broker = models.ForeignKey(User, on_delete=models.CASCADE)
+
+    period_start = models.DateField()
+    period_end = models.DateField()
+
+    base_salary = models.DecimalField(max_digits=12, decimal_places=2)
+    commission_total = models.DecimalField(max_digits=12, decimal_places=2)
+    total_income = models.DecimalField(max_digits=12, decimal_places=2)
+
+    status = models.CharField(
+        max_length=20,
+        choices=BrokerSettlementStatus.choices,
+        default=BrokerSettlementStatus.PENDING
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    settlement_date = models.DateField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["broker", "period_start", "period_end"],
+                name="unique_broker_period_start_period_end_settlement"
+            )
+        ]
+        indexes = [
+            models.Index(fields=["company", "broker"]),            
+            models.Index(fields=["broker", "status"])
+        ]
+
+
+    
+###### END BROKER COMPENSATION ######

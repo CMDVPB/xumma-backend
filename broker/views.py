@@ -8,24 +8,33 @@ from django.shortcuts import get_object_or_404
 from datetime import date
 from dateutil.relativedelta import relativedelta
 from django.db.models.functions import TruncMonth
+from django.utils.translation import gettext
+from django.utils.translation import activate
+from django.utils.translation import get_language_from_request
+from openpyxl import Workbook
+from django.http import HttpResponse
 from rest_framework.views import APIView
-from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView, DestroyAPIView
+from rest_framework.generics import (ListCreateAPIView, RetrieveUpdateDestroyAPIView, 
+                                     UpdateAPIView, DestroyAPIView, RetrieveUpdateAPIView)
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework import status
 
-
 from abb.utils import get_user_company
 from att.models import Contact
 from broker.helpers import get_user_role_in_point
 from broker.mixins import CompanyScopedMixin, JobVisibilityQuerysetMixin
-from broker.models import CustomerServicePrice, CustomerServiceTierPrice, Job, JobLine, PointMembership, PointOfService, Role, ServiceType, ServiceTypeTier
+from broker.models import BrokerBaseSalary, BrokerCommissionType, BrokerSettlement, CustomerServicePrice, CustomerServiceTierPrice, Job, JobLine, PointMembership, PointOfService, Role, ServiceType, ServiceTypeTier
 
 from broker.permissions import IsAdminOrManager, JobAccessPermission
-from broker.serializers import (BrokerEmployeePerformanceSerializer, BrokerReportsOverviewSerializer, CustomerServicePriceSerializer, 
-                                JobSerializer, BrokerCustomerPricingSerializer, BrokerCustomerPricingUpsertSerializer, PointMembershipSerializer, PointOfServiceSerializer, ServiceTypeSerializer)
+from broker.serializers import (BrokerEmployeePerformanceSerializer, BrokerStaffCompensationSerializer, BrokerStaffDetailsSerializer, 
+                                BrokerStaffSerializer, CustomerServicePriceSerializer, JobSerializer, ServiceTypeSerializer,
+                                 BrokerCustomerPricingUpsertSerializer, PointMembershipSerializer, PointOfServiceSerializer, 
+                                 )
+from broker.service import resolve_commission
+from broker.utils import build_broker_settlement_report
 
 logger = logging.getLogger(__name__)
 
@@ -546,18 +555,15 @@ class BrokerPartnerPricingAPIView(APIView):
                 ).first()
 
                 tiers.append(
-                    {
-                        "tier_id": tier.id,
-                        "range": (
-                            f"{tier.from_quantity}-{tier.to_quantity}"
-                            if tier.to_quantity
-                            else f"{tier.from_quantity}+"
-                        ),
-                        "default_price": tier.price,
-                        "special_price": special.price if special else None,
-                        "is_active": special.is_active if special else False,
-                    }
-                )
+                        {
+                            "tier_id": tier.id,
+                            "from_quantity": tier.from_quantity,
+                            "to_quantity": tier.to_quantity,
+                            "default_price": tier.price,
+                            "special_price": special.price if special else None,
+                            "is_active": special.is_active if special else False,
+                        }
+                    )
 
             pricing.append(
                 {
@@ -634,3 +640,178 @@ class BrokerSpecialPricingDeleteAPIView(DestroyAPIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 ###### END BROKER PRICING ######
+
+###### START STAFF ######
+class BrokerStaffListAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user_company = get_user_company(request.user)        
+
+        users = User.objects.filter(
+            company=user_company,
+            groups__name__in=["level_leader_broker", "level_broker"],
+        ).distinct()
+
+        serializer = BrokerStaffSerializer(users, many=True)
+
+        return Response(serializer.data)
+    
+
+class BrokerStaffDetailsView(RetrieveUpdateAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = BrokerStaffDetailsSerializer
+    lookup_field = "uf"
+
+    def get_queryset(self):
+
+        qs = User.objects.filter(
+            groups__name__in=[
+                "level_leader_broker",
+                "level_broker",
+            ]
+        )
+        return qs.distinct()
+    
+
+class BrokerStaffCompensationUpdateView(UpdateAPIView):
+
+    serializer_class = BrokerStaffCompensationSerializer
+    lookup_field = "uf"
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["company"] = get_user_company(self.request.user)
+        context["user"] = self.get_object()
+        return context
+
+    def get_queryset(self):
+
+        qs = User.objects.filter(
+            groups__name__in=[
+                "level_leader_broker",
+                "level_broker",
+            ]
+        )
+        return qs.distinct()
+    
+
+class BrokerCommissionTypeListView(APIView):
+
+    def get(self, request):
+
+        data = [
+            {
+                "code": code,
+                "label": gettext(label),
+            }
+            for code, label in BrokerCommissionType.choices
+        ]
+
+        return Response(data)
+    
+
+class BrokerSettlementReportAPIView(APIView):
+
+    def get(self, request):
+
+        company = get_user_company(request.user)
+
+        broker_uf = request.query_params.get("broker")
+        start = request.query_params.get("start")
+        end = request.query_params.get("end")
+
+        broker = get_object_or_404(User, uf=broker_uf, company=company)
+
+        report = build_broker_settlement_report(company, broker, start, end)
+
+        return Response(report)    
+
+
+class BrokerSettlementExportAPIView(APIView):
+
+    def get(self, request):
+        lang = get_language_from_request(request)
+        activate(lang)
+
+        print('LANG5060', lang)
+
+        company = get_user_company(request.user)
+
+        broker_uf = request.query_params.get("broker")
+        start = request.query_params.get("start")
+        end = request.query_params.get("end")
+
+        broker = get_object_or_404(User, uf=broker_uf, company=company)
+
+        report = build_broker_settlement_report(company, broker, start, end)
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Broker Settlement"
+
+        # header
+        ws.append([           
+            gettext("Date"),
+            gettext("Customer"),
+            gettext("Service"),
+            gettext("Quantity"),
+            gettext("Revenue"),
+            gettext("Commission")
+        ])
+
+        for row in report["rows"]:
+            ws.append([               
+                row["date"],
+                row["customer"],
+                row["service"],
+                row["quantity"],
+                float(row["revenue"]),
+                float(row["commission"]),
+            ])
+
+        ws.append([])
+        ws.append([gettext("Base salary"), float(report["summary"]["base_salary"])])
+        ws.append([gettext("Commission total"), float(report["summary"]["commission_total"])])
+        ws.append([gettext("Total income"), float(report["summary"]["total_income"])])
+
+        response = HttpResponse(
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+
+        response["Content-Disposition"] = f'attachment; filename="broker-settlement-{broker.uf}.xlsx"'
+
+        wb.save(response)
+
+        return response
+
+
+class BrokerSettlementCreateAPIView(APIView):
+
+    def post(self, request):
+
+        company = get_user_company(request.user)
+
+        broker_uf = request.data.get("broker")
+        start = request.data.get("start")
+        end = request.data.get("end")
+
+        broker = get_object_or_404(User, uf=broker_uf, company=company)
+
+        report = build_broker_settlement_report(company, broker, start, end)
+
+        settlement = BrokerSettlement.objects.create(
+            company=company,
+            broker=broker,
+            period_start=start,
+            period_end=end,
+            base_salary=report["summary"]["base_salary"],
+            commission_total=report["summary"]["commission_total"],
+            total_income=report["summary"]["total_income"],
+        )
+
+        return Response({
+            "uf": settlement.uf
+        })
+
+###### END STAFF ######

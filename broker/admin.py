@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from broker.models import CustomerServicePrice, Job, JobLine, PointOfService, ServiceType
+from broker.models import BrokerBaseSalary, BrokerCommission, CustomerServicePrice, Job, JobLine, PointOfService, ServiceType
 
 
 
@@ -19,7 +19,7 @@ class JobAdmin(admin.ModelAdmin):
 
 @admin.register(JobLine)
 class JobLineAdmin(admin.ModelAdmin):
-    list_display = ('id', 'job', 'service_type', 'quantity', 'unit_price_net', 'vat_percent',
+    list_display = ('id', 'job', 'service_type', 'quantity', 'unit_price_net', 'vat_percent', 'other_charges',
                     )
 
 
@@ -33,5 +33,18 @@ class ServiceTypeAdmin(admin.ModelAdmin):
 class CustomerServicePriceAdmin(admin.ModelAdmin):
     list_display = ('id', 'company', 'customer', 'service_type', 'price', 'is_active',
                     )
+
+
+@admin.register(BrokerBaseSalary)
+class BrokerBaseSalaryAdmin(admin.ModelAdmin):
+    list_display = ('id', 'company', 'user', 'amount', 'currency', 'valid_from', 'valid_to',
+                    )
+
+
+@admin.register(BrokerCommission)
+class BrokerCommissionAdmin(admin.ModelAdmin):
+    list_display = ('id', 'company', 'customer', 'service_type', 'type', 'value', 'valid_from', 'valid_to',
+                    )
+
 
 
