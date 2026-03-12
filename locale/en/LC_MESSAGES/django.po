@@ -49,3 +49,60 @@ msgstr "Total commission"
 
 msgid "total_income"
 msgstr "Total income"
+
+msgid "owner"
+msgstr "Owner"
+
+msgid "product_sku"
+msgstr "Product SKU"
+
+msgid "product_name"
+msgstr "Product name"
+
+msgid "location"
+msgstr "Location"
+
+msgid "pallet_type"
+msgstr "Pallet type"
+
+msgid "pallets"
+msgstr "Pallets"
+
+msgid "area_m2"
+msgstr "Area m²"
+
+msgid "area_m3"
+msgstr "Volume m³"
+
+msgid "stock"
+msgstr "Stock"
+
+msgid "stock_export"
+msgstr "Stock export"
+
+msgid "exported_at"
+msgstr "Exported at"
+
+msgid "stock_movements"
+msgstr "Stock movements"
+
+msgid "stock_movements_export"
+msgstr "Stock movements export"
+
+msgid "product"
+msgstr "Product"
+
+msgid "units"
+msgstr "Units"
+
+msgid "direction"
+msgstr "Direction"
+
+msgid "source"
+msgstr "Source"
+
+msgid "inbound"
+msgstr "Inbound"
+
+msgid "outbound"
+msgstr "Outbound"

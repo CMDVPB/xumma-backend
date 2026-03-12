@@ -1,11 +1,13 @@
 from decimal import Decimal
 from datetime import timedelta
 from math import ceil
+
 from django.db import transaction
 from django.utils import timezone
 
 from logistic.models import (
     WHBillingCharge,
+    WHPalletType,
     WHStockLedger,
     WHStorageBillingMode,
     WHTariff,
@@ -18,14 +20,14 @@ MEASURE_FIELD_MAP = {
     WHStorageBillingMode.PALLET: "delta_pallets",
     WHStorageBillingMode.UNIT: "delta_quantity",
     WHStorageBillingMode.M2: "delta_area_m2",
-    WHStorageBillingMode.VOLUME: "delta_volume_m3",
+    WHStorageBillingMode.M3: "delta_volume_m3",
 }
 
 UNIT_TYPE_MAP = {
     WHStorageBillingMode.PALLET: "pallet_day",
     WHStorageBillingMode.UNIT: "unit_day",
     WHStorageBillingMode.M2: "m2_day",
-    WHStorageBillingMode.VOLUME: "m3_day",
+    WHStorageBillingMode.M3: "m3_day",
 }
 
 
@@ -57,14 +59,16 @@ def _resolve_tariff(company, contact):
             return getattr(override, field)
         return getattr(default, field)
 
-    price_map = {
-        WHStorageBillingMode.PALLET: pick_price("storage_per_pallet_per_day"),
-        WHStorageBillingMode.UNIT: pick_price("storage_per_unit_per_day"),
-        WHStorageBillingMode.M2: pick_price("storage_per_m2_per_day"),
-        WHStorageBillingMode.VOLUME: pick_price("storage_per_m3_per_day"),
+    prices = {
+        WHStorageBillingMode.UNIT: Decimal(pick_price("storage_per_unit_per_day") or 0),
+        WHStorageBillingMode.M2: Decimal(pick_price("storage_per_m2_per_day") or 0),
+        WHStorageBillingMode.M3: Decimal(pick_price("storage_per_m3_per_day") or 0),
+        WHStorageBillingMode.PALLET: {
+            WHPalletType.EURO: Decimal(pick_price("storage_per_euro_pallet_per_day") or 0),
+            WHPalletType.ISO2: Decimal(pick_price("storage_per_iso2_pallet_per_day") or 0),
+            WHPalletType.BLOCK: Decimal(pick_price("storage_per_block_pallet_per_day") or 0),
+        },
     }
-
-    price = Decimal(price_map.get(storage_mode) or 0)
 
     min_days = (
         override.storage_min_days
@@ -72,19 +76,19 @@ def _resolve_tariff(company, contact):
         else default.storage_min_days
     ) or 1
 
-    return storage_mode, price, int(min_days)
+    return storage_mode, prices, int(min_days)
 
 
 def _period_bounds(period):
-
     start = timezone.make_aware(
         timezone.datetime.combine(period.start_date, timezone.datetime.min.time())
     )
-
     end = timezone.make_aware(
-        timezone.datetime.combine(period.end_date + timedelta(days=1), timezone.datetime.min.time())
+        timezone.datetime.combine(
+            period.end_date + timedelta(days=1),
+            timezone.datetime.min.time(),
+        )
     )
-
     return start, end
 
 
@@ -93,39 +97,129 @@ def _days_between(start, end):
     return ceil(seconds / SECONDS_PER_DAY)
 
 
+def _calculate_billed_total(rows, measure_field, start_dt, cutoff, min_days):
+    """
+    FIFO lot billing.
+
+    rows must already be filtered to the exact billing dimension:
+    - owner only for unit/m2/m3
+    - owner + pallet_type for pallet mode
+    """
+    lots = []
+
+    before_period = rows.filter(created_at__lt=start_dt)
+
+    for row in before_period:
+        delta = Decimal(getattr(row, measure_field) or 0)
+
+        if delta > 0:
+            lots.append({
+                "qty": delta,
+                "remaining": delta,
+                "start": row.created_at,
+            })
+        elif delta < 0:
+            to_remove = abs(delta)
+
+            for lot in lots:
+                if lot["remaining"] <= 0:
+                    continue
+
+                consume = min(lot["remaining"], to_remove)
+                lot["remaining"] -= consume
+                to_remove -= consume
+
+                if to_remove <= 0:
+                    break
+
+    for lot in lots:
+        if lot["remaining"] > 0 and lot["start"] < start_dt:
+            lot["bill_start"] = start_dt
+        else:
+            lot["bill_start"] = lot["start"]
+
+    in_period = rows.filter(created_at__gte=start_dt)
+
+    billed_total = Decimal("0")
+
+    for row in in_period:
+        if row.created_at >= cutoff:
+            break
+
+        delta = Decimal(getattr(row, measure_field) or 0)
+
+        if delta > 0:
+            lots.append({
+                "qty": delta,
+                "remaining": delta,
+                "start": row.created_at,
+                "bill_start": row.created_at,
+            })
+
+        elif delta < 0:
+            to_remove = abs(delta)
+
+            for lot in lots:
+                if lot["remaining"] <= 0:
+                    continue
+
+                consume = min(lot["remaining"], to_remove)
+
+                days = _days_between(lot["bill_start"], row.created_at)
+                days = max(days, min_days)
+
+                billed_total += Decimal(consume) * Decimal(days)
+
+                lot["remaining"] -= consume
+                to_remove -= consume
+
+                if to_remove <= 0:
+                    break
+
+    for lot in lots:
+        if lot["remaining"] <= 0:
+            continue
+
+        days = _days_between(lot["bill_start"], cutoff)
+        days = max(days, min_days)
+
+        billed_total += Decimal(lot["remaining"]) * Decimal(days)
+
+    return billed_total.quantize(Decimal("0.001"))
+
+
 @transaction.atomic
 def generate_storage_billing_for_period(*, company, period, contact_ids=None):
     """
     Lot-based storage billing with true min_days support.
-    No daily snapshots, no day-by-day loops.
 
     Billing logic:
     - Positive ledger delta => new lot
     - Negative ledger delta => consume earlier lots (FIFO)
     - Each consumed/open lot is billed for max(actual_days, min_days)
+
+    For pallet mode:
+    - billing is split by pallet_type
+    - separate charge is created per pallet_type
     """
 
     now = timezone.now()
     start_dt, end_dt = _period_bounds(period)
     cutoff = min(now, end_dt)
 
-    print('2224', start_dt, end_dt, cutoff)
-
     if cutoff <= start_dt:
         return []
 
-    ledger = WHStockLedger.objects.filter(
-        company=company,
-        created_at__lt=cutoff,
-    ).order_by("created_at", "id")
-
-    print('2240', ledger)
+    ledger = (
+        WHStockLedger.objects
+        .filter(company=company, created_at__lt=cutoff)
+        .order_by("created_at", "id")
+    )
 
     if contact_ids:
         ledger = ledger.filter(owner_id__in=contact_ids)
 
     owner_ids = ledger.values_list("owner_id", flat=True).distinct()
-
 
     created = []
 
@@ -137,15 +231,14 @@ def generate_storage_billing_for_period(*, company, period, contact_ids=None):
             continue
 
         contact = first_row.owner
-        storage_mode, price, min_days = _resolve_tariff(company, contact)
-
+        storage_mode, prices, min_days = _resolve_tariff(company, contact)
         measure_field = MEASURE_FIELD_MAP.get(storage_mode)
         unit_type = UNIT_TYPE_MAP.get(storage_mode)
 
-        if not measure_field or price <= 0:
+        if not measure_field:
             continue
 
-        # Remove previously generated, not yet invoiced storage charge for this period
+        # remove previously generated, not yet invoiced storage charges
         WHBillingCharge.objects.filter(
             company=company,
             contact_id=owner_id,
@@ -156,108 +249,72 @@ def generate_storage_billing_for_period(*, company, period, contact_ids=None):
             invoiced=False,
         ).delete()
 
-        # Build opening lots from movements before the period start
-        lots = []
+        if storage_mode == WHStorageBillingMode.PALLET:
+            pallet_prices = prices.get(WHStorageBillingMode.PALLET, {})
 
-        before_period = owner_ledger.filter(created_at__lt=start_dt)
+            for pallet_type in (
+                WHPalletType.EURO,
+                WHPalletType.ISO2,
+                WHPalletType.BLOCK,
+            ):
+                price = Decimal(pallet_prices.get(pallet_type) or 0)
+                if price <= 0:
+                    continue
 
-        for row in before_period:
-            delta = Decimal(getattr(row, measure_field) or 0)
+                typed_ledger = owner_ledger.filter(pallet_type=pallet_type)
 
-            if delta > 0:
-                lots.append({
-                    "qty": delta,
-                    "remaining": delta,
-                    "start": row.created_at,
-                })
-            elif delta < 0:
-                to_remove = abs(delta)
+                billed_total = _calculate_billed_total(
+                    rows=typed_ledger,
+                    measure_field="delta_pallets",
+                    start_dt=start_dt,
+                    cutoff=cutoff,
+                    min_days=min_days,
+                )
 
-                for lot in lots:
-                    if lot["remaining"] <= 0:
-                        continue
+                if billed_total <= 0:
+                    continue
 
-                    consume = min(lot["remaining"], to_remove)
-                    lot["remaining"] -= consume
-                    to_remove -= consume
+                charge = WHBillingCharge.objects.create(
+                    company=company,
+                    contact_id=owner_id,
+                    billing_period=period,
+                    charge_type=WHBillingCharge.Type.STORAGE,
+                    quantity=billed_total,
+                    unit_price=price,
+                    unit_type=unit_type,
+                    pallet_type=pallet_type,
+                    source_model="storage_period",
+                    source_uf=period.uf,
+                )
+                created.append(charge.uf)
 
-                    if to_remove <= 0:
-                        break
-
-        # For opening stock, billing in this period must start from period.start
-        for lot in lots:
-            if lot["remaining"] > 0 and lot["start"] < start_dt:
-                lot["bill_start"] = start_dt
-            else:
-                lot["bill_start"] = lot["start"]
-
-        # Process in-period movements with FIFO consumption
-        in_period = owner_ledger.filter(created_at__gte=start_dt)
-
-        billed_total = Decimal("0")
-
-        for row in in_period:
-            if row.created_at >= cutoff:
-                break
-
-            delta = Decimal(getattr(row, measure_field) or 0)
-
-            if delta > 0:
-                lots.append({
-                    "qty": delta,
-                    "remaining": delta,
-                    "start": row.created_at,
-                    "bill_start": row.created_at,
-                })
-
-            elif delta < 0:
-                to_remove = abs(delta)
-
-                for lot in lots:
-                    if lot["remaining"] <= 0:
-                        continue
-
-                    consume = min(lot["remaining"], to_remove)
-
-                    days = _days_between(lot["bill_start"], row.created_at)
-                    days = max(days, min_days)
-
-                    billed_total += Decimal(consume) * Decimal(days)
-
-                    lot["remaining"] -= consume
-                    to_remove -= consume
-
-                    if to_remove <= 0:
-                        break
-
-        # Bill remaining open lots until cutoff
-        for lot in lots:
-            if lot["remaining"] <= 0:
+        else:
+            price = Decimal(prices.get(storage_mode) or 0)
+            if price <= 0:
                 continue
 
-            days = _days_between(lot["bill_start"], cutoff)
-            days = max(days, min_days)
+            billed_total = _calculate_billed_total(
+                rows=owner_ledger,
+                measure_field=measure_field,
+                start_dt=start_dt,
+                cutoff=cutoff,
+                min_days=min_days,
+            )
 
-            billed_total += Decimal(lot["remaining"]) * Decimal(days)
+            if billed_total <= 0:
+                continue
 
-        billed_total = billed_total.quantize(Decimal("0.001"))
-
-        if billed_total <= 0:
-            continue
-
-        charge = WHBillingCharge.objects.create(
-            company=company,
-            contact_id=owner_id,
-            billing_period=period,
-            charge_type=WHBillingCharge.Type.STORAGE,
-            quantity=billed_total,
-            unit_price=price,
-            unit_type=unit_type,
-            source_model="storage_period",
-            source_uf=period.uf,
-        )
-
-        created.append(charge.uf)
+            charge = WHBillingCharge.objects.create(
+                company=company,
+                contact_id=owner_id,
+                billing_period=period,
+                charge_type=WHBillingCharge.Type.STORAGE,
+                quantity=billed_total,
+                unit_price=price,
+                unit_type=unit_type,
+                source_model="storage_period",
+                source_uf=period.uf,
+            )
+            created.append(charge.uf)
 
     return created
-

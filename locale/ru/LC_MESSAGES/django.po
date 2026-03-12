@@ -56,11 +56,60 @@ msgstr "Итого комиссия"
 msgid "total_income"
 msgstr "Общий доход"
 
+msgid "owner"
+msgstr "Владелец"
 
+msgid "product_sku"
+msgstr "Артикул товара"
 
+msgid "product_name"
+msgstr "Наименование товара"
 
+msgid "location"
+msgstr "Местоположение"
 
+msgid "pallet_type"
+msgstr "Тип паллеты"
 
+msgid "pallets"
+msgstr "Паллеты"
 
+msgid "area_m2"
+msgstr "Площадь м²"
 
+msgid "area_m3"
+msgstr "Объем м³"
+
+msgid "stock"
+msgstr "Остатки"
+
+msgid "stock_export"
+msgstr "Экспорт остатков"
+
+msgid "exported_at"
+msgstr "Экспортировано в"
+
+msgid "stock_movements"
+msgstr "Движения остатков"
+
+msgid "stock_movements_export"
+msgstr "Экспорт движений остатков"
+
+msgid "product"
+msgstr "Товар"
+
+msgid "units"
+msgstr "Единицы"
+
+msgid "direction"
+msgstr "Направление"
+
+msgid "source"
+msgstr "Источник"
+
+msgid "inbound"
+msgstr "Приход"
+
+msgid "outbound"
+msgstr "Расход"
 

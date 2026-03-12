@@ -56,9 +56,62 @@ msgstr "Total comision"
 msgid "total_income"
 msgstr "Venit total"
 
+msgid "owner"
+msgstr "Proprietar"
 
+msgid "product_sku"
+msgstr "SKU produs"
 
+msgid "product_name"
+msgstr "Denumirea produsului"
 
+msgid "location"
+msgstr "Locatie"
+
+msgid "pallet_type"
+msgstr "Tip palet"
+
+msgid "pallets"
+msgstr "Paleti"
+
+msgid "area_m2"
+msgstr "Suprafata m²"
+
+msgid "area_m3"
+msgstr "Volum m³"
+
+msgid "stock"
+msgstr "Stoc"
+
+msgid "stock_export"
+msgstr "Export stoc"
+
+msgid "exported_at"
+msgstr "Exportat la"
+
+msgid "stock_movements"
+msgstr "Miscari de stoc"
+
+msgid "stock_movements_export"
+msgstr "Export miscari de stoc"
+
+msgid "product"
+msgstr "Produs"
+
+msgid "units"
+msgstr "Unitati"
+
+msgid "direction"
+msgstr "Directie"
+
+msgid "source"
+msgstr "Sursa"
+
+msgid "inbound"
+msgstr "Intrare"
+
+msgid "outbound"
+msgstr "Iesire"
 
 
 

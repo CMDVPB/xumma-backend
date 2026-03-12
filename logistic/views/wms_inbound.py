@@ -42,13 +42,8 @@ class WHInboundViewSet(ModelViewSet):
         )
     
     # RECEIVE INBOUND   
-    @action(
-        detail=True, 
-        methods=["post"], 
-        permission_classes=[IsAuthenticated, IsCompanyUserNotContactUser],
-    )
+    @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated, IsCompanyUserNotContactUser])
     def receive(self, request, uf=None):
-
         inbound = self.get_object()
 
         if inbound.status == WHInbound.Status.RECEIVED:
@@ -62,15 +57,19 @@ class WHInboundViewSet(ModelViewSet):
         inbound.received_by = request.user
         inbound.save(update_fields=["status", "received_at", "received_by"])
 
-
         for line in inbound.inbound_lines.all():
-
             stock, _ = WHStock.objects.get_or_create(
                 company=inbound.company,
                 owner=inbound.owner,
                 product=line.product,
                 location=line.location,
-                defaults=dict(quantity=0, pallets=0, area_m2=0, volume_m3=0)
+                pallet_type=line.pallet_type,
+                defaults=dict(
+                    quantity=0,
+                    pallets=0,
+                    area_m2=0,
+                    volume_m3=0,
+                ),
             )
 
             stock.quantity += line.quantity or 0
@@ -84,6 +83,7 @@ class WHInboundViewSet(ModelViewSet):
                 owner=inbound.owner,
                 product=line.product,
                 location=line.location,
+                pallet_type=line.pallet_type,
                 delta_quantity=line.quantity or 0,
                 delta_pallets=line.pallets or 0,
                 delta_area_m2=line.area_m2 or 0,
@@ -91,7 +91,7 @@ class WHInboundViewSet(ModelViewSet):
                 source_type=WHStockLedger.SourceType.INBOUND,
                 source_uf=inbound.uf,
                 actor_user=request.user,
-                movement_direction="in"
+                movement_direction="in",
             )
 
         return Response({"status": "received"})

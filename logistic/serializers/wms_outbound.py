@@ -30,6 +30,7 @@ class WHOutboundLineSerializer(serializers.ModelSerializer):
             "location",
             "quantity",
             "pallets",
+            "pallet_type",
             "area_m2",
             "volume_m3",
         ]

@@ -44,18 +44,16 @@ class WHOutboundViewSet(ModelViewSet):
                             then=Sum("outbound_lines__pallets")),
                         When(owner__contact_wh_tariff_overrides__storage_mode="m2",
                             then=Sum("outbound_lines__area_m2")),
-                        When(owner__contact_wh_tariff_overrides__storage_mode="volume",
+                        When(owner__contact_wh_tariff_overrides__storage_mode="m3",
                             then=Sum("outbound_lines__volume_m3")),
                         default=Sum("outbound_lines__quantity"),
                     ),
                     Value(0, output_field=DecimalField()),
                 )
             )
-        
+                    
         
         return qs.order_by('-updated_at')
-    
-
     
     def perform_create(self, serializer):
         serializer.save(created_by_user=self.request.user)
@@ -63,7 +61,6 @@ class WHOutboundViewSet(ModelViewSet):
     @action(detail=True, methods=["post"])
     @transaction.atomic
     def ship(self, request, uf=None):
-
         outbound = self.get_queryset().select_for_update().get(uf=uf)
 
         if outbound.status == "shipped":
@@ -75,41 +72,48 @@ class WHOutboundViewSet(ModelViewSet):
         company = get_user_company(request.user)
 
         for line in outbound.outbound_lines.all():
-
             stock, _ = WHStock.objects.get_or_create(
-                                company=company,
-                                owner=outbound.owner,
-                                product=line.product,
-                                location=line.location,
-                                defaults={
-                                    "quantity": 0,
-                                    "pallets": 0,
-                                    "area_m2": 0,
-                                    "volume_m3": 0,
-                                },
-                            )
+                company=company,
+                owner=outbound.owner,
+                product=line.product,
+                location=line.location,
+                pallet_type=line.pallet_type,
+                defaults={
+                    "quantity": 0,
+                    "pallets": 0,
+                    "area_m2": 0,
+                    "volume_m3": 0,
+                },
+            )
 
             if stock.quantity < (line.quantity or 0):
-                raise ValidationError("Not enough stock")
+                raise ValidationError("Not enough quantity in stock")
+
+            if stock.pallets < (line.pallets or 0):
+                raise ValidationError("Not enough pallets in stock")
+
+            if stock.area_m2 < (line.area_m2 or 0):
+                raise ValidationError("Not enough area in stock")
+
+            if stock.volume_m3 < (line.volume_m3 or 0):
+                raise ValidationError("Not enough volume in stock")
 
             WHStockLedger.objects.create(
                 company=company,
                 owner=outbound.owner,
                 product=line.product,
                 location=line.location,
-
+                pallet_type=line.pallet_type,
                 delta_quantity=-(line.quantity or 0),
                 delta_pallets=-(line.pallets or 0),
                 delta_area_m2=-(line.area_m2 or 0),
                 delta_volume_m3=-(line.volume_m3 or 0),
-
                 source_type=WHStockLedger.SourceType.OUTBOUND,
                 source_uf=outbound.uf,
-
                 actor_user=request.user,
+                movement_direction="out",
             )
 
-            # Must update stock snapshot after creating the ledger row
             stock.quantity -= (line.quantity or 0)
             stock.pallets -= (line.pallets or 0)
             stock.area_m2 -= (line.area_m2 or 0)

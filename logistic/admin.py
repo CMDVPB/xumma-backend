@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from logistic.models import (WHBillingCharge, WHBillingInvoice, WHBillingInvoiceLine, WHBillingPeriod, WHInbound,
+from logistic.models import (WHBillingCharge, WHBillingInvoice, WHBillingInvoiceLine, WHBillingPeriod, WHContactTariffHandlingTierOverride, WHContactTariffOverride, WHInbound,
                               WHInboundLine, WHLocation, WHOutbound, WHOutboundLine, WHProduct, WHStock, WHStockLedger
                               )
 
@@ -30,13 +30,13 @@ class WHInboundAdmin(admin.ModelAdmin):
     
 @admin.register(WHInboundLine)
 class WHInboundLineAdmin(admin.ModelAdmin):
-    list_display = ('id', 'inbound', 'product', 'location', 'quantity', 'pallets', 'area_m2', 'volume_m3', 'note',
+    list_display = ('id', 'inbound', 'product', 'location', 'quantity', 'pallets', 'pallet_type', 'area_m2', 'volume_m3', 'note',
                     )
 
 @admin.register(WHStock)
 class WHStockAdmin(admin.ModelAdmin):
     list_display = ('id', 'company', 'owner', 'product', 'location', 
-                    'quantity', 'pallets', 'area_m2', 'volume_m3', 'updated_at',                     
+                    'quantity', 'pallets', 'pallet_type', 'area_m2', 'volume_m3', 'updated_at',                     
                     )
 
                  
@@ -60,7 +60,7 @@ class WHOutboundAdmin(admin.ModelAdmin):
 
 @admin.register(WHOutboundLine)
 class WHOutboundLineAdmin(admin.ModelAdmin):
-    list_display = ('id', 'outbound', 'product', 'location', 'quantity', 'pallets', 'area_m2', 'volume_m3', 'note',
+    list_display = ('id', 'outbound', 'product', 'location', 'quantity', 'pallets', 'pallet_type', 'area_m2', 'volume_m3', 'note',
                     )
 
 
@@ -89,6 +89,31 @@ class WHBillingChargeAdmin(admin.ModelAdmin):
 class WHBillingPeriodAdmin(admin.ModelAdmin):
     list_display = ('id', 'company', 'start_date', 'end_date', 'is_closed', 'created_at',                 
                     )
+
+
+@admin.register(WHContactTariffOverride)
+class WHContactTariffOverrideAdmin(admin.ModelAdmin):
+    list_display = ('id', 'contact', 'storage_mode', 'storage_per_euro_pallet_per_day', 'storage_per_iso2_pallet_per_day',
+                     'storage_per_block_pallet_per_day', 'storage_per_m2_per_day', 'storage_per_m3_per_day', 'storage_per_unit_per_day',                 
+                    )
+
+
+
+
+@admin.register(WHContactTariffHandlingTierOverride)
+class WHContactTariffHandlingTierOverrideAdmin(admin.ModelAdmin):
+    list_display = ('id', 'override', 'fee_type', 'unit', 'min_quantity',
+                     'max_quantity', 'price', 'order',
+                    )
+
+
+
+
+
+
+
+
+
 
 
 
