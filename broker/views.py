@@ -1,5 +1,5 @@
 import logging
-from datetime import timedelta
+from datetime import timedelta, datetime
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 from django.db.models import Sum, F, Count, DecimalField, ExpressionWrapper, Q, Value, Avg
@@ -11,7 +11,6 @@ from django.db.models.functions import TruncMonth
 from django.utils.translation import gettext
 from django.utils.translation import activate
 from django.utils.translation import get_language_from_request
-from openpyxl import Workbook
 from django.http import HttpResponse
 from rest_framework.views import APIView
 from rest_framework.generics import (ListCreateAPIView, RetrieveUpdateDestroyAPIView, 
@@ -21,6 +20,8 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework import status
+from openpyxl import Workbook
+from openpyxl.styles import Font
 
 from abb.utils import get_user_company
 from att.models import Contact
@@ -748,20 +749,46 @@ class BrokerSettlementExportAPIView(APIView):
 
         wb = Workbook()
         ws = wb.active
-        ws.title = "Broker Settlement"
+        ws.title = gettext("broker_settlement")
 
-        # header
-        ws.append([           
-            gettext("Date"),
-            gettext("Customer"),
-            gettext("Service"),
-            gettext("Quantity"),
-            gettext("Revenue"),
-            gettext("Commission")
+        bold = Font(bold=True)
+
+        ws.append([gettext("broker_settlement")])
+        ws[ws.max_row][0].font = bold
+
+        ws.append([])
+
+        ws.append([
+            gettext("broker"),
+            f"{broker.get_full_name()} ({broker.email})"
         ])
 
+        start_fmt = datetime.strptime(start, "%Y-%m-%d").strftime("%d-%m-%Y")
+        end_fmt = datetime.strptime(end, "%Y-%m-%d").strftime("%d-%m-%Y")
+
+        ws.append([
+            gettext("period"),
+            f"{start_fmt} - {end_fmt}"
+        ])
+        
+        ws.append([])
+      
+        # header
+        ws.append([
+            gettext("date"),
+            gettext("customer"),
+            gettext("service"),
+            gettext("quantity"),
+            gettext("revenue"),
+            gettext("commission")
+        ])
+
+        # make header bold
+        for cell in ws[ws.max_row]:
+            cell.font = bold
+
         for row in report["rows"]:
-            ws.append([               
+            ws.append([
                 row["date"],
                 row["customer"],
                 row["service"],
@@ -770,16 +797,37 @@ class BrokerSettlementExportAPIView(APIView):
                 float(row["commission"]),
             ])
 
+            # format date column
+            date_cell = ws.cell(row=ws.max_row, column=1)
+
+            if isinstance(row["date"], str):
+                date_cell.value = datetime.strptime(row["date"], "%Y-%m-%d")
+
+            date_cell.number_format = "DD-MM-YYYY"
+
+       
+
         ws.append([])
-        ws.append([gettext("Base salary"), float(report["summary"]["base_salary"])])
-        ws.append([gettext("Commission total"), float(report["summary"]["commission_total"])])
-        ws.append([gettext("Total income"), float(report["summary"]["total_income"])])
+        ws.append([gettext("base_salary"), float(report["summary"]["base_salary"])])
+        for c in ws[ws.max_row]:
+            c.font = bold
+
+        ws.append([gettext("total_commission"), float(report["summary"]["commission_total"])])
+        for c in ws[ws.max_row]:
+            c.font = bold
+
+        ws.append([gettext("total_income"), float(report["summary"]["total_income"])])
+        for c in ws[ws.max_row]:
+            c.font = bold
+
+        # Locks the header row when scrolling in Excel
+        ws.freeze_panes = "A2"
 
         response = HttpResponse(
             content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
 
-        response["Content-Disposition"] = f'attachment; filename="broker-settlement-{broker.uf}.xlsx"'
+        response["Content-Disposition"] = f'attachment; filename="{"raport broker"}-{broker.uf}.xlsx"'
 
         wb.save(response)
 

@@ -1,0 +1,66 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "documents_from_spv_received"
+msgstr "Документы из SPV были получены"
+
+msgid "error_in_invoice"
+msgstr "В счете {num}, отправленном в SPV, есть ошибки"
+
+msgid "error_to_send_inv_to_spv_try_again"
+msgstr "Произошла ошибка при отправке счета-фактуры номер {num} в SPV. Попробуйте еще раз."
+
+msgid "Including VAT"
+msgstr "Включая НДС"
+
+msgid "Excluding VAT"
+msgstr "Без НДС"
+
+msgid "broker_settlement"
+msgstr "Расчет брокера"
+
+msgid "broker_report"
+msgstr "Отчет брокера"
+
+msgid "broker"
+msgstr "Брокер"
+
+msgid "period"
+msgstr "Период"
+
+msgid "date"
+msgstr "Дата"
+
+msgid "customer"
+msgstr "Клиент"
+
+msgid "service"
+msgstr "Услуга"
+
+msgid "quantity"
+msgstr "Количество"
+
+msgid "revenue"
+msgstr "Выручка"
+
+msgid "commission"
+msgstr "Комиссия"
+
+msgid "base_salary"
+msgstr "Базовая зарплата"
+
+msgid "total_commission"
+msgstr "Итого комиссия"
+
+msgid "total_income"
+msgstr "Общий доход"
+
+
+
+
+
+
+
+
+

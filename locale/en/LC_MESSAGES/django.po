@@ -1,0 +1,51 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "documents_from_spv_received"
+msgstr "Documents from SPV received"
+
+msgid "error_in_invoice"
+msgstr "There are errors in invoice {num} sent to SPV"
+
+msgid "error_to_send_inv_to_spv_try_again"
+msgstr "There was an error to send invoice number {num} to SPV. Please try again."
+
+msgid "broker_settlement"
+msgstr "Broker settlement"
+
+msgid "broker_report"
+msgstr "Broker report"
+
+msgid "broker"
+msgstr "Broker"
+
+msgid "period"
+msgstr "Period"
+
+msgid "date"
+msgstr "Date"
+
+msgid "customer"
+msgstr "Customer"
+
+msgid "service"
+msgstr "Service"
+
+msgid "quantity"
+msgstr "Quantity"
+
+msgid "revenue"
+msgstr "Revenue"
+
+msgid "commission"
+msgstr "Commission"
+
+msgid "base_salary"
+msgstr "Base salary"
+
+msgid "total_commission"
+msgstr "Total commission"
+
+msgid "total_income"
+msgstr "Total income"

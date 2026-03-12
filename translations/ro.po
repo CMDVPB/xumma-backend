@@ -16,30 +16,3 @@ msgstr "Inclusiv TVA"
 
 msgid "Excluding VAT"
 msgstr "Fara TVA"
-
-msgid "Date"
-msgstr "Data"
-
-msgid "Customer"
-msgstr "Client"
-
-msgid "Service"
-msgstr "Serviciu"
-
-msgid "Quantity"
-msgstr "Cantitate"
-
-msgid "Revenue"
-msgstr "Venit"
-
-msgid "Commission"
-msgstr "Comision"
-
-msgid "Base salary"
-msgstr "Salariu de bază"
-
-msgid "Commission total"
-msgstr "Total comision"
-
-msgid "Total income"
-msgstr "Venit total"

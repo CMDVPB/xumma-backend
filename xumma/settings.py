@@ -273,6 +273,10 @@ USE_TZ = True
 # DATETIME_FORMAT = "%d-%m-%Y%H:%M:%S"
 DATETIME_FORMAT = "%d-%m-%y %H:%M:%S"
 
+LOCALE_PATHS = [
+    BASE_DIR / "locale",
+]
+
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

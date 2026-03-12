@@ -16,30 +16,3 @@ msgstr "Включая НДС"
 
 msgid "Excluding VAT"
 msgstr "Без НДС"
-
-msgid "Date"
-msgstr "Дата"
-
-msgid "Customer"
-msgstr "Клиент"
-
-msgid "Service"
-msgstr "Услуга"
-
-msgid "Quantity"
-msgstr "Количество"
-
-msgid "Revenue"
-msgstr "Выручка"
-
-msgid "Commission"
-msgstr "Комиссия"
-
-msgid "Base salary"
-msgstr "Базовая зарплата"
-
-msgid "Commission total"
-msgstr "Итого комиссия"
-
-msgid "Total income"
-msgstr "Общий доход"

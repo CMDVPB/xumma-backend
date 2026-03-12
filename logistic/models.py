@@ -468,7 +468,6 @@ class WHContactTariffOverride(models.Model):
 
 
 ###### START WH BILLING ######
-
 class WHBillingPeriod(models.Model):
     uf = models.CharField(max_length=36, default=hex_uuid, db_index=True, unique=True)
     company = models.ForeignKey("app.Company", on_delete=models.CASCADE)
