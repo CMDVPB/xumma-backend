@@ -191,16 +191,6 @@ def _calculate_billed_total(rows, measure_field, start_dt, cutoff, min_days):
 @transaction.atomic
 def generate_storage_billing_for_period(*, company, period, contact_ids=None):
     """
-    Lot-based storage billing with true min_days support.
-
-    Billing logic:
-    - Positive ledger delta => new lot
-    - Negative ledger delta => consume earlier lots (FIFO)
-    - Each consumed/open lot is billed for max(actual_days, min_days)
-
-    For pallet mode:
-    - billing is split by pallet_type
-    - separate charge is created per pallet_type
     """
 
     now = timezone.now()

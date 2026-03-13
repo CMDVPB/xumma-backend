@@ -1,10 +1,21 @@
+
 from django.db import transaction
+from datetime import timedelta
+from django.utils import timezone
+from django.db.models import Q
 from django.shortcuts import get_object_or_404
+from django.http import HttpResponse
+from django.utils.translation import gettext as _
+from django.utils.translation import activate
+from django.utils.translation import get_language_from_request
 from rest_framework.viewsets import ViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework import status
+from io import BytesIO
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment
 
 from abb.utils import get_user_company
 from att.models import Contact
@@ -15,6 +26,30 @@ from logistic.serializers.wms_tariff import WHTariffSerializer
 class WHTariffViewSet(ViewSet):
 
     permission_classes = [IsAuthenticated]
+
+    def _parse_date(self, value):
+        if not value:
+            return None
+        return timezone.datetime.strptime(value, "%Y-%m-%d").date()
+
+    def _get_active_override(self, company, contact, as_of_date=None):
+        if as_of_date is None:
+            as_of_date = timezone.localdate()
+
+        return (
+            WHContactTariffOverride.objects
+            .filter(
+                company=company,
+                contact=contact,
+                period_start__lte=as_of_date,
+            )
+            .filter(
+                Q(period_end__isnull=True) | Q(period_end__gte=as_of_date) 
+            )
+            .prefetch_related("handling_tier_overrides")
+            .order_by("-period_start", "-created_at")
+            .first()
+        )
 
     def _get_default_tariff(self, company):
         default_tariff = (
@@ -33,9 +68,9 @@ class WHTariffViewSet(ViewSet):
                 storage_per_euro_pallet_per_day=0,
                 storage_per_iso2_pallet_per_day=0,
                 storage_per_block_pallet_per_day=0,
-                inbound_per_line=0,
-                outbound_per_order=0,
-                outbound_per_line=0,
+                # inbound_per_line=0,
+                # outbound_per_order=0,
+                # outbound_per_line=0,
                 storage_min_days=1,
                 handling_tier_mode="bracket",
                 is_active=True,
@@ -56,9 +91,9 @@ class WHTariffViewSet(ViewSet):
             "storage_per_iso2_pallet_per_day": empty_to_none(data.get("storage_per_iso2_pallet_per_day")),
             "storage_per_block_pallet_per_day": empty_to_none(data.get("storage_per_block_pallet_per_day")),
             "storage_min_days": empty_to_none(data.get("storage_min_days")),
-            "inbound_per_line": empty_to_none(data.get("inbound_per_line")),
-            "outbound_per_order": empty_to_none(data.get("outbound_per_order")),
-            "outbound_per_line": empty_to_none(data.get("outbound_per_line")),
+            # "inbound_per_line": empty_to_none(data.get("inbound_per_line")),
+            # "outbound_per_order": empty_to_none(data.get("outbound_per_order")),
+            # "outbound_per_line": empty_to_none(data.get("outbound_per_line")),
             "handling_tier_mode": empty_to_none(data.get("handling_tier_mode")),
         }
     
@@ -101,91 +136,366 @@ class WHTariffViewSet(ViewSet):
         if rows_to_create:
             WHContactTariffHandlingTierOverride.objects.bulk_create(rows_to_create)
 
-    def list(self, request):
-            company = get_user_company(request.user)
-            default_tariff = self._get_default_tariff(company)
+    def _get_previous_override(self, company, contact, period_start):
+        return (
+            WHContactTariffOverride.objects
+            .select_for_update()
+            .filter(company=company, contact=contact, period_start__lt=period_start)
+            .order_by("-period_start", "-created_at")
+            .first()
+        )
 
-            overrides = (
-                WHContactTariffOverride.objects
-                .filter(company=company)
-                .select_related("contact")
-                .prefetch_related("handling_tier_overrides")
+    def _get_next_override(self, company, contact, period_start):
+        return (
+            WHContactTariffOverride.objects
+            .select_for_update()
+            .filter(company=company, contact=contact, period_start__gt=period_start)
+            .order_by("period_start", "created_at")
+            .first()
+        )
+
+    def list(self, request):
+        company = get_user_company(request.user)
+        today = timezone.localdate()
+        default_tariff = self._get_default_tariff(company)
+
+        overrides = (
+            WHContactTariffOverride.objects
+            .filter(company=company, period_start__lte=today)
+            .filter(Q(period_end__isnull=True) | Q(period_end__gte=today))
+            .select_related("contact")
+            .prefetch_related("handling_tier_overrides")
+            .order_by("contact_id", "-period_start", "-created_at")
+        )
+
+        active_override_by_contact_id = {}
+        for override in overrides:
+            if override.contact_id not in active_override_by_contact_id:
+                active_override_by_contact_id[override.contact_id] = override
+
+        data = []
+
+        for override in active_override_by_contact_id.values():
+            contact = override.contact
+
+            storage_mode = override.storage_mode or default_tariff.storage_mode
+
+            storage_per_euro_pallet = (
+                override.storage_per_euro_pallet_per_day
+                if override.storage_per_euro_pallet_per_day is not None
+                else default_tariff.storage_per_euro_pallet_per_day
             )
 
-            data = []
+            storage_per_iso2_pallet = (
+                override.storage_per_iso2_pallet_per_day
+                if override.storage_per_iso2_pallet_per_day is not None
+                else default_tariff.storage_per_iso2_pallet_per_day
+            )
 
-            for override in overrides:
-                contact = override.contact
+            storage_per_block_pallet = (
+                override.storage_per_block_pallet_per_day
+                if override.storage_per_block_pallet_per_day is not None
+                else default_tariff.storage_per_block_pallet_per_day
+            )
 
-                storage_mode = override.storage_mode or default_tariff.storage_mode
+            storage_per_unit = (
+                override.storage_per_unit_per_day
+                if override.storage_per_unit_per_day is not None
+                else default_tariff.storage_per_unit_per_day
+            )
 
-                storage_per_euro_pallet = (
-                    override.storage_per_euro_pallet_per_day
-                    if override.storage_per_euro_pallet_per_day is not None
-                    else default_tariff.storage_per_euro_pallet_per_day
+            storage_per_m2 = (
+                override.storage_per_m2_per_day
+                if override.storage_per_m2_per_day is not None
+                else default_tariff.storage_per_m2_per_day
+            )
+
+            storage_per_m3 = (
+                override.storage_per_m3_per_day
+                if override.storage_per_m3_per_day is not None
+                else default_tariff.storage_per_m3_per_day
+            )
+
+            storage_min_days = (
+                override.storage_min_days
+                if override.storage_min_days is not None
+                else default_tariff.storage_min_days
+            )
+
+            # inbound = (
+            #     override.inbound_per_line
+            #     if override.inbound_per_line is not None
+            #     else default_tariff.inbound_per_line
+            # )
+
+            # outbound_order = (
+            #     override.outbound_per_order
+            #     if override.outbound_per_order is not None
+            #     else default_tariff.outbound_per_order
+            # )
+
+            # outbound_line = (
+            #     override.outbound_per_line
+            #     if override.outbound_per_line is not None
+            #     else default_tariff.outbound_per_line
+            # )
+
+            handling_tier_mode = (
+                override.handling_tier_mode
+                if override.handling_tier_mode
+                else default_tariff.handling_tier_mode
+            )
+
+            handling_tiers = [
+                {
+                    "fee_type": tier.fee_type,
+                    "unit": tier.unit,
+                    "min_quantity": tier.min_quantity,
+                    "max_quantity": tier.max_quantity,
+                    "price": tier.price,
+                    "order": tier.order,
+                }
+                for tier in override.handling_tier_overrides.all()
+            ]
+
+            data.append({
+                "contact": contact.uf,
+                "contact_name": contact.company_name,
+                "period_start": override.period_start,
+                "period_end": override.period_end,
+                "is_active": override.is_active,
+                "storage_mode": storage_mode,
+                "storage_per_euro_pallet_per_day": storage_per_euro_pallet,
+                "storage_per_iso2_pallet_per_day": storage_per_iso2_pallet,
+                "storage_per_block_pallet_per_day": storage_per_block_pallet,
+                "storage_per_unit_per_day": storage_per_unit,
+                "storage_per_m2_per_day": storage_per_m2,
+                "storage_per_m3_per_day": storage_per_m3,
+                "storage_min_days": storage_min_days,
+                # "inbound_per_line": inbound,
+                # "outbound_per_order": outbound_order,
+                # "outbound_per_line": outbound_line,
+                "handling_tier_mode": handling_tier_mode,
+                "handling_tiers": handling_tiers,
+                "is_override": True,
+            })
+
+        serializer = WHTariffSerializer(data, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=["post"])
+    @transaction.atomic
+    def create_override(self, request):
+        company = get_user_company(request.user)
+        data = request.data.copy()
+
+        contact_uf = data.get("contact")
+        contact = get_object_or_404(Contact, company=company, uf=contact_uf)
+
+        period_start = self._parse_date(data.get("period_start")) or timezone.localdate()
+        period_end = self._parse_date(data.get("period_end"))
+
+        defaults = self._extract_override_defaults(data)
+
+        previous_override = self._get_previous_override(company, contact, period_start)
+        next_override = self._get_next_override(company, contact, period_start)
+
+        if previous_override:
+            previous_override.period_end = period_start - timedelta(days=1)
+            previous_override.save(update_fields=["period_end"])
+
+        if period_end is None and next_override:
+            period_end = next_override.period_start - timedelta(days=1)
+
+        override = WHContactTariffOverride.objects.create(
+            company=company,
+            contact=contact,
+            period_start=period_start,
+            period_end=period_end,
+            **defaults,
+        )
+
+        self._sync_handling_tier_overrides(
+            override=override,
+            handling_tiers=data.get("handling_tiers") or [],
+        )
+
+        return Response({"success": True}, status=status.HTTP_200_OK) 
+    
+    @action(detail=True, methods=["patch"])
+    @transaction.atomic
+    def update_override(self, request, pk=None):
+        company = get_user_company(request.user)
+        contact = get_object_or_404(Contact, company=company, uf=pk)
+
+        new_start_date = self._parse_date(request.data.get("period_start")) or timezone.localdate()
+        new_period_end = self._parse_date(request.data.get("period_end"))
+
+        defaults = self._extract_override_defaults(request.data)
+
+        existing_same_start = (
+            WHContactTariffOverride.objects
+            .select_for_update()
+            .filter(
+                company=company,
+                contact=contact,
+                period_start=new_start_date,
+            )
+            .first()
+        )
+
+        if existing_same_start:
+            for field, value in defaults.items():
+                if field in request.data:
+                    setattr(existing_same_start, field, value)
+
+            if "period_end" in request.data:
+                existing_same_start.period_end = new_period_end
+
+            existing_same_start.save()
+
+            if "handling_tiers" in request.data:
+                self._sync_handling_tier_overrides(
+                    override=existing_same_start,
+                    handling_tiers=request.data.get("handling_tiers") or [],
                 )
 
-                storage_per_iso2_pallet = (
-                    override.storage_per_iso2_pallet_per_day
-                    if override.storage_per_iso2_pallet_per_day is not None
-                    else default_tariff.storage_per_iso2_pallet_per_day
-                )
+            return Response({"status": "ok"}, status=status.HTTP_200_OK)
 
-                storage_per_block_pallet = (
-                    override.storage_per_block_pallet_per_day
-                    if override.storage_per_block_pallet_per_day is not None
-                    else default_tariff.storage_per_block_pallet_per_day
-                )
+        previous_override = self._get_previous_override(company, contact, new_start_date)
+        next_override = self._get_next_override(company, contact, new_start_date)
 
-                storage_per_unit = (
-                    override.storage_per_unit_per_day
-                    if override.storage_per_unit_per_day is not None
-                    else default_tariff.storage_per_unit_per_day
-                )
+        if previous_override:
+            previous_override.period_end = new_start_date - timedelta(days=1)
+            previous_override.save(update_fields=["period_end"])
 
-                storage_per_m2 = (
-                    override.storage_per_m2_per_day
-                    if override.storage_per_m2_per_day is not None
-                    else default_tariff.storage_per_m2_per_day
-                )
+        if new_period_end is None and next_override:
+            new_period_end = next_override.period_start - timedelta(days=1)
 
-                storage_per_m3 = (
-                    override.storage_per_m3_per_day
-                    if override.storage_per_m3_per_day is not None
-                    else default_tariff.storage_per_m3_per_day
-                )
+        override = WHContactTariffOverride.objects.create(
+            company=company,
+            contact=contact,
+            period_start=new_start_date,
+            period_end=new_period_end,
+            **defaults,
+        )
 
-                storage_min_days = (
-                    override.storage_min_days
-                    if override.storage_min_days is not None
-                    else default_tariff.storage_min_days
-                )
+        self._sync_handling_tier_overrides(
+            override=override,
+            handling_tiers=request.data.get("handling_tiers") or [],
+        )
 
-                inbound = (
-                    override.inbound_per_line
-                    if override.inbound_per_line is not None
-                    else default_tariff.inbound_per_line
-                )
+        return Response({"status": "ok"}, status=status.HTTP_200_OK)
+    
+    @action(detail=True, methods=["get"])
+    def override_history(self, request, pk=None):
+        company = get_user_company(request.user)
+        contact = get_object_or_404(Contact, company=company, uf=pk)
+        today = timezone.localdate()
+        default_tariff = self._get_default_tariff(company)
 
-                outbound_order = (
-                    override.outbound_per_order
-                    if override.outbound_per_order is not None
-                    else default_tariff.outbound_per_order
-                )
+        overrides = (
+            WHContactTariffOverride.objects
+            .filter(company=company, contact=contact)
+            .prefetch_related("handling_tier_overrides")
+            .order_by("-period_start", "-created_at")
+        )
 
-                outbound_line = (
-                    override.outbound_per_line
-                    if override.outbound_per_line is not None
-                    else default_tariff.outbound_per_line
-                )
+        data = []
+        for override in overrides:
+            is_active = (
+                override.period_start <= today and
+                (override.period_end is None or override.period_end >= today)
+            )
 
-                handling_tier_mode = (
-                    override.handling_tier_mode
-                    if getattr(override, "handling_tier_mode", None)
-                    else default_tariff.handling_tier_mode
-                )
+            storage_mode = override.storage_mode or default_tariff.storage_mode
 
-                handling_tiers = [
+            storage_per_euro_pallet = (
+                override.storage_per_euro_pallet_per_day
+                if override.storage_per_euro_pallet_per_day is not None
+                else default_tariff.storage_per_euro_pallet_per_day
+            )
+
+            storage_per_iso2_pallet = (
+                override.storage_per_iso2_pallet_per_day
+                if override.storage_per_iso2_pallet_per_day is not None
+                else default_tariff.storage_per_iso2_pallet_per_day
+            )
+
+            storage_per_block_pallet = (
+                override.storage_per_block_pallet_per_day
+                if override.storage_per_block_pallet_per_day is not None
+                else default_tariff.storage_per_block_pallet_per_day
+            )
+
+            storage_per_unit = (
+                override.storage_per_unit_per_day
+                if override.storage_per_unit_per_day is not None
+                else default_tariff.storage_per_unit_per_day
+            )
+
+            storage_per_m2 = (
+                override.storage_per_m2_per_day
+                if override.storage_per_m2_per_day is not None
+                else default_tariff.storage_per_m2_per_day
+            )
+
+            storage_per_m3 = (
+                override.storage_per_m3_per_day
+                if override.storage_per_m3_per_day is not None
+                else default_tariff.storage_per_m3_per_day
+            )
+
+            storage_min_days = (
+                override.storage_min_days
+                if override.storage_min_days is not None
+                else default_tariff.storage_min_days
+            )
+
+            inbound_per_line = (
+                override.inbound_per_line
+                if override.inbound_per_line is not None
+                else default_tariff.inbound_per_line
+            )
+
+            outbound_per_order = (
+                override.outbound_per_order
+                if override.outbound_per_order is not None
+                else default_tariff.outbound_per_order
+            )
+
+            outbound_per_line = (
+                override.outbound_per_line
+                if override.outbound_per_line is not None
+                else default_tariff.outbound_per_line
+            )
+
+            handling_tier_mode = (
+                override.handling_tier_mode
+                if override.handling_tier_mode
+                else default_tariff.handling_tier_mode
+            )
+
+            data.append({
+                "uf": override.uf,
+                "contact": contact.uf,
+                "contact_name": contact.company_name,
+                "period_start": override.period_start,
+                "period_end": override.period_end,
+                "is_active": is_active,
+                "storage_mode": storage_mode,
+                "storage_per_euro_pallet_per_day": storage_per_euro_pallet,
+                "storage_per_iso2_pallet_per_day": storage_per_iso2_pallet,
+                "storage_per_block_pallet_per_day": storage_per_block_pallet,
+                "storage_per_unit_per_day": storage_per_unit,
+                "storage_per_m2_per_day": storage_per_m2,
+                "storage_per_m3_per_day": storage_per_m3,
+                "storage_min_days": storage_min_days,
+                "inbound_per_line": inbound_per_line,
+                "outbound_per_order": outbound_per_order,
+                "outbound_per_line": outbound_per_line,
+                "handling_tier_mode": handling_tier_mode,
+                "handling_tiers": [
                     {
                         "fee_type": tier.fee_type,
                         "unit": tier.unit,
@@ -195,108 +505,130 @@ class WHTariffViewSet(ViewSet):
                         "order": tier.order,
                     }
                     for tier in override.handling_tier_overrides.all()
-                ]
+                ],
+                "is_override": True,
+            })
 
-                data.append({
-                    "contact": contact.uf,
-                    "contact_name": contact.company_name,
-                    "storage_mode": storage_mode,
-                    "storage_per_euro_pallet_per_day": storage_per_euro_pallet,
-                    "storage_per_iso2_pallet_per_day": storage_per_iso2_pallet,
-                    "storage_per_block_pallet_per_day": storage_per_block_pallet,
-                    "storage_per_unit_per_day": storage_per_unit,
-                    "storage_per_m2_per_day": storage_per_m2,
-                    "storage_per_m3_per_day": storage_per_m3,
-                    "storage_min_days": storage_min_days,
-                    "inbound_per_line": inbound,
-                    "outbound_per_order": outbound_order,
-                    "outbound_per_line": outbound_line,
-                    "handling_tier_mode": handling_tier_mode,
-                    "handling_tiers": handling_tiers,
-                    "is_override": True,
-                })
+        serializer = WHTariffSerializer(data, many=True)
+        return Response(serializer.data)
 
-            serializer = WHTariffSerializer(data, many=True)
-            return Response(serializer.data)
-    
-    @action(detail=True, methods=["patch"])
-    @transaction.atomic
-    def update_override(self, request, pk=None):
+    ### EXPORT ###
+    @action(detail=True, methods=["get"], permission_classes=[IsAuthenticated], url_path="override-history/export")
+    def export_override_history(self, request, pk=None):
+        lang = get_language_from_request(request)
+        activate(lang)
+
+        print('LANG5044', lang)
+
         company = get_user_company(request.user)
-
         contact = get_object_or_404(Contact, company=company, uf=pk)
 
-        override, _ = WHContactTariffOverride.objects.get_or_create(
-            company=company,
-            contact=contact,
+        overrides = (
+            WHContactTariffOverride.objects
+            .filter(company=company, contact=contact)
+            .prefetch_related("handling_tier_overrides")
+            .order_by("-period_start", "-created_at")
         )
 
-        defaults = self._extract_override_defaults(request.data)
+        wb = Workbook()
+        ws = wb.active
+        ws.title = _("tariff_history")
 
-        for field, value in defaults.items():
-            if field in request.data:
-                setattr(override, field, value)
+        headers = [
+            _("contact"),
+            _("period_start"),
+            _("period_end"),
+            _("is_active"),
+            _("storage_mode"),
+            _("storage_min_days"),
+            _("euro_pallet_per_day"),
+            _("iso2_pallet_per_day"),
+            _("block_pallet_per_day"),
+            _("m2_per_day"),
+            _("m3_per_day"),
+            _("unit_per_day"),            
+            _("handling_tier_mode"),
+           _("handling_tiers_count"),
+            _("handling_tiers"),
+        ]
 
-        override.save()
+        ws.append(headers)
 
-        if "handling_tiers" in request.data:
-            self._sync_handling_tier_overrides(
-                override=override,
-                handling_tiers=request.data.get("handling_tiers") or [],
+        header_fill = PatternFill("solid", fgColor="D9EAF7")
+        header_font = Font(bold=True)
+
+        for cell in ws[1]:
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(vertical="center", horizontal="center")
+
+        today = timezone.localdate()
+
+        for override in overrides:
+            is_active = (
+                override.period_start <= today and
+                (override.period_end is None or override.period_end >= today)
             )
 
-        return Response({"status": "ok"}, status=status.HTTP_200_OK)
-    
-    @action(detail=False, methods=["post"])
-    def create_override(self, request):
+            tiers_text = "\n".join([
+                f"{tier.fee_type} | {tier.unit} | min={tier.min_quantity} | max={tier.max_quantity or '-'} | price={tier.price}"
+                for tier in override.handling_tier_overrides.all()
+            ])
 
-        company = get_user_company(request.user)
+            ws.append([
+                contact.company_name,
+                override.period_start.strftime("%d-%m-%Y") if override.period_start else "",
+                override.period_end.strftime("%d-%m-%Y") if override.period_end else "",
+                "Yes" if is_active else "No",
+                override.storage_mode or "",
+                override.storage_min_days if override.storage_min_days is not None else "",
+                override.storage_per_euro_pallet_per_day if override.storage_per_euro_pallet_per_day is not None else "",
+                override.storage_per_iso2_pallet_per_day if override.storage_per_iso2_pallet_per_day is not None else "",
+                override.storage_per_block_pallet_per_day if override.storage_per_block_pallet_per_day is not None else "",
+                override.storage_per_m2_per_day if override.storage_per_m2_per_day is not None else "",
+                override.storage_per_m3_per_day if override.storage_per_m3_per_day is not None else "",
+                override.storage_per_unit_per_day if override.storage_per_unit_per_day is not None else "",
+               
+                override.handling_tier_mode or "",
+                override.handling_tier_overrides.count(),
+                tiers_text,
+            ])
 
-        data = request.data.copy()
+        widths = {
+            "A": 24,
+            "B": 14,
+            "C": 14,
+            "D": 10,
+            "E": 16,
+            "F": 16,
+            "G": 18,
+            "H": 18,
+            "I": 18,
+            "J": 12,
+            "K": 12,
+            "L": 12,
+            "M": 22,
+            "N": 24,
+            "O": 60,
 
-        contact_uf = data.get("contact")
-
-        contact = get_object_or_404(
-            Contact,
-            company=company,
-            uf=contact_uf
-        )
-        
-        mode = data.get("storage_mode")
-
-        fields = {
-            "pallet": "storage_per_pallet_per_day",
-            "unit": "storage_per_unit_per_day",
-            "m2": "storage_per_m2_per_day",
-            "m3": "storage_per_m3_per_day",
         }
 
-        # reset all storage prices
-        for f in fields.values():
-            data[f] = None
+        for col, width in widths.items():
+            ws.column_dimensions[col].width = width
 
-        # set the correct one
-        if mode in fields:
-            field = fields[mode]
-            data[field] = data.get(field)
+        for row in ws.iter_rows(min_row=2):
+            for cell in row:
+                cell.alignment = Alignment(vertical="top", wrap_text=True)
 
+        output = BytesIO()
+        wb.save(output)
+        output.seek(0)
 
-        override, _ = WHContactTariffOverride.objects.update_or_create(
-            company=company,
-            contact=contact,
-            defaults = {
-                "storage_mode": data.get("storage_mode"),
-                "storage_per_unit_per_day": data.get("storage_per_unit_per_day"),
-                "storage_per_m2_per_day": data.get("storage_per_m2_per_day"),
-                "storage_per_m3_per_day": data.get("storage_per_m3_per_day"),
-                "storage_per_euro_pallet_per_day": data.get("storage_per_euro_pallet_per_day"),
-                "storage_per_iso2_pallet_per_day": data.get("storage_per_iso2_pallet_per_day"),
-                "storage_per_block_pallet_per_day": data.get("storage_per_block_pallet_per_day"),
-                "storage_min_days": data.get("storage_min_days"),
-                "inbound_per_line": data.get("inbound_per_line"),
-                "outbound_per_order": data.get("outbound_per_order"),
-                "outbound_per_line": data.get("outbound_per_line"),
-            }
+        filename = f"tariff_history_{contact.company_name}_{contact.uf}.xlsx"
+
+        response = HttpResponse(
+            output.getvalue(),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
-
-        return Response({"success": True}, status=status.HTTP_200_OK)
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        return response

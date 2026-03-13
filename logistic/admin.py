@@ -93,7 +93,8 @@ class WHBillingPeriodAdmin(admin.ModelAdmin):
 
 @admin.register(WHContactTariffOverride)
 class WHContactTariffOverrideAdmin(admin.ModelAdmin):
-    list_display = ('id', 'contact', 'storage_mode', 'storage_per_euro_pallet_per_day', 'storage_per_iso2_pallet_per_day',
+    list_display = ('id', 'contact', 'storage_mode', 'period_start', 'period_end',
+                    'storage_per_euro_pallet_per_day', 'storage_per_iso2_pallet_per_day',
                      'storage_per_block_pallet_per_day', 'storage_per_m2_per_day', 'storage_per_m3_per_day', 'storage_per_unit_per_day',                 
                     )
 

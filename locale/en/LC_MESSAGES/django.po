@@ -106,3 +106,51 @@ msgstr "Inbound"
 
 msgid "outbound"
 msgstr "Outbound"
+
+msgid "tariff_history"
+msgstr "Tariff History"
+
+msgid "contact"
+msgstr "Contact"
+
+msgid "period_start"
+msgstr "Period Start"
+
+msgid "period_end"
+msgstr "Period End"
+
+msgid "is_active"
+msgstr "Is Active"
+
+msgid "storage_mode"
+msgstr "Storage Mode"
+
+msgid "storage_min_days"
+msgstr "Storage Min Days"
+
+msgid "euro_pallet_per_day"
+msgstr "Euro Pallet / Day"
+
+msgid "iso2_pallet_per_day"
+msgstr "ISO2 Pallet / Day"
+
+msgid "block_pallet_per_day"
+msgstr "Block Pallet / Day"
+
+msgid "m2_per_day"
+msgstr "m2 / Day"
+
+msgid "m3_per_day"
+msgstr "m3 / Day"
+
+msgid "unit_per_day"
+msgstr "Unit / Day"
+
+msgid "handling_tier_mode"
+msgstr "Handling Tier Mode"
+
+msgid "handling_tiers_count"
+msgstr "Handling Tiers Count"
+
+msgid "handling_tiers"
+msgstr "Handling Tiers"

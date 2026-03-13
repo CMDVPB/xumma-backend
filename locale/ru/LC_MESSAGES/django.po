@@ -113,3 +113,51 @@ msgstr "Приход"
 msgid "outbound"
 msgstr "Расход"
 
+
+msgid "tariff_history"
+msgstr "История тарифов"
+
+msgid "contact"
+msgstr "Контакт"
+
+msgid "period_start"
+msgstr "Начало периода"
+
+msgid "period_end"
+msgstr "Конец периода"
+
+msgid "is_active"
+msgstr "Активно"
+
+msgid "storage_mode"
+msgstr "Режим хранения"
+
+msgid "storage_min_days"
+msgstr "Мин. дней хранения"
+
+msgid "euro_pallet_per_day"
+msgstr "Европаллета / день"
+
+msgid "iso2_pallet_per_day"
+msgstr "Паллета ISO2 / день"
+
+msgid "block_pallet_per_day"
+msgstr "Блок-паллета / день"
+
+msgid "m2_per_day"
+msgstr "м2 / день"
+
+msgid "m3_per_day"
+msgstr "м3 / день"
+
+msgid "unit_per_day"
+msgstr "Единица / день"
+
+msgid "handling_tier_mode"
+msgstr "Режим уровней обработки"
+
+msgid "handling_tiers_count"
+msgstr "Количество уровней обработки"
+
+msgid "handling_tiers"
+msgstr "Уровни обработки"

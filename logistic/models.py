@@ -496,7 +496,10 @@ class WHContactTariffOverride(models.Model):
     uf = models.CharField(max_length=36, default=hex_uuid, db_index=True, unique=True)
 
     company = models.ForeignKey("app.Company", on_delete=models.CASCADE, related_name="company_wh_contact_tariff_overrides")
-    contact = models.OneToOneField("att.Contact", on_delete=models.CASCADE, related_name="contact_wh_tariff_overrides")
+    contact = models.ForeignKey("att.Contact", on_delete=models.CASCADE, related_name="contact_wh_tariff_overrides")
+
+    period_start = models.DateField()
+    period_end = models.DateField(null=True, blank=True)
 
     storage_mode = models.CharField(max_length=20, choices=WHStorageBillingMode.choices, null=True, blank=True)
 
@@ -538,10 +541,19 @@ class WHContactTariffOverride(models.Model):
     )
 
     created_at = models.DateTimeField(auto_now_add=True)
+    change_note = models.CharField(max_length=255, null=True, blank=True)
+    
+    is_active = models.BooleanField(default=True)
 
     storage_min_days = models.PositiveIntegerField(null=True, blank=True)
 
     class Meta:  
+        constraints = [
+                    models.UniqueConstraint(
+                        fields=["company", "contact", "period_start"],
+                        name="uniq_wh_contact_tariff_override_start",
+                    )
+        ]
         indexes = [
             models.Index(fields=["company", "contact"]),
         ]

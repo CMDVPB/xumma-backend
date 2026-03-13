@@ -113,7 +113,53 @@ msgstr "Intrare"
 msgid "outbound"
 msgstr "Iesire"
 
+msgid "tariff_history"
+msgstr "Istoric tarife"
 
+msgid "contact"
+msgstr "Contact"
+
+msgid "period_start"
+msgstr "Data inceput"
+
+msgid "period_end"
+msgstr "Data sfarsit"
+
+msgid "is_active"
+msgstr "Este activ"
+
+msgid "storage_mode"
+msgstr "Mod de stocare"
+
+msgid "storage_min_days"
+msgstr "Numar minim de zile de stocare"
+
+msgid "euro_pallet_per_day"
+msgstr "Palet euro / zi"
+
+msgid "iso2_pallet_per_day"
+msgstr "Palet ISO2 / zi"
+
+msgid "block_pallet_per_day"
+msgstr "Palet bloc / zi"
+
+msgid "m2_per_day"
+msgstr "m2 / zi"
+
+msgid "m3_per_day"
+msgstr "m3 / zi"
+
+msgid "unit_per_day"
+msgstr "Unitate / zi"
+
+msgid "handling_tier_mode"
+msgstr "Mod trepte manipulare"
+
+msgid "handling_tiers_count"
+msgstr "Numar trepte manipulare"
+
+msgid "handling_tiers"
+msgstr "Trepte manipulare"
 
 
 
