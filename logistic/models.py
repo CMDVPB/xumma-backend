@@ -611,9 +611,12 @@ class WHBillingCharge(models.Model):
 
     class Type(models.TextChoices):
         STORAGE = "storage"
+        HANDLING_LOADING = "handling_loading"
+        HANDLING_UNLOADING = "handling_unloading"
         INBOUND = "inbound"
         OUTBOUND_ORDER = "outbound_order"
         OUTBOUND_LINE = "outbound_line"
+        MANUAL = "manual"
 
     uf = models.CharField(max_length=36, default=hex_uuid, db_index=True, unique=True)
     company = models.ForeignKey("app.Company", on_delete=models.CASCADE)
@@ -747,6 +750,8 @@ class WHBillingInvoiceLine(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     charges = models.ManyToManyField("WHBillingCharge", blank=True, related_name="invoice_lines")
+
+    is_manual = models.BooleanField(default=False)    
 
     class Meta:       
         indexes = [

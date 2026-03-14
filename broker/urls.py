@@ -11,6 +11,7 @@ urlpatterns = [
     path("broker/memberships/<str:uf>/", PointMembershipDetailView.as_view()),
 
     path("broker/jobs/", JobListCreateView.as_view()),
+    path("broker/jobs/export/", BrokerJobExportAPIView.as_view()),
     path("broker/jobs/<str:uf>/", JobRetrieveUpdateDestroyView.as_view()),
     
     path("broker/service-types/", ServiceTypeListCreateView.as_view()),

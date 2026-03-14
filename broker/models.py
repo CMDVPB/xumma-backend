@@ -563,6 +563,5 @@ class BrokerSettlement(models.Model):
             models.Index(fields=["broker", "status"])
         ]
 
-
-    
+   
 ###### END BROKER COMPENSATION ######

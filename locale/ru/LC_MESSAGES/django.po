@@ -161,3 +161,121 @@ msgstr "Количество уровней обработки"
 
 msgid "handling_tiers"
 msgstr "Уровни обработки"
+
+msgid "billing_documents"
+msgstr "Платежные документы"
+
+msgid "billing_documents_export"
+msgstr "Экспорт платежных документов"
+
+msgid "document_no"
+msgstr "№ документа"
+
+msgid "status"
+msgstr "Статус"
+
+msgid "created_at"
+msgstr "Дата создания"
+
+msgid "total_amount"
+msgstr "Общая сумма"
+
+msgid "line_type"
+msgstr "Тип строки"
+
+msgid "line_description"
+msgstr "Описание строки"
+
+msgid "unit_price"
+msgstr "Цена за единицу"
+
+msgid "line_total"
+msgstr "Сумма строки"
+
+msgid "billing_document"
+msgstr "Платежный документ"
+
+msgid "billing_document_export"
+msgstr "Экспорт платежного документа"
+
+msgid "handling_unloading"
+msgstr "Обработка разгрузки"
+
+msgid "handling_loading"
+msgstr "Обработка загрузки"
+
+msgid "storage"
+msgstr "Хранение"
+
+msgid "draft"
+msgstr "Черновик"
+
+msgid "issued"
+msgstr "Выставлен"
+
+msgid "paid"
+msgstr "Оплачен"
+
+msgid "cancelled"
+msgstr "Отменен"
+
+msgid "invoice_total"
+msgstr "Итого по счету"
+
+msgid "act"
+msgstr "Акт"
+
+msgid "act_of_execution_of_services"
+msgstr "Акт оказания услуг"
+
+msgid "provider"
+msgstr "Исполнитель"
+
+msgid "client"
+msgstr "Клиент"
+
+msgid "issued_on"
+msgstr "Выдано"
+
+msgid "no"
+msgstr "№"
+
+msgid "total"
+msgstr "Итого"
+
+msgid "grand_total"
+msgstr "Общий итог"
+
+msgid "provider_signature"
+msgstr "Подпись исполнителя"
+
+msgid "client_signature"
+msgstr "Подпись клиента"
+
+msgid "the_act_can_be_generated_only_for_issued_invoices"
+msgstr "Акт может быть сформирован только для выставленных счетов."
+
+msgid "description"
+msgstr "Описание"
+
+msgid "generated_at"
+msgstr "Дата создания"
+
+msgid "customer_ref"
+msgstr "Ref. клиента"
+
+msgid "team"
+msgstr "Команда"
+
+msgid "assigned_to"
+msgstr "Назначено"
+
+msgid "services"
+msgstr "Услуги"
+
+msgid "comments"
+msgstr "Комментарии"
+
+msgid "broker_jobs"
+msgstr "Брокерские задания"
+

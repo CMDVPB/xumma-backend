@@ -161,5 +161,120 @@ msgstr "Numar trepte manipulare"
 msgid "handling_tiers"
 msgstr "Trepte manipulare"
 
+msgid "billing_documents"
+msgstr "Documente de facturare"
 
+msgid "billing_documents_export"
+msgstr "Export documente de facturare"
+
+msgid "document_no"
+msgstr "Nr. document"
+
+msgid "status"
+msgstr "Stare"
+
+msgid "created_at"
+msgstr "Creat la"
+
+msgid "total_amount"
+msgstr "Suma totala"
+
+msgid "line_type"
+msgstr "Tip linie"
+
+msgid "line_description"
+msgstr "Descriere linie"
+
+msgid "unit_price"
+msgstr "Pret unitar"
+
+msgid "line_total"
+msgstr "Total linie"
+
+msgid "billing_document"
+msgstr "Document de facturare"
+
+msgid "billing_document_export"
+msgstr "Export document de facturare"
+
+msgid "handling_unloading"
+msgstr "Manipulare descarcare"
+
+msgid "handling_loading"
+msgstr "Manipulare încarcare"
+
+msgid "storage"
+msgstr "Depozitare"
+
+msgid "draft"
+msgstr "Ciorna"
+
+msgid "issued"
+msgstr "Emis"
+
+msgid "paid"
+msgstr "Plătit"
+
+msgid "cancelled"
+msgstr "Anulat"
+
+msgid "invoice_total"
+msgstr "Total factura"
+
+msgid "act"
+msgstr "Act"
+
+msgid "act_of_execution_of_services"
+msgstr "Act de prestare a serviciilor"
+
+msgid "provider"
+msgstr "Prestator"
+
+msgid "client"
+msgstr "Client"
+
+msgid "issued_on"
+msgstr "Emis la"
+
+msgid "no"
+msgstr "Nr."
+
+msgid "total"
+msgstr "Total"
+
+msgid "grand_total"
+msgstr "Total general"
+
+msgid "provider_signature"
+msgstr "Semnatura prestatorului"
+
+msgid "client_signature"
+msgstr "Semnatura clientului"
+
+msgid "the_act_can_be_generated_only_for_issued_invoices"
+msgstr "Actul poate fi generat doar pentru facturile emise."
+
+msgid "description"
+msgstr "Descriere"
+
+msgid "generated_at"
+msgstr "Generat la"
+
+msgid "customer_ref"
+msgstr "Ref. client"
+
+msgid "team"
+msgstr "Echipa"
+
+msgid "assigned_to"
+msgstr "Atribuit catre"
+
+msgid "services"
+msgstr "Servicii"
+
+msgid "comments"
+msgstr "Comentarii"
+
+msgid "broker_jobs"
+msgstr "Lucrari de vamuire"
 

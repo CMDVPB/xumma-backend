@@ -318,7 +318,7 @@ class JobSerializer(WritableNestedModelSerializer):
         total = Decimal("0")
 
         for line in obj.job_lines.all():
-            print("LINE DEBUG:", line.total_net, line.other_charges)
+            # print("LINE DEBUG:", line.total_net, line.other_charges)
 
             total += line.total_net + (line.other_charges or Decimal("0"))
 

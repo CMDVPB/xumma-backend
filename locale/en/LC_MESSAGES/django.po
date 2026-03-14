@@ -154,3 +154,121 @@ msgstr "Handling Tiers Count"
 
 msgid "handling_tiers"
 msgstr "Handling Tiers"
+
+msgid "billing_documents"
+msgstr "Billing Documents"
+
+msgid "billing_documents_export"
+msgstr "Billing Documents Export"
+
+msgid "document_no"
+msgstr "Document No."
+
+msgid "status"
+msgstr "Status"
+
+msgid "created_at"
+msgstr "Created At"
+
+msgid "total_amount"
+msgstr "Total Amount"
+
+msgid "line_type"
+msgstr "Line Type"
+
+msgid "line_description"
+msgstr "Line Description"
+
+msgid "unit_price"
+msgstr "Unit Price"
+
+msgid "line_total"
+msgstr "Line Total"
+
+msgid "billing_document"
+msgstr "Billing Document"
+
+msgid "billing_document_export"
+msgstr "Billing Document Export"
+
+msgid "handling_unloading"
+msgstr "Handling Unloading"
+
+msgid "handling_loading"
+msgstr "Handling Loading"
+
+msgid "storage"
+msgstr "Storage"
+
+msgid "draft"
+msgstr "Draft"
+
+msgid "issued"
+msgstr "Issued"
+
+msgid "paid"
+msgstr "Paid"
+
+msgid "cancelled"
+msgstr "Cancelled"
+
+msgid "invoice_total"
+msgstr "Invoice Total"
+
+msgid "act"
+msgstr "Act"
+
+msgid "act_of_execution_of_services"
+msgstr "Act of Execution of Services"
+
+msgid "provider"
+msgstr "Provider"
+
+msgid "client"
+msgstr "Client"
+
+msgid "issued_on"
+msgstr "Issued on"
+
+msgid "no"
+msgstr "No."
+
+msgid "total"
+msgstr "Total"
+
+msgid "grand_total"
+msgstr "Grand total"
+
+msgid "provider_signature"
+msgstr "Provider signature"
+
+msgid "client_signature"
+msgstr "Client signature"
+
+msgid "the_act_can_be_generated_only_for_issued_invoices"
+msgstr "The act can be generated only for issued invoices."
+
+msgid "description"
+msgstr "Description"
+
+msgid "generated_at"
+msgstr "Generated At"
+
+msgid "customer_ref"
+msgstr "Customer Ref"
+
+msgid "team"
+msgstr "Team"
+
+msgid "assigned_to"
+msgstr "Assigned To"
+
+msgid "services"
+msgstr "Services"
+
+msgid "comments"
+msgstr "Comments"
+
+msgid "broker_jobs"
+msgstr "Broker Jobs"
+

@@ -1,4 +1,5 @@
 import logging
+from decimal import Decimal
 from datetime import timedelta, datetime
 from django.utils import timezone
 from django.contrib.auth import get_user_model
@@ -8,7 +9,7 @@ from django.shortcuts import get_object_or_404
 from datetime import date
 from dateutil.relativedelta import relativedelta
 from django.db.models.functions import TruncMonth
-from django.utils.translation import gettext
+from django.utils.translation import gettext as _
 from django.utils.translation import activate
 from django.utils.translation import get_language_from_request
 from django.http import HttpResponse
@@ -220,8 +221,168 @@ class JobRetrieveUpdateDestroyView(
                 .prefetch_related("job_lines__service_type"))
         
         return self.filter_queryset_by_visibility(qs)
-    
-    
+
+
+class BrokerJobExportAPIView(CompanyScopedMixin, JobVisibilityQuerysetMixin, APIView):
+    permission_classes = [IsAuthenticated, JobAccessPermission]
+
+    def get(self, request):
+        lang = get_language_from_request(request)
+        activate(lang)
+
+        company = self.get_company()
+
+        qs = (
+            Job.objects
+            .filter(company=company)
+            .select_related("point", "customer", "assigned_to")
+            .prefetch_related("job_lines", "job_lines__service_type")
+            .order_by("-created_at")
+        )
+
+        qs = self.filter_queryset_by_visibility(qs)
+
+        customer = request.query_params.get("customer")
+        point = request.query_params.get("point")
+        assigned_to = request.query_params.get("assigned_to")
+
+        if customer:
+            qs = qs.filter(customer__uf=customer)
+
+        if point:
+            qs = qs.filter(point__uf=point)
+
+        if assigned_to:
+            qs = qs.filter(assigned_to__uf=assigned_to)
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = _("broker_jobs")
+
+        bold = Font(bold=True)
+
+        ws.append([_("broker_jobs")])
+        ws[ws.max_row][0].font = bold
+
+        ws.append([])
+
+        ws.append([
+            _("generated_at"),
+            timezone.localtime(timezone.now()).strftime("%d-%m-%Y %H:%M")
+        ])
+        ws.append([])
+
+        ws.append([
+            _("ref"),
+            _("date"),
+            _("customer"),
+            _("team"),
+            _("assigned_to"),
+            _("status"),
+            _("services"),
+            _("quantity"),
+            _("total_amount"),
+            _("comments"),
+        ])
+
+        for cell in ws[ws.max_row]:
+            cell.font = bold
+
+        grand_total_quantity = Decimal("0")
+        grand_total_amount = Decimal("0")
+
+        for job in qs:
+            job_lines = job.job_lines.all()
+
+            total_quantity = sum(
+                [line.quantity for line in job_lines],
+                Decimal("0")
+            )
+
+            total_amount = sum(
+                [
+                    ((line.quantity * line.unit_price_net) + line.other_charges) +
+                    ((((line.quantity * line.unit_price_net) + line.other_charges) * line.vat_percent) / Decimal("100"))
+                    for line in job_lines
+                ],
+                Decimal("0")
+            )
+
+            grand_total_quantity += total_quantity
+            grand_total_amount += total_amount
+
+            services = ", ".join(
+                [
+                    line.service_type.name
+                    for line in job_lines
+                    if line.service_type_id
+                ]
+            )
+
+            ws.append([
+                job.ref or "",
+                timezone.localtime(job.created_at).replace(tzinfo=None),
+                job.customer.company_name or job.customer.alias_company_name or "",
+                job.point.name if job.point else "",
+                (job.assigned_to.get_full_name() or job.assigned_to.email) if job.assigned_to else "",
+                job.status or "",
+                services,
+                float(total_quantity),   # H
+                float(total_amount),     # I
+                job.comments or "",
+            ])
+
+            date_cell = ws.cell(row=ws.max_row, column=2)
+            date_cell.number_format = "DD-MM-YYYY HH:MM"
+
+        # total row directly below data
+        ws.append([])  # empty row before total
+
+        ws.append([
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            _("total"),
+            float(grand_total_quantity),   # H
+            float(grand_total_amount),     # I
+            "",
+        ])
+
+        total_row_idx = ws.max_row
+        for col in range(1, 11):
+            ws.cell(row=total_row_idx, column=col).font = bold
+
+        widths = {
+            "A": 16,
+            "B": 20,
+            "C": 26,
+            "D": 20,
+            "E": 25,
+            "F": 15,
+            "G": 35,
+            "H": 12,
+            "I": 15,
+            "J": 35,
+        }
+
+        for col, width in widths.items():
+            ws.column_dimensions[col].width = width
+
+        ws.freeze_panes = "A5"
+
+        response = HttpResponse(
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+        response["Content-Disposition"] = 'attachment; filename="broker-jobs.xlsx"'
+
+        wb.save(response)
+        return response
+
+
+
 class ServiceTypeListCreateView(CompanyScopedMixin, ListCreateAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = ServiceTypeSerializer
@@ -607,6 +768,7 @@ class BrokerPartnerPricingAPIView(APIView):
 
         return Response({"success": True})
 
+
 class BrokerSpecialPricingDeleteAPIView(DestroyAPIView):
     permission_classes = [IsAuthenticated]
     
@@ -704,7 +866,7 @@ class BrokerCommissionTypeListView(APIView):
         data = [
             {
                 "code": code,
-                "label": gettext(label),
+                "label": _(label),
             }
             for code, label in BrokerCommissionType.choices
         ]
@@ -734,8 +896,7 @@ class BrokerSettlementExportAPIView(APIView):
     def get(self, request):
         lang = get_language_from_request(request)
         activate(lang)
-
-        print('LANG5060', lang)
+      
 
         company = get_user_company(request.user)
 
@@ -749,17 +910,17 @@ class BrokerSettlementExportAPIView(APIView):
 
         wb = Workbook()
         ws = wb.active
-        ws.title = gettext("broker_settlement")
+        ws.title = _("broker_settlement")
 
         bold = Font(bold=True)
 
-        ws.append([gettext("broker_settlement")])
+        ws.append([_("broker_settlement")])
         ws[ws.max_row][0].font = bold
 
         ws.append([])
 
         ws.append([
-            gettext("broker"),
+            _("broker"),
             f"{broker.get_full_name()} ({broker.email})"
         ])
 
@@ -767,7 +928,7 @@ class BrokerSettlementExportAPIView(APIView):
         end_fmt = datetime.strptime(end, "%Y-%m-%d").strftime("%d-%m-%Y")
 
         ws.append([
-            gettext("period"),
+            _("period"),
             f"{start_fmt} - {end_fmt}"
         ])
         
@@ -775,12 +936,12 @@ class BrokerSettlementExportAPIView(APIView):
       
         # header
         ws.append([
-            gettext("date"),
-            gettext("customer"),
-            gettext("service"),
-            gettext("quantity"),
-            gettext("revenue"),
-            gettext("commission")
+            _("date"),
+            _("customer"),
+            _("service"),
+            _("quantity"),
+            _("revenue"),
+            _("commission")
         ])
 
         # make header bold
@@ -808,15 +969,15 @@ class BrokerSettlementExportAPIView(APIView):
        
 
         ws.append([])
-        ws.append([gettext("base_salary"), float(report["summary"]["base_salary"])])
+        ws.append([_("base_salary"), float(report["summary"]["base_salary"])])
         for c in ws[ws.max_row]:
             c.font = bold
 
-        ws.append([gettext("total_commission"), float(report["summary"]["commission_total"])])
+        ws.append([_("total_commission"), float(report["summary"]["commission_total"])])
         for c in ws[ws.max_row]:
             c.font = bold
 
-        ws.append([gettext("total_income"), float(report["summary"]["total_income"])])
+        ws.append([_("total_income"), float(report["summary"]["total_income"])])
         for c in ws[ws.max_row]:
             c.font = bold
 

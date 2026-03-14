@@ -1,7 +1,7 @@
 from django.urls import path
 from rest_framework.routers import DefaultRouter
 
-from logistic.views.wms_billing import WHBillingInvoiceViewSet, WHBillingPeriodViewSet
+from logistic.views.wms_billing import WHBillingDocumentViewSet, WHBillingInvoiceViewSet, WHBillingPeriodViewSet
 from logistic.views.wms_dashboard import WmsDashboardCustomersSummaryAPIView, WmsStorageOccupancyAPIView
 from logistic.views.wms_inbound import WHInboundViewSet
 from logistic.views.wms_location import WHLocationViewSet
@@ -20,6 +20,7 @@ router.register(r"products", WHProductViewSet, basename="wms-products")
 router.register(r"stock", WHStockViewSet, basename="wms-stock")
 router.register(r"tariffs", WHTariffViewSet, basename="wms-tariffs")
 router.register(r"billing-periods", WHBillingPeriodViewSet, basename="wms-billing-periods")
+router.register(r"billing-documents", WHBillingDocumentViewSet, basename="wms-billing-documents")
 router.register(r"billing-invoices", WHBillingInvoiceViewSet, basename="wms-billing-invoices")
 
 
