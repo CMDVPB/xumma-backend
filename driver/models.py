@@ -16,8 +16,6 @@ logger = logging.getLogger(__name__)
 User = get_user_model()
 
 ###### START TRIP STOPS ######
-
-
 class TripStop(models.Model):
 
     STOP_TYPES = [
@@ -152,8 +150,6 @@ class TripStopMessage(models.Model):
 
 
 ###### END TRIP STOPS ######
-
-
 class DriverLocation(models.Model):
     driver = models.OneToOneField(
         User,

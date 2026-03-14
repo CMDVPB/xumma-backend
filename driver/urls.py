@@ -48,6 +48,7 @@ urlpatterns = [
     path("trip-stops/<str:stopUf>/toggle-completed/", trip_stop_complete),
     path("trip-stops/<str:stopUf>/toggle-visibility/",
          trip_stop_toggle_visibility_by_dispatcher),
+    path("trip-stops/<str:uf>/assign-site-gps/", DriverAssignTripStopSiteGpsView.as_view()),
     ###### END TRIP STOPS MANAGER ######
 
     ###### START TRIP STOP MESSAGES ######

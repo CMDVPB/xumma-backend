@@ -27,7 +27,7 @@ from app.models import TypeCost
 from axx.models import Load, LoadEvidence, Trip
 from ayy.models import ItemCost, ItemForItemCost
 from driver.serializers import (
-    ActiveTripSerializer, DriverLoadCacheSerializer, DriverTripSerializer, DriverTripStopSerializer, DriverVehicleSerializer, ItemCostDriverSerializer, ItemForItemCostDriverSerializer, LoadEvidenceSerializer, TripStopMessageSerializer, TripStopReorderSerializer, TripStopSerializer, TripStopVisibilitySerializer, TypeCostSerializer)
+    ActiveTripSerializer, DriverLoadCacheSerializer, DriverTripSerializer, DriverTripStopSerializer, DriverVehicleSerializer, ItemCostDriverSerializer, ItemForItemCostDriverSerializer, LoadEvidenceSerializer, TripStopAssignGpsSerializer, TripStopMessageSerializer, TripStopReorderSerializer, TripStopSerializer, TripStopVisibilitySerializer, TypeCostSerializer)
 from driver.tasks import broadcast_trip_stop_messages_read, broadcast_trip_stop_reorder, broadcast_trip_stop_visibility
 
 from .models import DriverLocation, DriverTrackPoint, TripStop, TripStopMessage
@@ -410,7 +410,7 @@ class DriverCurrentTripView(APIView):
         stops = (
             trip.trip_stops
             .filter(is_visible_to_driver=True)
-            .select_related("load", "entry")
+            .select_related("entry", "entry__shipper", "entry__shipper__country_code_site")
             .annotate(
                 unread_count=Count(
                     "trip_stop_messages",
@@ -418,7 +418,6 @@ class DriverCurrentTripView(APIView):
                     & ~Q(trip_stop_messages__sender__groups__name="level_driver"),
                     distinct=True,
                 ),
-
             )
             .order_by("order", "id")
         )
@@ -627,8 +626,6 @@ class TypeCostDriverList(PolicyFilteredQuerysetMixin, ListAPIView):
 
 
 ###### START TRIP STOPS ######
-
-
 def _generate_trip_stops(trip):
 
     loads = trip.trip_loads.all()
@@ -839,11 +836,48 @@ def trip_stop_toggle_visibility_by_dispatcher(request, stopUf):
         "stops_version": trip.stops_version
     })
 
+
+class DriverAssignTripStopSiteGpsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, uf, *args, **kwargs):
+        lat = request.data.get("lat")
+        lon = request.data.get("lon")
+
+        if lat is None or lon is None:
+            return Response(
+                {"detail": "lat and lon are required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user_company = get_user_company(request.user)
+
+        stop = get_object_or_404(
+            TripStop.objects.select_related("entry", "entry__shipper"),
+            uf=uf,
+            company=user_company,
+            is_visible_to_driver=True,
+        )
+
+        shipper = getattr(stop.entry, "shipper", None) if stop.entry else None
+        if not shipper:
+            return Response(
+                {"detail": "No site linked to this stop"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        shipper.lat = lat
+        shipper.lon = lon
+        shipper.save(update_fields=["lat", "lon"])
+
+        return Response({
+            "detail": "Site GPS updated successfully",
+            "site_lat": shipper.lat,
+            "site_lon": shipper.lon,
+        })
 ###### END TRIP STOPS ######
 
 ###### START TRIP STOP MESSAGING ######
-
-
 class TripStopMessageListCreateAPIView(ListCreateAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = TripStopMessageSerializer

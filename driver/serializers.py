@@ -227,6 +227,15 @@ class DriverTripStopSerializer(serializers.ModelSerializer):
 
     unread_count = serializers.IntegerField(read_only=True)
 
+    address_label = serializers.SerializerMethodField()
+    address_site = serializers.SerializerMethodField()
+    city_site = serializers.SerializerMethodField()
+    zip_code_site = serializers.SerializerMethodField()
+    country_site = serializers.SerializerMethodField()
+    site_name = serializers.SerializerMethodField()
+    site_lat = serializers.SerializerMethodField()
+    site_lon = serializers.SerializerMethodField()
+
     class Meta:
         model = TripStop
         fields = [
@@ -247,8 +256,66 @@ class DriverTripStopSerializer(serializers.ModelSerializer):
             "is_visible_to_driver",
 
             "unread_count",
+
+            "address_label",
+            "address_site",
+            "city_site",
+            "zip_code_site",
+            "country_site",
+            "site_name",
+            "site_lat",
+            "site_lon",
         ]
         read_only_fields = fields
+
+    def _get_shipper(self, obj):
+            entry = getattr(obj, "entry", None)
+            if not entry:
+                return None
+            return getattr(entry, "shipper", None)
+
+    def get_site_name(self, obj):
+        shipper = self._get_shipper(obj)
+        return shipper.name_site if shipper else None
+
+    def get_address_site(self, obj):
+        shipper = self._get_shipper(obj)
+        return shipper.address_site if shipper else None
+
+    def get_city_site(self, obj):
+        shipper = self._get_shipper(obj)
+        return shipper.city_site if shipper else None
+
+    def get_zip_code_site(self, obj):
+        shipper = self._get_shipper(obj)
+        return shipper.zip_code_site if shipper else None
+
+    def get_country_site(self, obj):
+        shipper = self._get_shipper(obj)
+        if not shipper or not shipper.country_code_site:
+            return None
+        return getattr(shipper.country_code_site, "label", None) or str(shipper.country_code_site)
+    
+    def get_site_lat(self, obj):
+        shipper = self._get_shipper(obj)
+        return shipper.lat if shipper else None
+
+    def get_site_lon(self, obj):
+        shipper = self._get_shipper(obj)
+        return shipper.lon if shipper else None
+
+    def get_address_label(self, obj):
+        shipper = self._get_shipper(obj)
+        if not shipper:
+            return None
+
+        parts = [
+            shipper.address_site,
+            shipper.city_site,
+            shipper.zip_code_site,
+            getattr(shipper.country_code_site, "label", None) if shipper.country_code_site else None,
+        ]
+        return ", ".join([p for p in parts if p]) or None
 
 ###### END DRIVER LOADING ######
 
@@ -493,4 +560,9 @@ class TripStopMessageSerializer(serializers.ModelSerializer):
             "is_read_by_dispatcher",
         ]
 
-###### START TRIP STOPS ######
+
+class TripStopAssignGpsSerializer(serializers.Serializer):
+    lat = serializers.FloatField()
+    lon = serializers.FloatField()
+
+###### END TRIP STOPS ######
