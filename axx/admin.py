@@ -34,7 +34,8 @@ class LoadEvidenceAdmin(admin.ModelAdmin):
 
 @admin.register(Trip)
 class TripAdmin(admin.ModelAdmin):
-    list_display = ('id', 'company', 'vehicle_tractor', 'vehicle_trailer')
+    list_display = ('id', 'company', 'vehicle_tractor', 'vehicle_trailer', 'departure_inspection_completed', 'arrival_inspection_completed',
+                    )
 
 
 @admin.register(TripDriver)

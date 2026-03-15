@@ -94,10 +94,17 @@ class Trip(models.Model):
     is_locked = models.BooleanField(default=False)
 
     trip_number = models.CharField(max_length=20, blank=True, null=True)
+
     km_departure = models.CharField(max_length=20, blank=True, null=True)
+    km_start_driver = models.CharField(max_length=20, blank=True, null=True)
+    km_start_driver_recorded_at = models.DateTimeField(null=True, blank=True)
     km_arrival = models.CharField(max_length=20, blank=True, null=True)
+    km_end_driver = models.CharField(max_length=20, blank=True, null=True)
+    km_end_driver_recorded_at = models.DateTimeField(null=True, blank=True)
+
     km_exit = models.CharField(max_length=20, blank=True, null=True)
     km_entry = models.CharField(max_length=20, blank=True, null=True)
+    
     date_trip = models.DateTimeField(blank=True, null=True)
     date_departure = models.DateTimeField(blank=True, null=True)
     date_arrival = models.DateTimeField(blank=True, null=True)

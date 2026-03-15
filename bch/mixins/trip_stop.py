@@ -10,14 +10,6 @@ logger = logging.getLogger(__name__)
 class TripStopMixin:
     from driver.models import TripStop
 
-    # @action(detail=False)
-    # async def subscribe_trip_stop(self, **kwargs):
-    #     logger.info(f'WS Subscribed to TripStop changes.')
-    #     company = await get_user_company_async(self.scope["user"])
-    #     await self.tripstop_change.subscribe(
-    #         group_name=f"company_{company.id}"
-    #     )
-
     @action(detail=False)
     async def subscribe_trip_stop(self, **kwargs):
         logger.info("WS Subscribed to TripStop changes")

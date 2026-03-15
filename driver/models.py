@@ -71,12 +71,11 @@ class TripStop(models.Model):
 
     title = models.CharField(max_length=100, blank=True, null=True)
 
-    lat = models.FloatField(null=True, blank=True)
-    lon = models.FloatField(null=True, blank=True)
-
     is_visible_to_driver = models.BooleanField(default=False)
 
     date_completed = models.DateTimeField(null=True, blank=True)
+
+    km = models.PositiveIntegerField(null=True, blank=True)
 
     class Meta:
         ordering = ["order"]

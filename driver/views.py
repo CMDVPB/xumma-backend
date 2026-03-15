@@ -27,7 +27,7 @@ from app.models import TypeCost
 from axx.models import Load, LoadEvidence, Trip
 from ayy.models import ItemCost, ItemForItemCost
 from driver.serializers import (
-    ActiveTripSerializer, DriverLoadCacheSerializer, DriverTripSerializer, DriverTripStopSerializer, DriverVehicleSerializer, ItemCostDriverSerializer, ItemForItemCostDriverSerializer, LoadEvidenceSerializer, TripStopAssignGpsSerializer, TripStopMessageSerializer, TripStopReorderSerializer, TripStopSerializer, TripStopVisibilitySerializer, TypeCostSerializer)
+    ActiveTripSerializer, DriverCompleteTripStopSerializer, DriverLoadCacheSerializer, DriverTripKmSerializer, DriverTripSerializer, DriverTripStopSerializer, DriverVehicleSerializer, ItemCostDriverSerializer, ItemForItemCostDriverSerializer, LoadEvidenceSerializer, TripStopAssignGpsSerializer, TripStopMessageSerializer, TripStopReorderSerializer, TripStopSerializer, TripStopVisibilitySerializer, TypeCostSerializer)
 from driver.tasks import broadcast_trip_stop_messages_read, broadcast_trip_stop_reorder, broadcast_trip_stop_visibility
 
 from .models import DriverLocation, DriverTrackPoint, TripStop, TripStopMessage
@@ -265,24 +265,6 @@ class DriverSkipStopView(APIView):
 ###### END DRIVER CONFIRMTIONS ######
 
 ###### START DRIVER LOADING ######
-class DriverCurrentTripView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        user_company = get_user_company(request.user)
-
-        trip = Trip.objects.filter(
-            company=user_company,
-            drivers=request.user,
-            # status__name="in_progress"  # adjust to your system
-        ).first()
-
-        if not trip:
-            return Response({"detail": "No active trip"})
-
-        return Response(DriverTripSerializer(trip).data)
-
-
 class UploadLoadEvidenceView(APIView):
     permission_classes = [IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser]
@@ -294,18 +276,11 @@ class UploadLoadEvidenceView(APIView):
         except Load.DoesNotExist:
             return Response({"detail": "Load not found"}, status=404)
 
-        # ✅ Security check (CRITICAL)
+        # Security check (CRITICAL)
         if load.trip and request.user not in load.trip.drivers.all():
             return Response(
                 {"detail": "Not your load"},
                 status=status.HTTP_403_FORBIDDEN
-            )
-
-        # ✅ Business rule (VERY IMPORTANT)
-        if load.driver_status != "loaded":
-            return Response(
-                {"detail": "Load not loaded yet"},
-                status=status.HTTP_400_BAD_REQUEST
             )
 
         serializer = LoadEvidenceSerializer(data=request.data)
@@ -364,26 +339,6 @@ class LoadEvidenceProxyView(APIView):
         )
 
 
-class UpdateDriverStatus(APIView):
-    def patch(self, request, uf):
-        new_status = request.data.get("status")
-
-        print('3570', new_status)
-
-        if not new_status:
-            return Response(
-                {"detail": "Missing status"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        load = get_object_or_404(Load, uf=uf)
-
-        load.driver_status = new_status
-        load.save(update_fields=["driver_status"])
-
-        return Response({"success": True})
-
-
 class DriverCurrentTripView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -410,7 +365,16 @@ class DriverCurrentTripView(APIView):
         stops = (
             trip.trip_stops
             .filter(is_visible_to_driver=True)
-            .select_related("entry", "entry__shipper", "entry__shipper__country_code_site")
+            .select_related(
+                "load",
+                "entry",
+                "entry__shipper",
+                "entry__shipper__country_code_site",
+            )
+            .prefetch_related(
+                "entry__entry_details",
+                "entry__entry_details__colli_type",
+            )
             .annotate(
                 unread_count=Count(
                     "trip_stop_messages",
@@ -422,7 +386,7 @@ class DriverCurrentTripView(APIView):
             .order_by("order", "id")
         )
 
-        # print('5554', stops)
+        print('5554', stops)
 
         # next stop = first not completed
         next_stop = stops.exclude(status__in=["completed", "skipped"]).first()
@@ -438,10 +402,17 @@ class DriverCurrentTripView(APIView):
             for load in loads
         }
 
+        print('5558', next_stop)
+
         return Response({
             "uf": trip.uf,
             "rn": trip.rn,
             "date_order": trip.date_order,
+            "km_start_driver": trip.km_start_driver,
+            "km_start_driver_recorded_at": trip.km_start_driver_recorded_at,
+            "km_end_driver": trip.km_end_driver,
+            "km_end_driver_recorded_at": trip.km_end_driver_recorded_at,
+
             "vehicle_tractor": DriverVehicleSerializer(trip.vehicle_tractor).data if trip.vehicle_tractor else None,
             "vehicle_trailer": DriverVehicleSerializer(trip.vehicle_trailer).data if trip.vehicle_trailer else None,
 
@@ -502,6 +473,10 @@ class DriverCompleteTripStopView(APIView):
     def post(self, request, stopUf):
         user_company = get_user_company(request.user)
 
+        serializer = DriverCompleteTripStopSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        km = serializer.validated_data.get("km")
+
         # lock ONLY TripStop row (no nullable joins)
         stop = get_object_or_404(
             TripStop.objects.select_for_update().select_related("trip"),
@@ -517,7 +492,14 @@ class DriverCompleteTripStopView(APIView):
             return Response({"detail": "Stop not assigned to driver"}, status=400)
 
         if stop.status == "completed":
-            return Response({"status": "ok", "stop_status": stop.status, "stops_version": trip.stops_version})
+            return Response(
+                {
+                    "status": "ok",
+                    "stop_status": stop.status,
+                    "stops_version": trip.stops_version,
+                    "km": stop.km,
+                }
+            )
 
         if stop.status == "skipped":
             return Response({"detail": "Cannot complete skipped stop"}, status=400)
@@ -525,10 +507,17 @@ class DriverCompleteTripStopView(APIView):
         if stop.status != "in_progress":
             return Response({"detail": f"Invalid transition from {stop.status}"}, status=400)
 
-        # complete stop
+         # complete stop
         stop.status = "completed"
         stop.date_completed = timezone.now()
-        stop.save(update_fields=["status", "date_completed"])
+
+        update_fields = ["status", "date_completed"]
+
+        if km is not None:
+            stop.km = km
+            update_fields.append("km")
+
+        stop.save(update_fields=update_fields)
 
         # bump version
         trip.stops_version += 1
@@ -553,11 +542,59 @@ class DriverCompleteTripStopView(APIView):
             "stop_status": stop.status,
             "stops_version": trip.stops_version
         })
+
+
+class DriverTripKmView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @transaction.atomic
+    def post(self, request, tripUf):
+        user_company = get_user_company(request.user)
+
+        trip = get_object_or_404(
+            Trip.objects.select_for_update().prefetch_related("drivers"),
+            uf=tripUf,
+        )
+
+        if trip.company_id != user_company.id or not trip.drivers.filter(id=request.user.id).exists():
+            return Response({"detail": "Forbidden"}, status=403)
+
+        serializer = DriverTripKmSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        now = timezone.now()
+        update_fields = []
+
+        km_start_driver = serializer.validated_data.get("km_start_driver")
+        km_end_driver = serializer.validated_data.get("km_end_driver")
+
+        if km_start_driver is not None:
+            trip.km_start_driver = km_start_driver
+            trip.km_start_driver_recorded_at = now
+            update_fields.extend(["km_start_driver", "km_start_driver_recorded_at"])
+
+        if km_end_driver is not None:
+            trip.km_end_driver = km_end_driver
+            trip.km_end_driver_recorded_at = now
+            update_fields.extend(["km_end_driver", "km_end_driver_recorded_at"])
+
+        trip.save(update_fields=update_fields)
+
+        return Response(
+            {
+                "status": "ok",
+                "trip_uf": str(trip.uf),
+                "km_start_driver": trip.km_start_driver,
+                "km_start_driver_recorded_at": trip.km_start_driver_recorded_at,
+                "km_end_driver": trip.km_end_driver,
+                "km_end_driver_recorded_at": trip.km_end_driver_recorded_at,
+            }
+        )
+    
+
 ###### END DRIVER LOADING ######
 
 ###### START DRIVER COSTS DURING TRIP ######
-
-
 class TripCostsDriverView(PolicyFilteredQuerysetMixin, ListCreateAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = ItemCostDriverSerializer
@@ -657,10 +694,7 @@ def _generate_trip_stops(trip):
                 type=stop_type,
                 order=order,
 
-                title=shipper.name_site if shipper else "Unknown location",
-
-                lat=shipper.lat if shipper else None,
-                lon=shipper.lon if shipper else None,
+                title=shipper.name_site if shipper else "Unknown location",                
             )
 
             order += 1
@@ -859,12 +893,16 @@ class DriverAssignTripStopSiteGpsView(APIView):
             is_visible_to_driver=True,
         )
 
+        print('6080', stop.trip, stop.load, stop.entry)
+
         shipper = getattr(stop.entry, "shipper", None) if stop.entry else None
         if not shipper:
             return Response(
                 {"detail": "No site linked to this stop"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        
+        
 
         shipper.lat = lat
         shipper.lon = lon

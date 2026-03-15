@@ -12,8 +12,8 @@ urlpatterns = [
     path('dispatcher/driver-location/<str:driver_uf>/',
          DriverLocationAPIView.as_view(),  name='driver-location'),
 
+     path("driver/trips/<str:tripUf>/km/", DriverTripKmView.as_view(), name="driver-trip-km"),
 
-    path("driver/trips/<str:uf>/status/", UpdateDriverStatus.as_view()),
     path("driver/trip-stops/<str:uf>/confirm-arrival/",
          DriverConfirmArrivalView.as_view()),
     path("driver/trip-stops/<str:uf>/start/", DriverStartStopView.as_view()),
@@ -33,6 +33,7 @@ urlpatterns = [
          DriverTripStopsSyncView.as_view()),
     path("driver/stops/<str:stopUf>/complete/",
          DriverCompleteTripStopView.as_view()),
+     
 
     ###### START DRIVER COSTS DURING TRIP ######
     path("trips/<str:trip_uf>/costs/", TripCostsDriverView.as_view()),

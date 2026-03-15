@@ -1,6 +1,6 @@
-from .models import TripStop, TripStopMessage
-from rest_framework import serializers
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from django.conf import settings
+from rest_framework import serializers
 
 from abb.models import Country, Currency
 from app.models import TypeCost
@@ -8,7 +8,8 @@ from att.models import Vehicle
 from axx.models import Load, LoadEvidence, Trip
 from ayy.models import ItemCost, ItemForItemCost
 from driver.utils import format_site
-from .models import DriverLocation
+from .models import DriverLocation, TripStop, TripStopMessage
+
 
 
 class DriverLocationSerializer(serializers.ModelSerializer):
@@ -90,8 +91,6 @@ class ActiveTripSerializer(serializers.ModelSerializer):
 
 
 ###### START DRIVER LOADING ######
-
-
 class ConfirmLoadingSerializer(serializers.Serializer):
     uf = serializers.CharField()
 
@@ -210,6 +209,11 @@ class DriverTripSerializer(serializers.ModelSerializer):
             "uf",
 
             "departure_inspection_completed",
+
+            "km_start_driver",
+            "km_start_driver_recorded_at",
+            "km_end_driver",
+            "km_end_driver_recorded_at",
         ]
 
     def get_loads(self, obj):
@@ -235,6 +239,15 @@ class DriverTripStopSerializer(serializers.ModelSerializer):
     site_name = serializers.SerializerMethodField()
     site_lat = serializers.SerializerMethodField()
     site_lon = serializers.SerializerMethodField()
+    reference = serializers.SerializerMethodField()
+    loading_point_note = serializers.SerializerMethodField()
+
+    pieces_total = serializers.SerializerMethodField()
+    weight_total = serializers.SerializerMethodField()
+    ldm_total = serializers.SerializerMethodField()
+    volume_total = serializers.SerializerMethodField()
+    dims_summary = serializers.SerializerMethodField()
+    colli_type_summary = serializers.SerializerMethodField()
 
     class Meta:
         model = TripStop
@@ -242,12 +255,11 @@ class DriverTripStopSerializer(serializers.ModelSerializer):
             "uf",
             "order",
             "type",
-            "title",
-            "lat",
-            "lon",
+            "title",           
             "is_completed",
             "date_completed",
             "status",
+            "km",
 
             "load_sn",
             "time_load_min",
@@ -265,14 +277,49 @@ class DriverTripStopSerializer(serializers.ModelSerializer):
             "site_name",
             "site_lat",
             "site_lon",
+            "reference",
+            "loading_point_note",
+
+            "pieces_total",
+            "weight_total",
+            "ldm_total",
+            "volume_total",
+            "dims_summary",
+            "colli_type_summary",
         ]
         read_only_fields = fields
 
     def _get_shipper(self, obj):
             entry = getattr(obj, "entry", None)
+            # print('6060', obj)
             if not entry:
                 return None
             return getattr(entry, "shipper", None)
+
+    def _get_details(self, obj):
+            entry = getattr(obj, "entry", None)
+            if not entry:
+                return []
+            return list(entry.entry_details.all())
+
+    def _sum_decimal_field(self, details, field_name):
+        total = Decimal("0")
+        found = False
+
+        for d in details:
+            raw = getattr(d, field_name, None)
+            if raw in [None, ""]:
+                continue
+            try:
+                total += Decimal(str(raw).replace(",", "."))
+                found = True
+            except (InvalidOperation, TypeError, ValueError):
+                continue
+
+        if not found:
+            return None
+
+        return total
 
     def get_site_name(self, obj):
         shipper = self._get_shipper(obj)
@@ -310,18 +357,117 @@ class DriverTripStopSerializer(serializers.ModelSerializer):
             return None
 
         parts = [
-            shipper.address_site,
-            shipper.city_site,
-            shipper.zip_code_site,
             getattr(shipper.country_code_site, "label", None) if shipper.country_code_site else None,
+            shipper.zip_code_site,
+            shipper.city_site,
+            shipper.address_site,
         ]
         return ", ".join([p for p in parts if p]) or None
+    
+    def get_reference(self, obj):
+        shipper = self._get_shipper(obj)
+        return getattr(shipper, "instructions1", None) if shipper else None
+
+    def get_loading_point_note(self, obj):
+        shipper = self._get_shipper(obj)
+        return getattr(shipper, "comment2", None) if shipper else None
+    
+    def get_pieces_total(self, obj):
+        total = self._sum_decimal_field(self._get_details(obj), "pieces")
+        if total is None:
+            return None
+
+        return str(int(total))
+
+    def get_ldm_total(self, obj):
+        total = self._sum_decimal_field(self._get_details(obj), "ldm")
+        if total is None:
+            return None
+
+        if total <= Decimal("0.01"):
+            return None
+
+        return str(total.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+
+    def get_weight_total(self, obj):
+        total = self._sum_decimal_field(self._get_details(obj), "weight")
+        if total is None:
+            return None
+
+        return str(total.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+
+    def get_volume_total(self, obj):
+        total = self._sum_decimal_field(self._get_details(obj), "volume")
+        if total is None:
+            return None
+
+        return str(total.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+
+    def get_dims_summary(self, obj):
+        details = self._get_details(obj)
+        dims = [d.dims.strip() for d in details if d.dims and d.dims.strip()]
+        return " | ".join(dict.fromkeys(dims)) if dims else None
+
+    def get_colli_type_summary(self, obj):
+        details = self._get_details(obj)
+
+        counts = {}
+        for d in details:
+            colli = getattr(d, "colli_type", None)
+            if not colli:
+                continue
+
+            label = colli.label or colli.code or str(colli)
+            raw_pieces = getattr(d, "pieces", None)
+
+            qty = Decimal("0")
+            try:
+                if raw_pieces not in [None, ""]:
+                    qty = Decimal(str(raw_pieces).replace(",", "."))
+            except (InvalidOperation, TypeError, ValueError):
+                qty = Decimal("0")
+
+            counts[label] = counts.get(label, Decimal("0")) + qty
+
+        if not counts:
+            return None
+
+        parts = []
+        for label, qty in counts.items():
+            qty_str = str(qty.normalize()) if qty != 0 else "0"
+            parts.append(f"{qty_str} {label}")
+
+        return " | ".join(parts)
+
+
+class DriverCompleteTripStopSerializer(serializers.Serializer):
+    km = serializers.IntegerField(required=False, min_value=0)
+   
+
+class DriverTripKmSerializer(serializers.Serializer):
+    km_start_driver = serializers.CharField(required=False, allow_blank=False, max_length=20)
+    km_end_driver = serializers.CharField(required=False, allow_blank=False, max_length=20)
+
+    def validate(self, attrs):
+        km_start_driver = attrs.get("km_start_driver")
+        km_end_driver = attrs.get("km_end_driver")
+
+        if not km_start_driver and not km_end_driver:
+            raise serializers.ValidationError(
+                "Provide either km_start_driver or km_end_driver."
+            )
+
+        if km_start_driver and km_end_driver:
+            raise serializers.ValidationError(
+                "Provide only one of km_start_driver or km_end_driver."
+            )
+
+        return attrs
 
 ###### END DRIVER LOADING ######
 
 
 ###### START DRIVER COSTS DURING TRIP ######
-
 class ItemForItemCostDriverSerializer(serializers.ModelSerializer):
 
     class Meta:
@@ -451,8 +597,6 @@ class TypeCostSerializer(serializers.ModelSerializer):
 
 
 ###### START TRIP STOPS ######
-
-
 class TripStopSerializer(serializers.ModelSerializer):
 
     load_sn = serializers.CharField(source="load.sn", read_only=True)
@@ -468,9 +612,7 @@ class TripStopSerializer(serializers.ModelSerializer):
         fields = [
             "order",
             "type",
-            "title",
-            "lat",
-            "lon",
+            "title",           
             "is_visible_to_driver",
             "date_completed",
             "status",
