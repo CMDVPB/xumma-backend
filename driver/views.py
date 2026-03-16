@@ -663,14 +663,27 @@ class TypeCostDriverList(PolicyFilteredQuerysetMixin, ListAPIView):
 
 
 ###### START TRIP STOPS ######
-def _generate_trip_stops(trip):
+def sync_trip_stops_for_trip(trip):
+    if not trip:
+        return
 
-    loads = trip.trip_loads.all()
+    loads = (
+        trip.trip_loads.all()
+        .prefetch_related("entry_loads__shipper")
+    )
+
+    existing_stops = TripStop.objects.filter(trip=trip)
+    existing_by_entry_id = {
+        stop.entry_id: stop
+        for stop in existing_stops
+        if stop.entry_id is not None
+    }
+
+    desired = []
     order = 1
 
     for load in loads:
         for entry in load.entry_loads.all():
-
             if entry.action == "loading":
                 stop_type = "pickup"
             elif entry.action == "unloading":
@@ -679,43 +692,194 @@ def _generate_trip_stops(trip):
                 continue
 
             shipper = entry.shipper
-
             if not shipper:
-                logger.warning(
-                    f"Entry {entry.id} has no shipper — skipping TripStop")
+                logger.warning(f"Entry {entry.id} has no shipper — skipping TripStop")
                 continue
 
-            TripStop.objects.create(
-                uf=hex_uuid(),
-                company=trip.company,
-                trip=trip,
-                load=load,
-                entry=entry,
-                type=stop_type,
-                order=order,
-
-                title=shipper.name_site if shipper else "Unknown location",                
-            )
-
+            desired.append({
+                "entry_id": entry.id,
+                "load_id": load.id,
+                "type": stop_type,
+                "title": shipper.name_site if shipper else "Unknown location",
+                "order": order,
+            })
             order += 1
 
+    desired_entry_ids = {d["entry_id"] for d in desired}
+
+    # create missing
+    to_create = []
+    for d in desired:
+        if d["entry_id"] not in existing_by_entry_id:
+            to_create.append(
+                TripStop(
+                    uf=hex_uuid(),
+                    company=trip.company,
+                    trip=trip,
+                    load_id=d["load_id"],
+                    entry_id=d["entry_id"],
+                    type=d["type"],
+                    title=d["title"],
+                    order=d["order"],
+                )
+            )
+
+    if to_create:
+        TripStop.objects.bulk_create(to_create)
+
+    # refresh map after create
+    existing_stops = TripStop.objects.filter(trip=trip)
+    existing_by_entry_id = {
+        stop.entry_id: stop
+        for stop in existing_stops
+        if stop.entry_id is not None
+    }
+
+    # update existing
+    to_update = []
+    for d in desired:
+        stop = existing_by_entry_id.get(d["entry_id"])
+        if not stop:
+            continue
+
+        changed = False
+
+        if stop.load_id != d["load_id"]:
+            stop.load_id = d["load_id"]
+            changed = True
+        if stop.type != d["type"]:
+            stop.type = d["type"]
+            changed = True
+        if stop.title != d["title"]:
+            stop.title = d["title"]
+            changed = True
+        if stop.order != d["order"]:
+            stop.order = d["order"]
+            changed = True
+
+        if changed:
+            to_update.append(stop)
+
+    if to_update:
+        TripStop.objects.bulk_update(
+            to_update,
+            ["load", "type", "title", "order"]
+        )
+
+    # delete obsolete stops
+    obsolete = TripStop.objects.filter(trip=trip).exclude(entry_id__in=desired_entry_ids)
+    obsolete.delete()
+
+    trip.stops_version += 1
+    trip.save(update_fields=["stops_version"])
+  
+    
+def _sync_trip_stops(trip):
+    loads = trip.trip_loads.all().prefetch_related("entry_loads__shipper")
+    existing_stops = TripStop.objects.filter(trip=trip)
+
+    existing_by_entry_id = {
+        stop.entry_id: stop
+        for stop in existing_stops
+        if stop.entry_id is not None
+    }
+
+    desired = []
+    order = 1
+
+    for load in loads:
+        for entry in load.entry_loads.all():
+            if entry.action == "loading":
+                stop_type = "pickup"
+            elif entry.action == "unloading":
+                stop_type = "delivery"
+            else:
+                continue
+
+            shipper = entry.shipper
+            if not shipper:
+                logger.warning(f"Entry {entry.id} has no shipper — skipping TripStop")
+                continue
+
+            desired.append({
+                "entry_id": entry.id,
+                "load_id": load.id,
+                "type": stop_type,
+                "title": shipper.name_site if shipper else "Unknown location",
+                "order": order,
+            })
+            order += 1
+
+    desired_entry_ids = {d["entry_id"] for d in desired}
+    existing_entry_ids = set(existing_by_entry_id.keys())
+
+    # create missing
+    to_create = []
+    for d in desired:
+        if d["entry_id"] not in existing_entry_ids:
+            to_create.append(
+                TripStop(
+                    uf=hex_uuid(),
+                    company=trip.company,
+                    trip=trip,
+                    load_id=d["load_id"],
+                    entry_id=d["entry_id"],
+                    type=d["type"],
+                    title=d["title"],
+                    order=d["order"],
+                )
+            )
+
+    if to_create:
+        TripStop.objects.bulk_create(to_create)
+
+    # update existing
+    to_update = []
+    for d in desired:
+        stop = existing_by_entry_id.get(d["entry_id"])
+        if not stop:
+            continue
+
+        changed = False
+
+        if stop.load_id != d["load_id"]:
+            stop.load_id = d["load_id"]
+            changed = True
+        if stop.type != d["type"]:
+            stop.type = d["type"]
+            changed = True
+        if stop.title != d["title"]:
+            stop.title = d["title"]
+            changed = True
+        if stop.order != d["order"]:
+            stop.order = d["order"]
+            changed = True
+
+        if changed:
+            to_update.append(stop)
+
+    if to_update:
+        TripStop.objects.bulk_update(
+            to_update,
+            ["load", "type", "title", "order"]
+        )
+
+    # delete obsolete derived stops
+    TripStop.objects.filter(trip=trip).exclude(entry_id__in=desired_entry_ids).delete()
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated, NotDriverPermission])
 @transaction.atomic
 def trip_stops_list(request, tripUf):
-
     trip = Trip.objects.select_for_update().get(uf=tripUf)
 
-    stops_qs = TripStop.objects.filter(trip=trip)
+    _sync_trip_stops(trip)
 
-    if not stops_qs.exists():
-        _generate_trip_stops(trip)
-        stops_qs = TripStop.objects.filter(trip=trip)
+    stops_qs = TripStop.objects.filter(trip=trip).order_by("order")
 
-    stops_qs = stops_qs.order_by("order")
-
-    return Response(TripStopSerializer(stops_qs, many=True, context={"request": request}).data)
+    return Response(
+        TripStopSerializer(stops_qs, many=True, context={"request": request}).data
+    )
 
 
 @api_view(["PATCH"])

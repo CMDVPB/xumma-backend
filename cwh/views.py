@@ -168,6 +168,7 @@ class LoadReloadToTripView(GenericAPIView):
     serializer_class = LoadReloadSerializer
 
     def post(self, request, load_uf):
+        from driver.views import _sync_trip_stops
 
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -216,6 +217,11 @@ class LoadReloadToTripView(GenericAPIView):
             load.trip = trip
             load.warehouse = None
             load.save()
+
+
+            _sync_trip_stops(trip)
+            trip.stops_version += 1
+            trip.save(update_fields=["stops_version"])
 
             # Movement history
 

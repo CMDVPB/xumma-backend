@@ -32,6 +32,8 @@ from dff.serializers.serializers_other import CMRSerializer, CommentSerializer, 
 from dff.serializers.serializers_tor import TorSerializer
 
 
+
+
 User = get_user_model()
 
 LOAD_EVENT_FLAG_MAP = {
@@ -251,7 +253,7 @@ class LoadSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
     vehicle_trailer = SlugRelatedGetOrCreateField(
         allow_null=True, slug_field='uf', queryset=Vehicle.objects.all(), write_only=True)
     trip = serializers.SlugRelatedField(
-        allow_null=True, slug_field='uf', queryset=Vehicle.objects.none(), write_only=True)
+        allow_null=True, slug_field='uf', queryset=Trip.objects.none(), write_only=True)
 
     load_tors = serializers.SlugRelatedField(
         many=True, slug_field='uf', queryset=Tor.objects.all(), write_only=True)
@@ -428,6 +430,7 @@ class LoadSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
         return response
 
     def create(self, validated_data):
+        from driver.views import sync_trip_stops_for_trip
         # print('1614:', validated_data)
 
         # Extract nested CMR data before relations pop it
@@ -455,10 +458,16 @@ class LoadSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
                     defaults={**cmr_data, "company": instance.company},
                 )
 
+            if instance.trip_id:
+                sync_trip_stops_for_trip(instance.trip)
+
         return instance
 
     def update(self, instance, validated_data):
         # print('3347', validated_data)
+        from driver.views import sync_trip_stops_for_trip
+        old_trip_id = instance.trip_id
+        old_trip = instance.trip if instance.trip_id else None
 
         # # Extract nested CMR data before relations pop it
         # cmr_data = validated_data.pop('cmr', None)
@@ -486,7 +495,30 @@ class LoadSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
             #         defaults={**cmr_data, "company": instance.company},
             #     )
 
+
+
             instance.refresh_from_db()
+
+
+            new_trip = instance.trip if instance.trip_id else None
+            new_trip_id = instance.trip_id
+
+            trips_to_sync = []
+
+            if old_trip_id:
+                trips_to_sync.append(old_trip)
+
+            if new_trip_id and new_trip_id != old_trip_id:
+                trips_to_sync.append(new_trip)
+            elif new_trip_id and old_trip_id == new_trip_id:
+                trips_to_sync.append(new_trip)
+
+            synced_ids = set()
+            for trip in trips_to_sync:
+                if trip and trip.id not in synced_ids:
+                    sync_trip_stops_for_trip(trip)
+                    synced_ids.add(trip.id)
+
             return instance
 
     class Meta:
