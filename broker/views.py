@@ -31,7 +31,7 @@ from broker.mixins import CompanyScopedMixin, JobVisibilityQuerysetMixin
 from broker.models import BrokerBaseSalary, BrokerCommissionType, BrokerSettlement, CustomerServicePrice, CustomerServiceTierPrice, Job, JobLine, PointMembership, PointOfService, Role, ServiceType, ServiceTypeTier
 
 from broker.permissions import IsAdminOrManager, JobAccessPermission
-from broker.serializers import (BrokerEmployeePerformanceSerializer, BrokerStaffCompensationSerializer, BrokerStaffDetailsSerializer, 
+from broker.serializers import (BrokerEmployeePerformanceSerializer, BrokerInvoiceCreateSerializer, BrokerInvoiceReadSerializer, BrokerStaffCompensationSerializer, BrokerStaffDetailsSerializer, 
                                 BrokerStaffSerializer, CustomerServicePriceSerializer, JobSerializer, ServiceTypeSerializer,
                                  BrokerCustomerPricingUpsertSerializer, PointMembershipSerializer, PointOfServiceSerializer, 
                                  )
@@ -155,6 +155,24 @@ class PointMembershipDetailView(CompanyScopedMixin, RetrieveUpdateDestroyAPIView
         instance.is_active = False
         instance.save()
 
+###### START JOB INVOICING ######
+class BrokerInvoiceCreateAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = BrokerInvoiceCreateSerializer(
+            data=request.data,
+            context={"request": request}
+        )
+        serializer.is_valid(raise_exception=True)
+        invoice = serializer.save()
+        return Response(
+            BrokerInvoiceReadSerializer(invoice).data,
+            status=status.HTTP_201_CREATED
+        )
+
+###### END JOB INVOICING ######
+
 
 class JobListCreateView(CompanyScopedMixin, JobVisibilityQuerysetMixin, ListCreateAPIView):
     permission_classes = [IsAuthenticated, JobAccessPermission]
@@ -172,6 +190,8 @@ class JobListCreateView(CompanyScopedMixin, JobVisibilityQuerysetMixin, ListCrea
         customer = self.request.query_params.get("customer")
         point = self.request.query_params.get("point")
         assigned_to = self.request.query_params.get("assigned_to")
+        start = self.request.query_params.get("start")
+        end = self.request.query_params.get("end")
 
         if customer:
             qs = qs.filter(customer__uf=customer)
@@ -181,6 +201,13 @@ class JobListCreateView(CompanyScopedMixin, JobVisibilityQuerysetMixin, ListCrea
 
         if assigned_to:
             qs = qs.filter(assigned_to__uf=assigned_to)
+
+        if start and end:
+            qs = qs.filter(created_at__date__range=[start, end])
+        elif start:
+            qs = qs.filter(created_at__date__gte=start)
+        elif end:
+            qs = qs.filter(created_at__date__lte=end)     
 
 
         return qs.order_by('-created_at')
@@ -245,6 +272,8 @@ class BrokerJobExportAPIView(CompanyScopedMixin, JobVisibilityQuerysetMixin, API
         customer = request.query_params.get("customer")
         point = request.query_params.get("point")
         assigned_to = request.query_params.get("assigned_to")
+        start = request.query_params.get("start")
+        end = request.query_params.get("end")
 
         if customer:
             qs = qs.filter(customer__uf=customer)
@@ -254,6 +283,14 @@ class BrokerJobExportAPIView(CompanyScopedMixin, JobVisibilityQuerysetMixin, API
 
         if assigned_to:
             qs = qs.filter(assigned_to__uf=assigned_to)
+
+        if start and end:
+            qs = qs.filter(created_at__date__range=[start, end])
+        elif start:
+            qs = qs.filter(created_at__date__gte=start)
+        elif end:
+            qs = qs.filter(created_at__date__lte=end)
+
 
         wb = Workbook()
         ws = wb.active
@@ -380,7 +417,6 @@ class BrokerJobExportAPIView(CompanyScopedMixin, JobVisibilityQuerysetMixin, API
 
         wb.save(response)
         return response
-
 
 
 class ServiceTypeListCreateView(CompanyScopedMixin, ListCreateAPIView):
@@ -838,7 +874,7 @@ class BrokerStaffDetailsView(RetrieveUpdateAPIView):
     
 
 class BrokerStaffCompensationUpdateView(UpdateAPIView):
-
+    permission_classes = [IsAuthenticated]
     serializer_class = BrokerStaffCompensationSerializer
     lookup_field = "uf"
 
@@ -939,7 +975,7 @@ class BrokerSettlementExportAPIView(APIView):
             _("date"),
             _("customer"),
             _("service"),
-            _("quantity"),
+            _("positions"),
             _("revenue"),
             _("commission")
         ])
@@ -965,7 +1001,6 @@ class BrokerSettlementExportAPIView(APIView):
                 date_cell.value = datetime.strptime(row["date"], "%Y-%m-%d")
 
             date_cell.number_format = "DD-MM-YYYY"
-
        
 
         ws.append([])
@@ -981,7 +1016,20 @@ class BrokerSettlementExportAPIView(APIView):
         for c in ws[ws.max_row]:
             c.font = bold
 
-        # Locks the header row when scrolling in Excel
+
+        column_widths = {
+            "A": 16,  # date
+            "B": 26,  # customer
+            "C": 25,  # service
+            "D": 12,  # quantity
+            "E": 15,  # revenue
+            "F": 15,  # commission
+        }
+
+        for col, width in column_widths.items():
+                        ws.column_dimensions[col].width = width
+
+        # locks the header row when scrolling in Excel
         ws.freeze_panes = "A2"
 
         response = HttpResponse(

@@ -79,8 +79,82 @@ class TeamVisibilityGrant(models.Model):
             models.UniqueConstraint(fields=["company", "user", "point"], name="uniq_visibility_grant"),            
         ]
 
+###### START BROKER JOB INVOICING ######
+class BrokerInvoice(models.Model):
+    class InvoiceStatus(models.TextChoices):
+        DRAFT = "draft", "Draft"
+        ISSUED = "issued", "Issued"
+        CANCELLED = "cancelled", "Cancelled"
+
+    uf = models.CharField(max_length=36, default=hex_uuid, unique=True, db_index=True)
+
+    company = models.ForeignKey(
+        "app.Company",
+        on_delete=models.CASCADE,
+        related_name="broker_invoices"
+    )
+
+    customer = models.ForeignKey(
+        "att.Contact",
+        on_delete=models.PROTECT,
+        related_name="customer_broker_invoices"
+    )
+
+    invoice_number = models.CharField(max_length=50, db_index=True)
+    invoice_date = models.DateField()
+    issued_at = models.DateTimeField(blank=True, null=True)
+
+    status = models.CharField(
+        max_length=20,
+        choices=InvoiceStatus.choices,
+        default=InvoiceStatus.DRAFT,
+        db_index=True
+    )
+
+    comments = models.CharField(max_length=500, blank=True, null=True)
+
+    total_net = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total_vat = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total_gross = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+class BrokerInvoiceLine(models.Model):
+    invoice = models.ForeignKey(
+        BrokerInvoice,
+        on_delete=models.CASCADE,
+        related_name="broker_invoice_lines"
+    )
+
+    job = models.ForeignKey(
+        "broker.Job",
+        on_delete=models.PROTECT,
+        related_name="job_invoice_lines"
+    )
+
+    description = models.CharField(max_length=255, blank=True, null=True)
+
+    amount_net = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    vat_percent = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    amount_vat = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    amount_gross = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+    position = models.PositiveIntegerField(default=1)
+
+    class Meta:
+        ordering = ["position"]
+
+
+###### END BROKER JOB INVOICING ######
 
 class Job(models.Model):
+    class JobStatus(models.TextChoices):
+        NEW = "new", "New"
+        CREATED = "created", "Created"     
+        PENDING = "pending", "Pending"
+        FINISHED = "finished", "Finished"
+
     uf = models.CharField(max_length=36, db_index=True, default=hex_uuid, unique=True)
     company = models.ForeignKey("app.Company", on_delete=models.CASCADE, related_name="company_broker_jobs")
     point = models.ForeignKey(PointOfService, on_delete=models.PROTECT, related_name="point_broker_jobs")
@@ -95,15 +169,29 @@ class Job(models.Model):
     job_add_info = models.CharField(max_length=100, blank=True, null=True)
     comments = models.CharField(max_length=500, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    date_job = models.DateField(blank=True, null=True)
 
     ref = models.CharField(max_length=50, blank=True, null=True, db_index=True)
-    status = models.CharField(max_length=30, default="new", blank=True, null=True, db_index=True)
+    status = models.CharField(max_length=30, choices=JobStatus, default=JobStatus.CREATED, db_index=True)
+
+    broker_invoice = models.ForeignKey(
+            BrokerInvoice,
+            on_delete=models.SET_NULL,
+            null=True,
+            blank=True,
+            related_name="broker_invoice_jobs"
+        )
 
     class Meta:
         indexes = [
             models.Index(fields=["company", "point", "status"]),
             models.Index(fields=["company", "assigned_to", "created_at"]),
         ]
+
+    @property
+    def is_invoiced(self):
+        return self.broker_invoice_id is not None
+
 
     def __str__(self):
         return f"{self.ref}"
@@ -483,33 +571,20 @@ class BrokerCommission(models.Model):
     valid_to = models.DateField(null=True, blank=True)
 
     class Meta:
-        ordering = ["-valid_from"]
-        constraints = [
-            models.UniqueConstraint(
-                fields=["company", "user", "customer", "service_type", "valid_from"],
-                name="unique_broker_commission_rule"
-            )
-        ]
+        ordering = ["-valid_from"]        
         indexes = [
             models.Index(fields=["user", "valid_from"]),
             models.Index(fields=["company", "user"]),
         ]
 
     def clean(self):
+        super().clean()
 
-        overlapping = BrokerCommission.objects.filter(
-            user=self.user,
-            company=self.company,
-            customer=self.customer,
-            service_type=self.service_type,
-        ).exclude(pk=self.pk).filter(
-            Q(valid_to__isnull=True) | Q(valid_to__gte=self.valid_from)
-        ).filter(
-            Q(valid_from__lte=self.valid_to) if self.valid_to else Q()
-        )
-
-        if overlapping.exists():
-            raise ValidationError("Commission rule overlaps.")
+        if self.valid_to and self.valid_to < self.valid_from:
+            raise ValidationError({
+                "valid_to": "valid_to cannot be earlier than valid_from."
+            })
+        
         
     def save(self, *args, **kwargs):
         self.full_clean()

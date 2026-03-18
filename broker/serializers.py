@@ -1,10 +1,13 @@
 from decimal import Decimal, ROUND_HALF_UP
+from django.db.models import Sum, F, DecimalField, ExpressionWrapper
+from django.utils import timezone
 from django.db import transaction
 from rest_framework import serializers
 from drf_writable_nested.serializers import WritableNestedModelSerializer
 
 from abb.utils import get_user_company
 from att.models import Contact
+from broker.utils import get_next_broker_invoice_number
 from .models import *
 
 class PointOfServiceSerializer(serializers.ModelSerializer):
@@ -143,6 +146,206 @@ class TeamVisibilityGrantSerializer(serializers.ModelSerializer):
         fields = "__all__"
         read_only_fields = ("uf", "company", "created_at", "created_by")
 
+###### START JOB INVOICING ######
+class BrokerInvoiceLineReadSerializer(serializers.ModelSerializer):
+    job_uf = serializers.CharField(source="job.uf", read_only=True)
+    job_ref = serializers.CharField(source="job.ref", read_only=True)
+
+    class Meta:
+        model = BrokerInvoiceLine
+        fields = [
+            "id",
+            "position",
+            "job",
+            "job_uf",
+            "job_ref",
+            "description",
+            "amount_net",
+            "vat_percent",
+            "amount_vat",
+            "amount_gross",
+        ]
+
+
+class BrokerInvoiceReadSerializer(serializers.ModelSerializer):
+    customer_info = serializers.SerializerMethodField()
+    jobs_info = serializers.SerializerMethodField()
+    invoice_lines = BrokerInvoiceLineReadSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = BrokerInvoice
+        fields = [
+            "id",
+            "uf",
+            "invoice_number",
+            "invoice_date",
+            "issued_at",
+            "status",
+            "comments",
+            "total_net",
+            "total_vat",
+            "total_gross",
+            "customer",
+            "customer_info",
+            "jobs_info",
+            "invoice_lines",
+            "created_at",
+        ]
+
+    def get_customer_info(self, obj):
+        if not obj.customer:
+            return None
+        return {
+            "uf": obj.customer.uf,
+            "company_name": getattr(obj.customer, "company_name", ""),
+            "alias_company_name": getattr(obj.customer, "alias_company_name", ""),
+        }
+
+    def get_jobs_info(self, obj):
+        return [
+            {
+                "uf": job.uf,
+                "ref": job.ref,
+                # "total_amount": job.total_amount,
+            }
+            for job in obj.broker_invoice_jobs.all()
+        ]
+
+
+class BrokerInvoiceCreateSerializer(serializers.Serializer):
+    invoice_number = serializers.CharField(max_length=50)
+    invoice_date = serializers.DateField()
+    status = serializers.ChoiceField(
+        choices=BrokerInvoice.InvoiceStatus.choices,
+        default=BrokerInvoice.InvoiceStatus.ISSUED
+    )
+    comments = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    job_ufs = serializers.ListField(
+        child=serializers.CharField(),
+        allow_empty=False
+    )
+
+    def validate_job_ufs(self, value):
+        unique = list(dict.fromkeys(value))
+        if not unique:
+            raise serializers.ValidationError("At least one job must be selected.")
+        return unique
+
+    def validate(self, attrs):
+        request = self.context["request"]
+        company = get_user_company(request.user)
+        job_ufs = attrs["job_ufs"]
+
+        jobs = list(
+            Job.objects.select_related("customer", "company")
+            .prefetch_related("job_lines")
+            .filter(company=company, uf__in=job_ufs)
+        )
+
+        if len(jobs) != len(job_ufs):
+            raise serializers.ValidationError({
+                "job_ufs": "One or more jobs were not found."
+            })
+
+        customer_ids = {job.customer_id for job in jobs}
+        if len(customer_ids) != 1:
+            raise serializers.ValidationError({
+                "job_ufs": "All selected jobs must belong to the same customer."
+            })
+
+        already_invoiced = [job.uf for job in jobs if job.broker_invoice_id]
+        if already_invoiced:
+            raise serializers.ValidationError({
+                "job_ufs": f"Some jobs are already invoiced: {', '.join(already_invoiced)}"
+            })
+
+        attrs["company"] = company
+        attrs["jobs"] = jobs
+        attrs["customer"] = jobs[0].customer
+        return attrs
+
+    @transaction.atomic
+    def create(self, validated_data):
+        company = validated_data["company"]
+        customer = validated_data["customer"]
+        jobs = validated_data["jobs"]
+
+        invoice_number = get_next_broker_invoice_number(company)
+
+        invoice = BrokerInvoice.objects.create(
+            company=company,
+            customer=customer,
+            invoice_number=invoice_number,
+            invoice_date=validated_data["invoice_date"],
+            issued_at=timezone.now() if validated_data["status"] == BrokerInvoice.InvoiceStatus.ISSUED else None,
+            status=validated_data["status"],
+            comments=validated_data.get("comments") or "",
+        )
+
+        total_net = Decimal("0.00")
+        total_vat = Decimal("0.00")
+        total_gross = Decimal("0.00")
+
+        for index, job in enumerate(jobs, start=1):
+            job_net = Decimal("0.00")
+            job_vat = Decimal("0.00")
+            job_gross = Decimal("0.00")
+
+            for line in job.job_lines.all():
+                quantity = Decimal(line.quantity or 0)
+                unit_price_gross = Decimal(line.unit_price_net or 0)   # actually VAT-inclusive
+                other_charges_gross = Decimal(line.other_charges or 0)
+                vat_percent = Decimal(line.vat_percent or 0)
+
+                gross_amount = (quantity * unit_price_gross) + other_charges_gross
+
+                vat_multiplier = Decimal("1.00") + (vat_percent / Decimal("100.00"))
+
+                if vat_percent > 0:
+                    net_amount = (gross_amount / vat_multiplier).quantize(
+                        Decimal("0.01"),
+                        rounding=ROUND_HALF_UP
+                    )
+                    vat_amount = (gross_amount - net_amount).quantize(
+                        Decimal("0.01"),
+                        rounding=ROUND_HALF_UP
+                    )
+                else:
+                    net_amount = gross_amount.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+                    vat_amount = Decimal("0.00")
+
+                gross_amount = gross_amount.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+                job_net += net_amount
+                job_vat += vat_amount
+                job_gross += gross_amount
+
+            BrokerInvoiceLine.objects.create(
+                invoice=invoice,
+                job=job,
+                position=index,
+                description=job.ref or job.job_add_info or f"Job {job.uf}",
+                amount_net=job_net.quantize(Decimal("0.01")),
+                vat_percent=Decimal("0.00"),  # mixed VAT possible across job lines
+                amount_vat=job_vat.quantize(Decimal("0.01")),
+                amount_gross=job_gross.quantize(Decimal("0.01")),
+            )
+
+            total_net += job_net
+            total_vat += job_vat
+            total_gross += job_gross
+
+            job.broker_invoice = invoice
+            job.save(update_fields=["broker_invoice"])
+
+        invoice.total_net = total_net.quantize(Decimal("0.01"))
+        invoice.total_vat = total_vat.quantize(Decimal("0.01"))
+        invoice.total_gross = total_gross.quantize(Decimal("0.01"))
+        invoice.save(update_fields=["total_net", "total_vat", "total_gross"])
+
+        return invoice
+        
+###### END INVOICING ######
 
 class JobLineSerializer(serializers.ModelSerializer):
     service_type_uf = serializers.CharField(
@@ -254,6 +457,10 @@ class JobSerializer(WritableNestedModelSerializer):
     total_amount = serializers.SerializerMethodField()
     assigned_to_info = serializers.SerializerMethodField()
 
+    is_invoiced = serializers.SerializerMethodField()
+    invoice_number = serializers.CharField(source="broker_invoice.invoice_number", read_only=True)
+    broker_invoice_uf = serializers.CharField(source="broker_invoice.uf", read_only=True)
+
     class Meta:
         model = Job
         fields = "__all__"
@@ -314,6 +521,7 @@ class JobSerializer(WritableNestedModelSerializer):
 
         return instance
 
+
     def get_total_amount(self, obj):
         total = Decimal("0")
 
@@ -352,6 +560,9 @@ class JobSerializer(WritableNestedModelSerializer):
             "uf": obj.assigned_to.uf,
             "name": obj.assigned_to.get_full_name(),
         }
+
+    def get_is_invoiced(self, obj):
+        return bool(obj.broker_invoice_id)
 
 
 class ServiceTypeTierSerializer(serializers.ModelSerializer):
@@ -530,6 +741,8 @@ class BrokerCommissionSerializer(serializers.ModelSerializer):
 
     customer = serializers.SlugRelatedField(
         allow_null=True, slug_field='uf', queryset=Contact.objects.all())
+    service_type = serializers.SlugRelatedField(
+        allow_null=True, slug_field='code', queryset=ServiceType.objects.all())
     uf = serializers.CharField(read_only=True)
 
     class Meta:
@@ -583,7 +796,6 @@ class BrokerStaffDetailsSerializer(serializers.ModelSerializer):
         if obj.groups.filter(name="level_broker").exists():
             return "broker"
         return None
-
 
 
 class BrokerStaffCompensationSerializer(WritableNestedModelSerializer):

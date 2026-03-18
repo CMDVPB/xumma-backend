@@ -17,6 +17,8 @@ from abb.constants import BASE_COUNTRIES, BASE_COUNTRIES_LIST, APP_LANGS, DOC_LA
 from abb.validators import validate_columns_arrayfield_length_exactly_20
 
 import logging
+
+from app.validations import validate_invoice_start_number
 logger = logging.getLogger(__name__)
 
 
@@ -318,20 +320,15 @@ class CompanySettings(models.Model):
         related_name="company_settings"
     )
 
-    # # General
     currency = models.ForeignKey(
         Currency, on_delete=models.SET_NULL, blank=True, null=True, related_name='currency_company_settings')
-    # language = models.CharField(max_length=5, default="en")
 
-    # # Financial
-    # vat_rate = models.DecimalField(
-    #     max_digits=5,
-    #     decimal_places=2,
-    #     default=0
-    # )
-
-    # # System behavior
-    # timezone = models.CharField(max_length=50, default="Europe/Berlin")
+    broker_invoice_start_number = models.CharField(
+        max_length=50,
+        blank=True,
+        null=True,
+        validators=[validate_invoice_start_number],
+    )
 
     updated_at = models.DateTimeField(auto_now=True)
 

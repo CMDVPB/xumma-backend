@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from broker.models import BrokerBaseSalary, BrokerCommission, CustomerServicePrice, Job, JobLine, PointOfService, ServiceType
+from broker.models import BrokerBaseSalary, BrokerCommission, BrokerInvoice, CustomerServicePrice, Job, JobLine, PointOfService, ServiceType
 
 
 
@@ -45,6 +45,18 @@ class BrokerBaseSalaryAdmin(admin.ModelAdmin):
 class BrokerCommissionAdmin(admin.ModelAdmin):
     list_display = ('id', 'company', 'customer', 'service_type', 'type', 'value', 'valid_from', 'valid_to',
                     )
+
+
+
+@admin.register(BrokerInvoice)
+class BrokerInvoiceAdmin(admin.ModelAdmin):
+    list_display = ('id', 'company', 'customer', 'invoice_number', 'invoice_date', 'issued_at', 'status', 'comments',
+                    'total_gross',
+                    )
+    
+  
+
+
 
 
 

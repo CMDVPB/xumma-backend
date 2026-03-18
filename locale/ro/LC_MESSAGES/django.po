@@ -278,3 +278,5 @@ msgstr "Comentarii"
 msgid "broker_jobs"
 msgstr "Lucrari de vamuire"
 
+msgid "positions"
+msgstr "Pozitii"

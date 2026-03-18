@@ -1,4 +1,8 @@
-from broker.models import BrokerBaseSalary, JobLine
+import re
+from django.db import transaction
+from django.core.exceptions import ValidationError
+
+from broker.models import BrokerBaseSalary, BrokerInvoice, JobLine
 from broker.service import resolve_commission
 
 
@@ -72,3 +76,45 @@ def build_broker_settlement_report(company, broker, start, end):
         }
 
         return report
+
+
+NUMBERING_RE = re.compile(r"^(?P<prefix>.*?)(?P<number>\d+)$")
+
+
+def split_invoice_number(value: str):
+    match = NUMBERING_RE.match(value or "")
+    if not match:
+        raise ValidationError(
+            "Invoice number must end with digits, e.g. 1, INV-1, AB2026-001."
+        )
+    return match.group("prefix"), match.group("number")
+
+
+def increment_invoice_number(value: str) -> str:
+    prefix, numeric_part = split_invoice_number(value)
+    width = len(numeric_part)
+    next_number = str(int(numeric_part) + 1).zfill(width)
+    return f"{prefix}{next_number}"
+
+
+@transaction.atomic
+def get_next_broker_invoice_number(company):
+    settings = getattr(company, "company_settings", None)
+
+    if not settings or not settings.broker_invoice_start_number:
+        raise ValidationError(
+            "Broker invoice start number is not configured in company settings."
+        )
+
+    last_invoice = (
+        BrokerInvoice.objects
+        .select_for_update()
+        .filter(company=company)
+        .order_by("-id")
+        .first()
+    )
+
+    if not last_invoice:
+        return settings.broker_invoice_start_number
+
+    return increment_invoice_number(last_invoice.invoice_number)

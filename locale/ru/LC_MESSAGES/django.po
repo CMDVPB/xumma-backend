@@ -279,3 +279,5 @@ msgstr "Комментарии"
 msgid "broker_jobs"
 msgstr "Брокерские задания"
 
+msgid "positions"
+msgstr "Позиций"

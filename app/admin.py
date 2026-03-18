@@ -98,7 +98,7 @@ class CompanyAdmin(admin.ModelAdmin):
 @admin.register(CompanySettings)
 class CompanySettingsAdmin(admin.ModelAdmin):
 
-    list_display = ('id', 'company', 'currency',)
+    list_display = ('id', 'company', 'currency', 'broker_invoice_start_number')
 
     search_fields = ("company__company_name", 'company__uf', 'uf')
 

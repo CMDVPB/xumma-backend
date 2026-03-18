@@ -13,7 +13,11 @@ urlpatterns = [
     path("broker/jobs/", JobListCreateView.as_view()),
     path("broker/jobs/export/", BrokerJobExportAPIView.as_view()),
     path("broker/jobs/<str:uf>/", JobRetrieveUpdateDestroyView.as_view()),
+
+    ###### JOB INVOICING ######
+    path("broker/invoices/create/", BrokerInvoiceCreateAPIView.as_view(),),
     
+    ###### SERVICE TYPES ######
     path("broker/service-types/", ServiceTypeListCreateView.as_view()),
     path("broker/service-types/<str:uf>/", ServiceTypeDetailView.as_view()),
     

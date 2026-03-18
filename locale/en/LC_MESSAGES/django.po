@@ -272,3 +272,5 @@ msgstr "Comments"
 msgid "broker_jobs"
 msgstr "Broker Jobs"
 
+msgid "positions"
+msgstr "Positions"
