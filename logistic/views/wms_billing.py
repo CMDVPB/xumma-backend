@@ -1,3 +1,4 @@
+import logging
 from decimal import Decimal
 from io import BytesIO
 from zoneinfo import ZoneInfo
@@ -26,8 +27,10 @@ from att.models import Contact
 from logistic.models import WHBillingCharge, WHBillingInvoice, WHBillingInvoiceLine, WHBillingPeriod
 from logistic.serializers.wms_billing import WHBillingInvoiceManualLinesCreateSerializer, WHBillingInvoiceSerializer, WHBillingPeriodSerializer, WHIssueBillingDocumentsSerializer
 from logistic.services.wms_billing_documents import issue_billing_documents_for_period
-from logistic.services.wms_billing_engine import (generate_storage_billing_for_period, regenerate_all_billing_charges_for_period, 
+from logistic.services.wms_billing_engine import (regenerate_all_billing_charges_for_period, 
                                                     )
+
+logger = logging.getLogger(__name__)
 
 
 ###### HELPER ######
@@ -74,11 +77,12 @@ def _get_or_create_current_period(company):
 def _translated_charge_type_label(charge_type):
     return {
         "storage": _("storage"),
-        "inbound": _("inbouned"),
+        "inbound": _("inbound"),
         "outbound_order": _("outbound_order"),
         "outbound_line": _("outbound_line"),
         "handling_loading": _("handling_loading"),
         "handling_unloading": _("handling_unloading"),
+        "manual": _("manual"),
     }.get(charge_type, charge_type or "")
 
 
@@ -804,264 +808,288 @@ class WHBillingDocumentViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["get"], url_path="export-act")
     def export_act_excel(self, request, uf=None):
-        document = self.get_object()
+        try:           
+            document = self.get_object()
 
-        if document.status != "issued":
+            print('6470', document)
+
+            if document.status != "issued":
+                return Response(
+                    {"detail": "The act can be generated only for issued invoices."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+
+            print('6474', document)
+
+            lang = request.query_params.get("lang", "ro")
+            if lang not in ["ro", "en", "ru"]:
+                lang = "ro"
+
+            user_tz = "Europe/Chisinau"
+            timezone.activate(ZoneInfo(user_tz))
+            now = timezone.localtime(timezone.now())
+
+            print('6478', lang)
+
+            with override(lang):
+                wb = Workbook()
+                ws = wb.active
+                ws.title = _("Act")
+
+                # -----------------------------
+                # PAGE SETUP - A4 PORTRAIT
+                # -----------------------------
+                ws.page_setup.paperSize = ws.PAPERSIZE_A4
+                ws.page_setup.orientation = ws.ORIENTATION_PORTRAIT
+
+                # Force Excel to scale the print area
+                ws.sheet_properties.pageSetUpPr = PageSetupProperties(fitToPage=True)
+
+                # If you want everything on ONE page:
+                ws.page_setup.fitToWidth = 1
+                ws.page_setup.fitToHeight = 1
+
+                # Alternative:
+                # fit width to 1 page, height can continue to next pages
+                # ws.page_setup.fitToWidth = 1
+                # ws.page_setup.fitToHeight = 0
+
+                ws.page_margins = PageMargins(
+                    left=0.25, right=0.25, top=0.35, bottom=0.35, header=0.15, footer=0.15
+                )
+
+                ws.sheet_view.showGridLines = False
+                ws.print_options.horizontalCentered = True
+
+                # Print settings
+                ws.print_options.horizontalCentered = True
+                ws.print_title_rows = "$1:$12"
+
+                # -----------------------------
+                # STYLES
+                # -----------------------------
+                thin = Side(style="thin", color="000000")
+                border = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+                bold_font = Font(bold=True, size=11)
+                title_font = Font(bold=True, size=14)
+                normal_font = Font(size=11)
+
+                center = Alignment(horizontal="center", vertical="center", wrap_text=True)
+                left = Alignment(horizontal="left", vertical="center", wrap_text=True)
+                right = Alignment(horizontal="right", vertical="center", wrap_text=True)
+
+                # -----------------------------
+                # COLUMN WIDTHS
+                # A:F
+                # -----------------------------
+                widths = {
+                    "A": 6,
+                    "B": 42,
+                    "C": 12,
+                    "D": 14,
+                    "E": 16,
+                    "F": 18,
+                }
+                for col, width in widths.items():
+                    ws.column_dimensions[col].width = width
+
+                # -----------------------------
+                # TRANSLATED LABELS
+                # -----------------------------
+                title = _("act_of_execution_of_services")
+                provider_label = _("provider")
+                client_label = _("client")
+                document_no_label = _("document_no")
+                period_label = _("period")
+                issued_on_label = _("issued_on")
+                no_label = _("no")
+                description_label = _("description")
+                quantity_label = _("quantity")
+                unit_price_label = _("unit_price")
+                total_label = _("total")
+                grand_total_label = _("grand_total")
+                provider_sign_label = _("provider_signature")
+                client_sign_label = _("client_signature")
+
+                # -----------------------------
+                # HEADER
+                # -----------------------------
+                ws.merge_cells("A1:F1")
+                ws["A1"] = title
+                ws["A1"].font = title_font
+                ws["A1"].alignment = center
+
+                ws.merge_cells("A3:F3")
+                ws["A3"] = f"{document_no_label}: {document.uf}"
+                ws["A3"].font = bold_font
+                ws["A3"].alignment = center
+
+                ws["A5"] = provider_label
+                ws["A5"].font = bold_font
+                ws["B5"] = getattr(get_user_company(request.user), "name", "") or getattr(get_user_company(request.user), "title", "") or ""
+
+                ws["A6"] = client_label
+                ws["A6"].font = bold_font
+                ws["B6"] = document.contact.company_name if document.contact else ""
+
+                ws["D5"] = issued_on_label
+                ws["D5"].font = bold_font
+                ws["E5"] = now.strftime("%d-%m-%Y")
+
+                ws["D6"] = period_label
+                ws["D6"].font = bold_font
+                ws["E6"] = (
+                    f"{document.period.start_date.strftime('%d-%m-%Y')} → "
+                    f"{document.period.end_date.strftime('%d-%m-%Y')}"
+                    if document.period else ""
+                )
+
+                # -----------------------------
+                # TABLE HEADER
+                # -----------------------------
+                table_header_row = 9
+                headers = [
+                    no_label,
+                    description_label,
+                    quantity_label,
+                    unit_price_label,
+                    total_label,
+                    "",
+                ]
+
+                for idx, header in enumerate(headers, start=1):
+                    cell = ws.cell(row=table_header_row, column=idx, value=header)
+                    cell.font = bold_font
+                    cell.alignment = center
+                    cell.border = border
+
+                # Merge E/F visually for total column header
+                ws.merge_cells(start_row=table_header_row, start_column=5, end_row=table_header_row, end_column=6)
+
+                # -----------------------------
+                # BODY
+                # -----------------------------
+                lines = list(document.invoice_wh_lines.all())
+                row_num = table_header_row + 1
+
+                for idx, line in enumerate(lines, start=1):
+                    charge_type_label = _translated_charge_type_label(line.charge_type)
+                    line_description = _translated_line_description(line)
+
+                    description = charge_type_label
+                    if line_description:
+                        description = f"{charge_type_label} | {line_description}"
+
+                    ws.cell(row=row_num, column=1, value=idx)
+                    ws.cell(row=row_num, column=2, value=description)
+                    ws.cell(row=row_num, column=3, value=float(line.quantity or 0))
+                    ws.cell(row=row_num, column=4, value=float(line.unit_price or 0))
+                    ws.merge_cells(start_row=row_num, start_column=5, end_row=row_num, end_column=6)
+                    ws.cell(row=row_num, column=5, value=float(line.total or 0))
+
+                    for col_idx in range(1, 7):
+                        cell = ws.cell(row=row_num, column=col_idx)
+                        cell.font = normal_font
+                        cell.border = border
+                        cell.alignment = left if col_idx == 2 else center
+
+                    ws.cell(row=row_num, column=3).alignment = right
+                    ws.cell(row=row_num, column=4).alignment = right
+                    ws.cell(row=row_num, column=5).alignment = right
+
+                    ws.row_dimensions[row_num].height = 28
+                    row_num += 1
+
+                # -----------------------------
+                # TOTAL
+                # -----------------------------
+                total_row = row_num + 1
+
+                ws.merge_cells(start_row=total_row, start_column=1, end_row=total_row, end_column=4)
+                ws.cell(row=total_row, column=1, value=grand_total_label)
+                ws.merge_cells(start_row=total_row, start_column=5, end_row=total_row, end_column=6)
+                ws.cell(row=total_row, column=5, value=float(document.total_amount or 0))
+
+                ws.cell(row=total_row, column=1).font = bold_font
+                ws.cell(row=total_row, column=1).alignment = right
+                ws.cell(row=total_row, column=5).font = bold_font
+                ws.cell(row=total_row, column=5).alignment = right
+
+                for col_idx in range(1, 7):
+                    ws.cell(row=total_row, column=col_idx).border = border
+
+                # -----------------------------
+                # SIGNATURES
+                # -----------------------------
+                sign_row = total_row + 4
+
+                ws.merge_cells(start_row=sign_row, start_column=1, end_row=sign_row, end_column=2)
+                ws.cell(row=sign_row, column=1, value=provider_label)
+                ws.cell(row=sign_row, column=1).font = bold_font
+                ws.cell(row=sign_row, column=1).alignment = center
+
+                ws.merge_cells(start_row=sign_row, start_column=5, end_row=sign_row, end_column=6)
+                ws.cell(row=sign_row, column=5, value=client_label)
+                ws.cell(row=sign_row, column=5).font = bold_font
+                ws.cell(row=sign_row, column=5).alignment = center
+
+                line_row = sign_row + 3
+
+                ws.merge_cells(start_row=line_row, start_column=1, end_row=line_row, end_column=2)
+                ws.cell(row=line_row, column=1, value="________________________")
+                ws.cell(row=line_row, column=1).alignment = center
+
+                ws.merge_cells(start_row=line_row, start_column=5, end_row=line_row, end_column=6)
+                ws.cell(row=line_row, column=5, value="________________________")
+                ws.cell(row=line_row, column=5).alignment = center
+
+                label_row = line_row + 1
+
+                ws.merge_cells(start_row=label_row, start_column=1, end_row=label_row, end_column=2)
+                ws.cell(row=label_row, column=1, value=provider_sign_label)
+                ws.cell(row=label_row, column=1).alignment = center
+
+                ws.merge_cells(start_row=label_row, start_column=5, end_row=label_row, end_column=6)
+                ws.cell(row=label_row, column=5, value=client_sign_label)
+                ws.cell(row=label_row, column=5).alignment = center
+
+                # -----------------------------
+                # VERTICAL ALIGNMENT
+                # -----------------------------
+                for r in range(1, label_row + 1):
+                    ws.row_dimensions[r].height = max(ws.row_dimensions[r].height or 15, 20)
+
+                # -----------------------------
+                # RESPONSE
+                # -----------------------------
+                output = BytesIO()
+                wb.save(output)
+                output.seek(0)
+
+                customer_name = (document.contact.company_name if document.contact else "act").replace("/", "_")
+                filename_dt = now.strftime("%Y%m%d_%H%M%S")
+                filename = f"act_services_{customer_name}_{lang}_{filename_dt}.xlsx"
+
+                response = HttpResponse(
+                    output.getvalue(),
+                    content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                )
+                response["Content-Disposition"] = f'attachment; filename="{filename}"'
+                return response
+        
+        except Exception as e:
+            import traceback
+            print("ERRORLOG1591:", repr(e), flush=True)
+            traceback.print_exc()
+            logger.exception("Failed to export act for invoice %s", uf)
+
             return Response(
-                {"detail": _("The act can be generated only for issued invoices.")},
+                {"detail": str(e)},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        lang = request.query_params.get("lang", "ro")
-        if lang not in ["ro", "en", "ru"]:
-            lang = "ro"
-
-        user_tz = "Europe/Chisinau"
-        timezone.activate(ZoneInfo(user_tz))
-        now = timezone.localtime(timezone.now())
-
-        with override(lang):
-            wb = Workbook()
-            ws = wb.active
-            ws.title = _("Act")
-
-            # -----------------------------
-            # PAGE SETUP - A4 PORTRAIT
-            # -----------------------------
-            ws.page_setup.paperSize = ws.PAPERSIZE_A4
-            ws.page_setup.orientation = ws.ORIENTATION_PORTRAIT
-
-            # Force Excel to scale the print area
-            ws.sheet_properties.pageSetUpPr = PageSetupProperties(fitToPage=True)
-
-            # If you want everything on ONE page:
-            ws.page_setup.fitToWidth = 1
-            ws.page_setup.fitToHeight = 1
-
-            # Alternative:
-            # fit width to 1 page, height can continue to next pages
-            # ws.page_setup.fitToWidth = 1
-            # ws.page_setup.fitToHeight = 0
-
-            ws.page_margins = PageMargins(
-                left=0.25, right=0.25, top=0.35, bottom=0.35, header=0.15, footer=0.15
-            )
-
-            ws.sheet_view.showGridLines = False
-            ws.print_options.horizontalCentered = True
-
-            # Print settings
-            ws.print_options.horizontalCentered = True
-            ws.print_title_rows = "$1:$12"
-
-            # -----------------------------
-            # STYLES
-            # -----------------------------
-            thin = Side(style="thin", color="000000")
-            border = Border(left=thin, right=thin, top=thin, bottom=thin)
-
-            bold_font = Font(bold=True, size=11)
-            title_font = Font(bold=True, size=14)
-            normal_font = Font(size=11)
-
-            center = Alignment(horizontal="center", vertical="center", wrap_text=True)
-            left = Alignment(horizontal="left", vertical="center", wrap_text=True)
-            right = Alignment(horizontal="right", vertical="center", wrap_text=True)
-
-            # -----------------------------
-            # COLUMN WIDTHS
-            # A:F
-            # -----------------------------
-            widths = {
-                "A": 6,
-                "B": 42,
-                "C": 12,
-                "D": 14,
-                "E": 16,
-                "F": 18,
-            }
-            for col, width in widths.items():
-                ws.column_dimensions[col].width = width
-
-            # -----------------------------
-            # TRANSLATED LABELS
-            # -----------------------------
-            title = _("act_of_execution_of_services")
-            provider_label = _("provider")
-            client_label = _("client")
-            document_no_label = _("document_no")
-            period_label = _("period")
-            issued_on_label = _("issued_on")
-            no_label = _("no")
-            description_label = _("description")
-            quantity_label = _("quantity")
-            unit_price_label = _("unit_price")
-            total_label = _("total")
-            grand_total_label = _("grand_total")
-            provider_sign_label = _("provider_signature")
-            client_sign_label = _("client_signature")
-
-            # -----------------------------
-            # HEADER
-            # -----------------------------
-            ws.merge_cells("A1:F1")
-            ws["A1"] = title
-            ws["A1"].font = title_font
-            ws["A1"].alignment = center
-
-            ws.merge_cells("A3:F3")
-            ws["A3"] = f"{document_no_label}: {document.uf}"
-            ws["A3"].font = bold_font
-            ws["A3"].alignment = center
-
-            ws["A5"] = provider_label
-            ws["A5"].font = bold_font
-            ws["B5"] = getattr(get_user_company(request.user), "name", "") or getattr(get_user_company(request.user), "title", "") or ""
-
-            ws["A6"] = client_label
-            ws["A6"].font = bold_font
-            ws["B6"] = document.contact.company_name if document.contact else ""
-
-            ws["D5"] = issued_on_label
-            ws["D5"].font = bold_font
-            ws["E5"] = now.strftime("%d-%m-%Y")
-
-            ws["D6"] = period_label
-            ws["D6"].font = bold_font
-            ws["E6"] = (
-                f"{document.period.start_date.strftime('%d-%m-%Y')} → "
-                f"{document.period.end_date.strftime('%d-%m-%Y')}"
-                if document.period else ""
-            )
-
-            # -----------------------------
-            # TABLE HEADER
-            # -----------------------------
-            table_header_row = 9
-            headers = [
-                no_label,
-                description_label,
-                quantity_label,
-                unit_price_label,
-                total_label,
-                "",
-            ]
-
-            for idx, header in enumerate(headers, start=1):
-                cell = ws.cell(row=table_header_row, column=idx, value=header)
-                cell.font = bold_font
-                cell.alignment = center
-                cell.border = border
-
-            # Merge E/F visually for total column header
-            ws.merge_cells(start_row=table_header_row, start_column=5, end_row=table_header_row, end_column=6)
-
-            # -----------------------------
-            # BODY
-            # -----------------------------
-            lines = list(document.invoice_wh_lines.all())
-            row_num = table_header_row + 1
-
-            for idx, line in enumerate(lines, start=1):
-                description = _translated_line_description(line)
-
-                ws.cell(row=row_num, column=1, value=idx)
-                ws.cell(row=row_num, column=2, value=description)
-                ws.cell(row=row_num, column=3, value=float(line.quantity or 0))
-                ws.cell(row=row_num, column=4, value=float(line.unit_price or 0))
-                ws.merge_cells(start_row=row_num, start_column=5, end_row=row_num, end_column=6)
-                ws.cell(row=row_num, column=5, value=float(line.total or 0))
-
-                for col_idx in range(1, 7):
-                    cell = ws.cell(row=row_num, column=col_idx)
-                    cell.font = normal_font
-                    cell.border = border
-                    cell.alignment = left if col_idx == 2 else center
-
-                ws.cell(row=row_num, column=3).alignment = right
-                ws.cell(row=row_num, column=4).alignment = right
-                ws.cell(row=row_num, column=5).alignment = right
-
-                ws.row_dimensions[row_num].height = 28
-                row_num += 1
-
-            # -----------------------------
-            # TOTAL
-            # -----------------------------
-            total_row = row_num + 1
-
-            ws.merge_cells(start_row=total_row, start_column=1, end_row=total_row, end_column=4)
-            ws.cell(row=total_row, column=1, value=grand_total_label)
-            ws.merge_cells(start_row=total_row, start_column=5, end_row=total_row, end_column=6)
-            ws.cell(row=total_row, column=5, value=float(document.total_amount or 0))
-
-            ws.cell(row=total_row, column=1).font = bold_font
-            ws.cell(row=total_row, column=1).alignment = right
-            ws.cell(row=total_row, column=5).font = bold_font
-            ws.cell(row=total_row, column=5).alignment = right
-
-            for col_idx in range(1, 7):
-                ws.cell(row=total_row, column=col_idx).border = border
-
-            # -----------------------------
-            # SIGNATURES
-            # -----------------------------
-            sign_row = total_row + 4
-
-            ws.merge_cells(start_row=sign_row, start_column=1, end_row=sign_row, end_column=2)
-            ws.cell(row=sign_row, column=1, value=provider_label)
-            ws.cell(row=sign_row, column=1).font = bold_font
-            ws.cell(row=sign_row, column=1).alignment = center
-
-            ws.merge_cells(start_row=sign_row, start_column=5, end_row=sign_row, end_column=6)
-            ws.cell(row=sign_row, column=5, value=client_label)
-            ws.cell(row=sign_row, column=5).font = bold_font
-            ws.cell(row=sign_row, column=5).alignment = center
-
-            line_row = sign_row + 3
-
-            ws.merge_cells(start_row=line_row, start_column=1, end_row=line_row, end_column=2)
-            ws.cell(row=line_row, column=1, value="________________________")
-            ws.cell(row=line_row, column=1).alignment = center
-
-            ws.merge_cells(start_row=line_row, start_column=5, end_row=line_row, end_column=6)
-            ws.cell(row=line_row, column=5, value="________________________")
-            ws.cell(row=line_row, column=5).alignment = center
-
-            label_row = line_row + 1
-
-            ws.merge_cells(start_row=label_row, start_column=1, end_row=label_row, end_column=2)
-            ws.cell(row=label_row, column=1, value=provider_sign_label)
-            ws.cell(row=label_row, column=1).alignment = center
-
-            ws.merge_cells(start_row=label_row, start_column=5, end_row=label_row, end_column=6)
-            ws.cell(row=label_row, column=5, value=client_sign_label)
-            ws.cell(row=label_row, column=5).alignment = center
-
-            # -----------------------------
-            # VERTICAL ALIGNMENT
-            # -----------------------------
-            for r in range(1, label_row + 1):
-                ws.row_dimensions[r].height = max(ws.row_dimensions[r].height or 15, 20)
-
-            # -----------------------------
-            # RESPONSE
-            # -----------------------------
-            output = BytesIO()
-            wb.save(output)
-            output.seek(0)
-
-            customer_name = (document.contact.company_name if document.contact else "act").replace("/", "_")
-            filename_dt = now.strftime("%Y%m%d_%H%M%S")
-            filename = f"act_services_{customer_name}_{lang}_{filename_dt}.xlsx"
-
-            response = HttpResponse(
-                output.getvalue(),
-                content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            )
-            response["Content-Disposition"] = f'attachment; filename="{filename}"'
-            return response
-        
 
 class WHBillingInvoiceViewSet(viewsets.ReadOnlyModelViewSet):
 
@@ -1116,9 +1144,10 @@ class WHBillingInvoiceViewSet(viewsets.ReadOnlyModelViewSet):
 
         contact_uf = request.data.get("contact")
         contact = get_object_or_404(Contact, uf=contact_uf)
-
     
         period = _get_or_create_current_period(company)
+        period_start = period.start_date.strftime("%d-%m-%Y") if period and period.start_date else ""
+        period_end = period.end_date.strftime("%d-%m-%Y") if period and period.end_date else ""
       
         print('1144', period)
 
@@ -1129,7 +1158,7 @@ class WHBillingInvoiceViewSet(viewsets.ReadOnlyModelViewSet):
             return Response({"detail": "Billing period closed"}, status=400)
 
         # Generate storage charges ONLY for this contact
-        generate_storage_billing_for_period(
+        regenerate_all_billing_charges_for_period(
             company=company,
             period=period,
             contact_ids=[contact.id],
@@ -1168,7 +1197,7 @@ class WHBillingInvoiceViewSet(viewsets.ReadOnlyModelViewSet):
             line = WHBillingInvoiceLine.objects.create(
                 invoice=invoice,
                 charge_type=charge.charge_type,
-                description = f"({period.start_date} → {period.end_date})",
+                description = f"({period_start} → {period_end})",
                 quantity=charge.quantity,
                 unit_price=charge.unit_price,
                 total=charge.total
@@ -1186,7 +1215,6 @@ class WHBillingInvoiceViewSet(viewsets.ReadOnlyModelViewSet):
             "lines": len(lines),
             "total": str(total)
         })
-
 
     @action(detail=True, methods=["post"])
     def issue(self, request, uf=None):

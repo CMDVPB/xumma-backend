@@ -707,7 +707,7 @@ class BrokerStaffSerializer(serializers.ModelSerializer):
         return obj.phone
 
     def get_role(self, obj):
-        if obj.groups.filter(name="level_leader_broker").exists():
+        if obj.groups.filter(name="level_broker_leader").exists():
             return "leader"
         if obj.groups.filter(name="level_broker").exists():
             return "broker"
@@ -791,7 +791,7 @@ class BrokerStaffDetailsSerializer(serializers.ModelSerializer):
  
 
     def get_role(self, obj):
-        if obj.groups.filter(name="level_leader_broker").exists():
+        if obj.groups.filter(name="level_broker_leader").exists():
             return "leader"
         if obj.groups.filter(name="level_broker").exists():
             return "broker"

@@ -274,3 +274,7 @@ msgstr "Broker Jobs"
 
 msgid "positions"
 msgstr "Positions"
+
+msgid "manual"
+msgstr "Manual"
+

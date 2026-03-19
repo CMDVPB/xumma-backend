@@ -3,9 +3,9 @@ from rest_framework.routers import DefaultRouter
 
 from logistic.views.wms_billing import WHBillingDocumentViewSet, WHBillingInvoiceViewSet, WHBillingPeriodViewSet
 from logistic.views.wms_dashboard import WmsDashboardCustomersSummaryAPIView, WmsStorageOccupancyAPIView
-from logistic.views.wms_inbound import WHInboundViewSet
+from logistic.views.wms_inbound import WHInboundChargeOptionsApiView, WHInboundChargePriceApiView, WHInboundViewSet
 from logistic.views.wms_location import WHLocationViewSet
-from logistic.views.wms_outbound import WHOutboundViewSet
+from logistic.views.wms_outbound import WHOutboundChargeOptionsApiView, WHOutboundChargePriceApiView, WHOutboundViewSet
 from logistic.views.wms_product import WHProductViewSet
 from logistic.views.wms_stock import WHStockViewSet
 from logistic.views.wms_tariff import WHTariffViewSet
@@ -27,6 +27,13 @@ router.register(r"billing-invoices", WHBillingInvoiceViewSet, basename="wms-bill
 urlpatterns = [
     path("dashboard/customers-summary/", WmsDashboardCustomersSummaryAPIView.as_view()),
     path("dashboard/storage-occupancy/", WmsStorageOccupancyAPIView.as_view()),
+
+    path("inbound-charge-options/", WHInboundChargeOptionsApiView.as_view()),
+    path("inbound-charge-price/", WHInboundChargePriceApiView.as_view()),
+
+    path("outbound-charge-options/", WHOutboundChargeOptionsApiView.as_view()),
+    path("outbound-charge-price/", WHOutboundChargePriceApiView.as_view()),
+
 ]
 
 urlpatterns += router.urls

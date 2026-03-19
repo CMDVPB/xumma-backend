@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from logistic.models import (WHBillingCharge, WHBillingInvoice, WHBillingInvoiceLine, WHBillingPeriod, WHContactTariffHandlingTierOverride, WHContactTariffOverride, WHInbound,
+from logistic.models import (WHBillingCharge, WHBillingInvoice, WHBillingInvoiceLine, WHBillingPeriod, WHContactTariffHandlingTierOverride, WHContactTariffOverride, WHInbound, WHInboundCharge,
                               WHInboundLine, WHLocation, WHOutbound, WHOutboundLine, WHProduct, WHStock, WHStockLedger
                               )
 
@@ -99,8 +99,6 @@ class WHContactTariffOverrideAdmin(admin.ModelAdmin):
                     )
 
 
-
-
 @admin.register(WHContactTariffHandlingTierOverride)
 class WHContactTariffHandlingTierOverrideAdmin(admin.ModelAdmin):
     list_display = ('id', 'override', 'fee_type', 'unit', 'min_quantity',
@@ -108,12 +106,11 @@ class WHContactTariffHandlingTierOverrideAdmin(admin.ModelAdmin):
                     )
 
 
-
-
-
-
-
-
+@admin.register(WHInboundCharge)
+class WHInboundChargeAdmin(admin.ModelAdmin):
+    list_display = ('id', 'inbound', 'charge_type', 'label', 'unit_type',
+                     'quantity', 'unit_price', 'total',
+                    )
 
 
 

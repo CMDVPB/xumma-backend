@@ -6,8 +6,7 @@ from broker.models import BrokerBaseSalary, BrokerInvoice, JobLine
 from broker.service import resolve_commission
 
 
-def build_broker_settlement_report(company, broker, start, end):
-        
+def build_broker_settlement_report(company, broker, start, end):        
 
         job_lines = (
             JobLine.objects

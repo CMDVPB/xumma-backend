@@ -9,6 +9,8 @@ from logistic.models import (
     WHBillingCharge,
     WHHandlingFeeType,
     WHHandlingUnit,
+    WHInbound,
+    WHInboundCharge,
     WHInboundLine,
     WHOutboundLine,
     WHPalletType,
@@ -652,9 +654,105 @@ def regenerate_all_billing_charges_for_period(*, company, period, contact_ids=No
         contact_ids=contact_ids,
     )
 
+    inbound_extra_created = regenerate_inbound_extra_charges_for_period(
+        company=company,
+        period=period,
+        contact_ids=contact_ids,
+    )    
+
     return {
         "storage": storage_created,
         "handling": handling_created,
+        "inbound_extra": inbound_extra_created,
         "created_count": len(storage_created) + len(handling_created),
     }
 
+
+@transaction.atomic
+def generate_inbound_extra_charges_for_period(*, company, period, contact_ids=None):
+    start_dt, end_dt = _period_bounds(period)
+    created = []
+
+    inbound_charges = (
+        WHInboundCharge.objects
+        .select_related("inbound")
+        .filter(
+            inbound__company=company,
+            inbound__status=WHInbound.Status.RECEIVED,
+            inbound__received_at__gte=start_dt,
+            inbound__received_at__lt=end_dt,
+        )
+        .order_by("id")
+    )
+
+    if contact_ids:
+        inbound_charges = inbound_charges.filter(inbound__owner_id__in=contact_ids)
+
+    for extra in inbound_charges:
+        inbound = extra.inbound
+        contact = inbound.owner
+
+        if extra.charge_type == "handling_unloading":
+            billing_charge_type = WHBillingCharge.Type.HANDLING_UNLOADING
+        elif extra.charge_type == "handling_loading":
+            billing_charge_type = WHBillingCharge.Type.HANDLING_LOADING
+        elif extra.charge_type == "inbound_per_line":
+            billing_charge_type = WHBillingCharge.Type.INBOUND
+        else:
+            billing_charge_type = WHBillingCharge.Type.MANUAL
+
+        charge, _ = WHBillingCharge.objects.update_or_create(
+            company=company,
+            contact=contact,
+            billing_period=period,
+            charge_type=billing_charge_type,
+            source_model="inbound_charge",
+            source_uf=extra.uf,
+            unit_type=extra.unit_type,
+            pallet_type=None,
+            defaults={
+                "quantity": extra.quantity,
+                "unit_price": extra.unit_price,
+                "invoiced": False,
+            },
+        )
+
+        created.append(charge.uf)
+
+    return created
+
+
+@transaction.atomic
+def regenerate_inbound_extra_charges_for_period(*, company, period, contact_ids=None):
+    locked_qs = WHBillingCharge.objects.filter(
+        company=company,
+        billing_period=period,
+        source_model="inbound_charge",
+        invoiced=True,
+    )
+
+    if contact_ids:
+        locked_qs = locked_qs.filter(contact_id__in=contact_ids)
+
+    if locked_qs.exists():
+        raise ValueError(
+            "Cannot regenerate inbound extra charges because some charges are already billed."
+        )
+
+    qs = WHBillingCharge.objects.filter(
+        company=company,
+        billing_period=period,
+        source_model="inbound_charge",
+        invoiced=False,
+    )
+
+    if contact_ids:
+        qs = qs.filter(contact_id__in=contact_ids)
+
+    qs.delete()
+
+    return generate_inbound_extra_charges_for_period(
+        company=company,
+        period=period,
+        contact_ids=contact_ids,
+    )

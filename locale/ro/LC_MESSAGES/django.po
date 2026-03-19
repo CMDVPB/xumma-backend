@@ -280,3 +280,7 @@ msgstr "Lucrari de vamuire"
 
 msgid "positions"
 msgstr "Pozitii"
+
+msgid "manual"
+msgstr "Manual"
+

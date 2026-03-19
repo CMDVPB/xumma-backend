@@ -1,4 +1,5 @@
 import logging
+from decimal import Decimal
 from django.conf import settings
 from django.db import models
 from django.db.models import Q
@@ -586,6 +587,146 @@ class WHContactTariffHandlingTierOverride(models.Model):
 
 
 ###### START WH BILLING ######
+
+class WHInboundCharge(models.Model):
+    class ChargeType(models.TextChoices):
+        INBOUND_PER_LINE = "inbound_per_line", "Inbound per line"
+        HANDLING_UNLOADING = "handling_unloading", "Handling unloading"
+        OTHER = "other", "Other"
+
+    class UnitType(models.TextChoices):
+        LINE = "line", "Line"
+        PALLET = "pallet", "Pallet"
+        M3 = "m3", "m3"
+        UNIT = "unit", "Unit"
+        FIXED = "fixed", "Fixed"
+
+    uf = models.CharField(max_length=36, default=hex_uuid, db_index=True, unique=True)
+
+    inbound = models.ForeignKey(
+        "WHInbound",
+        on_delete=models.CASCADE,
+        related_name="inbound_charges",
+    )
+
+    charge_type = models.CharField(max_length=30, choices=ChargeType.choices)
+    label = models.CharField(max_length=120)  # custom label visible in UI/invoice
+    unit_type = models.CharField(max_length=20, choices=UnitType.choices, default=UnitType.FIXED)
+
+    quantity = models.DecimalField(max_digits=18, decimal_places=3, default=1)
+    unit_price = models.DecimalField(max_digits=12, decimal_places=4, default=0)
+    total = models.DecimalField(max_digits=18, decimal_places=4, default=0)
+
+    # optional metadata for handling tiers
+    fee_type = models.CharField(
+        max_length=20,
+        choices=WHHandlingFeeType.choices,
+        null=True,
+        blank=True,
+    )
+    handling_unit = models.CharField(
+        max_length=20,
+        choices=WHHandlingUnit.choices,
+        null=True,
+        blank=True,
+    )
+
+    is_manual_price = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["inbound"]),
+            models.Index(fields=["inbound", "charge_type"]),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(quantity__gt=0),
+                name="chk_wh_inbound_charge_qty_gt_0",
+            ),
+            models.CheckConstraint(
+                condition=Q(unit_price__gte=0),
+                name="chk_wh_inbound_charge_unit_price_gte_0",
+            ),
+        ]
+
+    def save(self, *args, **kwargs):
+        self.total = (self.quantity or Decimal("0")) * (self.unit_price or Decimal("0"))
+        super().save(*args, **kwargs)
+
+
+class WHOutboundCharge(models.Model):
+    class ChargeType(models.TextChoices):
+        OUTBOUND_PER_ORDER = "outbound_per_order", "Outbound per order"
+        OUTBOUND_PER_LINE = "outbound_per_line", "Outbound per line"
+        HANDLING_LOADING = "handling_loading", "Handling loading"
+        OTHER = "other", "Other"
+
+    class UnitType(models.TextChoices):
+        ORDER = "order", "Order"
+        LINE = "line", "Line"
+        PALLET = "pallet", "Pallet"
+        M3 = "m3", "m3"
+        UNIT = "unit", "Unit"
+        FIXED = "fixed", "Fixed"
+
+    uf = models.CharField(max_length=36, default=hex_uuid, db_index=True, unique=True)
+
+    outbound = models.ForeignKey(
+        "WHOutbound",
+        on_delete=models.CASCADE,
+        related_name="outbound_charges",
+    )
+
+    charge_type = models.CharField(max_length=30, choices=ChargeType.choices)
+    label = models.CharField(max_length=120)
+
+    unit_type = models.CharField(
+        max_length=20,
+        choices=UnitType.choices,
+        default=UnitType.FIXED,
+    )
+
+    quantity = models.DecimalField(max_digits=18, decimal_places=3, default=1)
+    unit_price = models.DecimalField(max_digits=12, decimal_places=4, default=0)
+    total = models.DecimalField(max_digits=18, decimal_places=4, default=0)
+
+    fee_type = models.CharField(
+        max_length=20,
+        choices=WHHandlingFeeType.choices,
+        null=True,
+        blank=True,
+    )
+    handling_unit = models.CharField(
+        max_length=20,
+        choices=WHHandlingUnit.choices,
+        null=True,
+        blank=True,
+    )
+
+    is_manual_price = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["outbound"]),
+            models.Index(fields=["outbound", "charge_type"]),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(quantity__gt=0),
+                name="chk_wh_outbound_charge_qty_gt_0",
+            ),
+            models.CheckConstraint(
+                condition=Q(unit_price__gte=0),
+                name="chk_wh_outbound_charge_unit_price_gte_0",
+            ),
+        ]
+
+    def save(self, *args, **kwargs):
+        self.total = (self.quantity or Decimal("0")) * (self.unit_price or Decimal("0"))
+        super().save(*args, **kwargs)
+
 
 class WHBillingPeriod(models.Model):
     uf = models.CharField(max_length=36, default=hex_uuid, db_index=True, unique=True)

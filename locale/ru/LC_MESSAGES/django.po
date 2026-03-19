@@ -281,3 +281,7 @@ msgstr "Брокерские задания"
 
 msgid "positions"
 msgstr "Позиций"
+
+msgid "manual"
+msgstr "Ручной"
+

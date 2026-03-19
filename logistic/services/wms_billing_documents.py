@@ -1,15 +1,37 @@
 from decimal import Decimal
 from django.db import transaction
 from django.db.models import Sum
+from django.utils.translation import gettext as _
 
 from logistic.models import (
     WHBillingCharge,
     WHBillingInvoice,
     WHBillingInvoiceLine,
+    WHInboundCharge,
 )
 
 
 def _charge_description(charge, period):
+    period_start = period.start_date.strftime("%d-%m-%Y") if period and period.start_date else ""
+    period_end = period.end_date.strftime("%d-%m-%Y") if period and period.end_date else ""
+
+    if charge.source_model == "inbound_charge":
+        inbound_charge = (
+            WHInboundCharge.objects
+            .filter(uf=charge.source_uf)
+            .select_related("inbound")
+            .first()
+        )
+
+        if inbound_charge:
+            parts = [inbound_charge.label or charge.charge_type]
+
+            if inbound_charge.inbound and inbound_charge.inbound.reference:
+                parts.append(f"{_('inbound')}: {inbound_charge.inbound.reference}")
+
+            parts.append(f"{_('period')}: {period_start} → {period_end}")
+            return " | ".join(parts)
+        
     type_map = {
         WHBillingCharge.Type.STORAGE: "Storage",
         WHBillingCharge.Type.INBOUND: "Inbound",
@@ -22,12 +44,12 @@ def _charge_description(charge, period):
     parts = [type_map.get(charge.charge_type, charge.charge_type)]
 
     if charge.product:
-        parts.append(f"Product: {charge.product.name}")
+        parts.append(f"{_('product')}: {charge.product.name}")
 
     if charge.location:
-        parts.append(f"Location: {charge.location.code}")
+        parts.append(f"{_('location')}: {charge.location.code}")
 
-    parts.append(f"Period: {period.start_date} → {period.end_date}")
+    parts.append(f"{_('period')}: {period_start} → {period_end}")
 
     return " | ".join(parts)
 
@@ -44,6 +66,9 @@ def issue_billing_documents_for_period(*, company, period, contact_ids=None):
 
     Later you can rename these models to Bill/BillLine.
     """
+
+    period_start = period.start_date.strftime("%d-%m-%Y") if period and period.start_date else ""
+    period_end = period.end_date.strftime("%d-%m-%Y") if period and period.end_date else ""
 
     charges = WHBillingCharge.objects.filter(
         company=company,
@@ -85,13 +110,13 @@ def issue_billing_documents_for_period(*, company, period, contact_ids=None):
             description_parts = [f"{charge.charge_type}"]
 
             if charge.product_id and charge.product:
-                description_parts.append(f"Product: {charge.product.name}")
+                description_parts.append(f"{_('period')}: {charge.product.name}")
 
             if charge.location_id and charge.location:
-                description_parts.append(f"Location: {charge.location.code}")
+                description_parts.append(f"{_('location')}: {charge.location.code}")
 
             description_parts.append(
-                f"Period: {period.start_date} → {period.end_date}"
+                f"{_('period')}: {period_start} → {period_end}"
             )
 
             line = WHBillingInvoiceLine.objects.create(

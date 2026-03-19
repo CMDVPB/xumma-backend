@@ -30,7 +30,7 @@ from broker.helpers import get_user_role_in_point
 from broker.mixins import CompanyScopedMixin, JobVisibilityQuerysetMixin
 from broker.models import BrokerBaseSalary, BrokerCommissionType, BrokerSettlement, CustomerServicePrice, CustomerServiceTierPrice, Job, JobLine, PointMembership, PointOfService, Role, ServiceType, ServiceTypeTier
 
-from broker.permissions import IsAdminOrManager, JobAccessPermission
+from broker.permissions import BrokerDeletePermission, IsAdminOrManager, JobAccessPermission
 from broker.serializers import (BrokerEmployeePerformanceSerializer, BrokerInvoiceCreateSerializer, BrokerInvoiceReadSerializer, BrokerStaffCompensationSerializer, BrokerStaffDetailsSerializer, 
                                 BrokerStaffSerializer, CustomerServicePriceSerializer, JobSerializer, ServiceTypeSerializer,
                                  BrokerCustomerPricingUpsertSerializer, PointMembershipSerializer, PointOfServiceSerializer, 
@@ -192,6 +192,7 @@ class JobListCreateView(CompanyScopedMixin, JobVisibilityQuerysetMixin, ListCrea
         assigned_to = self.request.query_params.get("assigned_to")
         start = self.request.query_params.get("start")
         end = self.request.query_params.get("end")
+        search = self.request.query_params.get("search")
 
         if customer:
             qs = qs.filter(customer__uf=customer)
@@ -208,6 +209,20 @@ class JobListCreateView(CompanyScopedMixin, JobVisibilityQuerysetMixin, ListCrea
             qs = qs.filter(created_at__date__gte=start)
         elif end:
             qs = qs.filter(created_at__date__lte=end)     
+
+        if search:
+            qs = qs.filter(
+                Q(customer__company_name__icontains=search) |
+                Q(customer__alias_company_name__icontains=search) |
+                Q(point__name__icontains=search) |
+                Q(assigned_to__first_name__icontains=search) |
+                Q(assigned_to__last_name__icontains=search) |
+                Q(assigned_to__email__icontains=search) |
+                Q(ref__icontains=search) |
+                Q(job_add_info__icontains=search) |
+                Q(comments__icontains=search) |
+                Q(status__icontains=search)
+            )
 
 
         return qs.order_by('-created_at')
@@ -237,7 +252,7 @@ class JobRetrieveUpdateDestroyView(
     JobVisibilityQuerysetMixin,
     RetrieveUpdateDestroyAPIView
 ):
-    permission_classes = [IsAuthenticated, JobAccessPermission]
+    permission_classes = [IsAuthenticated, JobAccessPermission, BrokerDeletePermission]
     serializer_class = JobSerializer
     lookup_field = 'uf'
 
@@ -248,6 +263,26 @@ class JobRetrieveUpdateDestroyView(
                 .prefetch_related("job_lines__service_type"))
         
         return self.filter_queryset_by_visibility(qs)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+
+        allowed_group_names = {
+            'level_admin',
+            'level_manager',
+            'level_finance_leader',
+        }
+
+        user_group_names = set(
+            request.user.groups.values_list('name', flat=True)
+        )
+
+        if instance.is_invoiced and not (user_group_names & allowed_group_names):
+            raise PermissionDenied(
+                "You cannot delete this job because an invoice has already been issued."
+            )
+
+        return super().destroy(request, *args, **kwargs)
 
 
 class BrokerJobExportAPIView(CompanyScopedMixin, JobVisibilityQuerysetMixin, APIView):
@@ -849,7 +884,7 @@ class BrokerStaffListAPIView(APIView):
 
         users = User.objects.filter(
             company=user_company,
-            groups__name__in=["level_leader_broker", "level_broker"],
+            groups__name__in=["level_broker_leader", "level_broker"],
         ).distinct()
 
         serializer = BrokerStaffSerializer(users, many=True)
@@ -866,7 +901,7 @@ class BrokerStaffDetailsView(RetrieveUpdateAPIView):
 
         qs = User.objects.filter(
             groups__name__in=[
-                "level_leader_broker",
+                "level_broker_leader",
                 "level_broker",
             ]
         )
@@ -888,7 +923,7 @@ class BrokerStaffCompensationUpdateView(UpdateAPIView):
 
         qs = User.objects.filter(
             groups__name__in=[
-                "level_leader_broker",
+                "level_broker_leader",
                 "level_broker",
             ]
         )

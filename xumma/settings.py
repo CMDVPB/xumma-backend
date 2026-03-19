@@ -163,6 +163,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 
+    'abb.middleware.ForceEnglishForApiMiddleware',
     'django.middleware.locale.LocaleMiddleware',
 
     ### AxesMiddleware should be the last middleware in the MIDDLEWARE list. ###
