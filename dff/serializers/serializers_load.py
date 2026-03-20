@@ -495,10 +495,7 @@ class LoadSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
             #         defaults={**cmr_data, "company": instance.company},
             #     )
 
-
-
             instance.refresh_from_db()
-
 
             new_trip = instance.trip if instance.trip_id else None
             new_trip_id = instance.trip_id

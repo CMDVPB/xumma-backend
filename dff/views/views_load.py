@@ -622,11 +622,12 @@ class LoadDetailView(RetrieveUpdateDestroyAPIView):
                 raise ValidationError({"detail": "Database integrity error."})
 
         except Exception as e:
-            logger.error(f'EV137 LoadDetail perform_update {e}')
+            logger.error(f'ERRORLOG1373 LoadDetail perform_update {e}')
             raise ValidationError({"detail": "failed_to_update_load"})
 
 
 ###### Load list for Trip ######
+
 class LoadListForTripView(ListAPIView):
     ''' Get list of loads for a particular 1 trip'''
     permission_classes = [IsAuthenticated]
