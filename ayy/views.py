@@ -78,11 +78,11 @@ class DocumentTypeRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIVie
             is_active=True,
         )
 
-
 ###### END DOCUMENT TYPES ######
 
 
 ###### START CARDS ######
+
 class CompanyCardListCreateView(generics.ListCreateAPIView):
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = CompanyCardSerializer
@@ -306,6 +306,7 @@ class CardPeriodsView(APIView):
 
 
 ###### START CMR TRANSFER ######
+
 class CMRAvailableView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 

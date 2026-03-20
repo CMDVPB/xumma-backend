@@ -11,7 +11,7 @@ from abb.models import Currency
 from abb.serializers import CurrencySerializer
 from abb.serializers_drf_writable import CustomWritableNestedModelSerializer, CustomUniqueFieldsMixin
 from att.models import BankAccount, Note, Vehicle
-from axx.models import Load
+from axx.models import Load, Trip
 from ayy.models import DamageReport, ImageUpload
 
 
@@ -123,6 +123,14 @@ class NoteSerializer(WritableNestedModelSerializer):
 
 class ImageUploadInSerializer(WritableNestedModelSerializer):
 
+    trip = SlugRelatedField(
+        allow_null=True,
+        slug_field='uf',
+        queryset=Trip.objects.all(),
+        required=False,
+        write_only=True
+    )
+
     load = SlugRelatedField(
         allow_null=True,
         slug_field='uf',
@@ -155,9 +163,15 @@ class ImageUploadInSerializer(WritableNestedModelSerializer):
         write_only=True,
     )
 
+    document_type = serializers.ChoiceField(
+        choices=ImageUpload.TYPE_CHOICES,
+        required=False,
+        allow_null=True
+    )
+
     def to_internal_value(self, data):
         # normalize empty strings → None
-        for field in ("load", "user", "vehicle", "damage"):
+        for field in ("trip", "load", "user", "vehicle", "damage", "document_type"):
             if data.get(field) == "":
                 data[field] = None
 
@@ -168,6 +182,7 @@ class ImageUploadInSerializer(WritableNestedModelSerializer):
         Exactly ONE of load / user / vehicle must be set
         """
         relations = [
+            attrs.get("trip"),
             attrs.get("load"),
             attrs.get("user"),
             attrs.get("vehicle"),
@@ -176,38 +191,27 @@ class ImageUploadInSerializer(WritableNestedModelSerializer):
 
         if sum(bool(rel) for rel in relations) != 1:
             raise serializers.ValidationError(
-                "Exactly one of 'load', 'user', 'vehicle', 'damage' must be provided."
-            )
+                "Exactly one of 'trip', 'load', 'user', 'vehicle', 'damage' must be provided."
+                )
 
         return attrs
 
     class Meta:
         model = ImageUpload
         fields = ('file_name', 'file_obj', 'uf',
-                  'company', 'load', 'user', 'vehicle', 'damage',
+                  'company', 'trip', 'load', 'user', 'vehicle', 'damage',
+                  'document_type',
                   )
 
 
-class ImageUploadOutSerializer(WritableNestedModelSerializer):
-
-    # load = serializers.SlugRelatedField(
-    #     allow_null=True, slug_field='uf', queryset=Load.objects.all(), write_only=True, required=False)
-    # user = serializers.SlugRelatedField(
-    #     allow_null=True, slug_field='uf', queryset=User.objects.all(), write_only=True, required=False)
+class ImageUploadOutSerializer(WritableNestedModelSerializer):  
 
     file_obj = serializers.SerializerMethodField(read_only=True)
-
-    # def to_internal_value(self, data):
-    #     # print('4574',)
-
-    #     if 'load' in data and data['load'] == '':
-    #         data['load'] = None
-
-    #     return super(ImageUploadOutSerializer, self).to_internal_value(data)
 
     def validate(self, attrs):
         relations = [
             attrs.get('company'),
+            attrs.get('trip'),
             attrs.get('load'),
             attrs.get('user'),
             attrs.get('vehicle'),
@@ -218,7 +222,7 @@ class ImageUploadOutSerializer(WritableNestedModelSerializer):
 
         if sum(bool(r) for r in relations) != 1:
             raise serializers.ValidationError(
-                'Exactly one relation (load, user, vehicle, company, damage) must be provided.'
+                'Exactly one relation (trip, load, user, vehicle, company, damage) must be provided.'
             )
 
         return attrs
@@ -226,12 +230,12 @@ class ImageUploadOutSerializer(WritableNestedModelSerializer):
     class Meta:
         model = ImageUpload
         fields = ('uf', 'company',
-                  'file_name', 'file_obj',
-                  'load', 'user', 'damage',
+                  'file_name', 'file_obj', 'document_type',
+                  'trip', 'load', 'user', 'damage',
                   )
 
     def get_file_obj(self, obj):
-        # ✅ ALWAYS return backend proxy URL
+        # ALWAYS return backend proxy URL
         return f"{settings.BACKEND_URL}/api/image/{obj.uf}/"
 
 

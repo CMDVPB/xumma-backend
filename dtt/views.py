@@ -681,7 +681,7 @@ class ImageView(CreateAPIView, RetrieveUpdateDestroyAPIView):
         try:
             user = self.request.user
             user_company = get_user_company(user)
-            # print('4642', user_company)
+            print('4642', serializer)
             serializer.save(company=user_company)
         except Exception as e:
             logger.error(f'ERRORV461 ImageView. perform_create. Error: {e}')

@@ -192,6 +192,16 @@ class UserPhoto(models.Model):
 
 
 class ImageUpload(models.Model):
+    TYPE_CHOICES= (
+            ('cmr', 'CMR'),
+            ('comm_invoice', 'Commercial invoice'),
+            ('pack_list', 'Packing list'),
+            ('cust_declaration', 'Customs declaration'),
+            ('invoice', 'Invoice'),
+            ('order', 'Order'),
+            ('act', 'Act of execution'),
+    )
+
     SOURCE_CHOICES = (
         ('upload', 'User upload'),
         ('generated', 'System generated'),
@@ -211,6 +221,8 @@ class ImageUpload(models.Model):
     file_obj = models.FileField(upload_to=image_upload_path)
     file_size = models.PositiveIntegerField(blank=True, null=True)
 
+    trip = models.ForeignKey(
+        Trip, on_delete=models.CASCADE, null=True, blank=True, related_name='trip_imageuploads')
     load = models.ForeignKey(
         Load, on_delete=models.CASCADE, null=True, blank=True, related_name='load_imageuploads')
     user = models.ForeignKey(
@@ -222,17 +234,7 @@ class ImageUpload(models.Model):
 
     source = models.CharField(max_length=20, choices=SOURCE_CHOICES)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES)
-
-    document_type = models.CharField(
-        max_length=50,
-        choices=(
-            ('invoice', 'Invoice'),
-            ('order', 'Order'),
-            ('act', 'Act of execution'),
-        ),
-        null=True,
-        blank=True
-    )
+    document_type = models.CharField(max_length=50, choices=TYPE_CHOICES, null=True, blank=True)
 
     def clean(self):
         relations = [self.load, self.vehicle, self.user]

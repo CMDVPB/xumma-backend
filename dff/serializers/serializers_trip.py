@@ -15,6 +15,7 @@ from att.serializers import BodyTypeSerializer, ModeTypeSerializer, StatusTypeSe
 from axx.models import Load, Trip, TripDriver
 from ayy.models import Comment, Entry, RouteSheet
 from ayy.serializers import ItemCostSerializer
+from dff.serializers.serializers_bce import ImageUploadOutSerializer
 from dff.serializers.serializers_load import LoadTripGetSerializer, LoadTripListSerializer
 from dff.serializers.serializers_other import CommentSerializer, ContactSerializer, ContactTripListSerializer, HistorySerializer, PersonBasicReadSerializer, PersonSerializer, VehicleBasicReadSerializer, VehicleUnitBasicReadSerializer, VehicleUnitSerializer
 
@@ -122,6 +123,7 @@ class TripSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
     trip_comments = CommentSerializer(many=True)
     trip_histories = HistorySerializer(many=True, read_only=True)
     trip_itemcosts = ItemCostSerializer(many=True)
+    trip_imageuploads = ImageUploadOutSerializer(many=True, read_only=True)
 
     def to_internal_value(self, data):
         # print('8274', data.get('drivers'))
@@ -255,7 +257,7 @@ class TripSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
                   'km_departure', 'km_arrival', 'km_exit', 'km_entry', 'trip_number', 'date_trip', 'date_departure', 'date_arrival',
                   'trip_details', 'l_departure', 'l_arrival', 'trip_add_info', 'trip_comments', 'trip_histories', 'uf',
                   'rs_number',
-                  'drivers', 'trip_itemcosts', 'trip_loads',
+                  'drivers', 'trip_itemcosts', 'trip_loads', 'trip_imageuploads',
                   # 👇 computed, read-only
                   'loading_points_count',
                   'unloading_points_count'

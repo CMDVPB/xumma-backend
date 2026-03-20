@@ -523,6 +523,9 @@ def image_upload_path(instance, filename):
 
     model = instance.__class__.__name__
 
+    if model == "Trip":
+        return f"{base}/trips/{instance.uf}/documents/{new_name}"
+
     if model == "LoadDocument":
         return f"{base}/loads/{instance.load.uf}/documents/{new_name}"
 
