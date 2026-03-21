@@ -4,9 +4,11 @@ from drf_writable_nested.mixins import UniqueFieldsMixin, NestedCreateMixin, Nes
 from rest_framework import serializers
 
 from abb.serializers import CountrySerializer
-from att.models import ContactSite
+from app.models import LoadWarehouse
+from att.models import Contact, ContactSite
 from ayy.models import ColliType, Detail, Entry
-from dff.serializers.serializers_other import ContactSiteBasicReadSerializer, ContactSiteSerializer
+from cwh.serializers import LoadWarehouseDetailSerializer
+from dff.serializers.serializers_other import ContactBasicReadSerializer, ContactSiteBasicReadSerializer, ContactSiteSerializer
 
 
 class ColliTypeSerializer(WritableNestedModelSerializer):
@@ -48,6 +50,26 @@ class EntrySerializer(WritableNestedModelSerializer):
     country_load = CountrySerializer(allow_null=True)
 
     entry_details = DetailSerializer(many=True)
+
+    warehouse = LoadWarehouseDetailSerializer(read_only=True)
+    warehouse_uf = serializers.SlugRelatedField(
+        source='warehouse',
+        slug_field='uf',
+        queryset=LoadWarehouse.objects.all(),
+        write_only=True,
+        required=False,
+        allow_null=True,
+    )
+
+    customs_broker = ContactBasicReadSerializer(read_only=True)
+    customs_broker_uf = serializers.SlugRelatedField(
+        source='customs_broker',
+        slug_field='uf',
+        queryset=Contact.objects.all(),
+        write_only=True,
+        required=False,
+        allow_null=True,
+    )
 
     def to_internal_value(self, data):
         try:
@@ -124,7 +146,9 @@ class EntrySerializer(WritableNestedModelSerializer):
 
     class Meta:
         model = Entry
-        fields = ('id', 'action', 'shipper', 'date_load', 'time_load_min', 'time_load_max', 'is_stackable',
+        fields = ('id', 'action', 'shipper', 'date_load', 'time_load_min', 'time_load_max', 'is_stackable', 'uf',
                   'shipperinstructions1', 'shipperinstructions2', 'tail_lift', 'palletexchange',
                   'dangerousgoods', 'dangerousgoods_class', 'temp_control', 'temp_control_details', 'order',
-                  'country_load', 'zip_load', 'city_load', 'entry_details', 'uf')
+                  'country_load', 'zip_load', 'city_load', 'entry_details', 
+                  'warehouse', 'warehouse_uf', 'customs_broker', 'customs_broker_uf',
+                  )

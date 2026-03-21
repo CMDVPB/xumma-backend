@@ -197,6 +197,8 @@ class ImageUpload(models.Model):
             ('comm_invoice', 'Commercial invoice'),
             ('pack_list', 'Packing list'),
             ('cust_declaration', 'Customs declaration'),
+            ('other', 'Other'),
+            
             ('invoice', 'Invoice'),
             ('order', 'Order'),
             ('act', 'Act of execution'),
@@ -402,6 +404,22 @@ class Entry(models.Model):
         Inv, on_delete=models.CASCADE, blank=True, null=True, related_name='entry_invs')
 
     order = models.PositiveSmallIntegerField(blank=True, null=True)
+
+    warehouse = models.ForeignKey(
+        'app.LoadWarehouse',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='warehouse_entries',
+    )
+
+    customs_broker = models.ForeignKey(
+        'att.Contact',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='customs_broker_entries',
+    )
 
     class Meta:
         verbose_name = "Entry"

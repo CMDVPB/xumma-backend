@@ -632,6 +632,18 @@ class LoadEvidence(models.Model):
 
 
 class LoadMovement(models.Model):
+    MOVEMENT_STATUS_CHOICES = [
+        ("expected_warehouse", "Expected at warehouse"),
+        ("arrived_warehouse", "Arrived at warehouse"),
+        ("left_warehouse", "Left warehouse"),
+        ("in_transit", "In transit"),
+    ]
+
+    ROLE_CHOICES = [
+        ("loading", "Loading side"),
+        ("unloading", "Unloading side"),
+    ]
+
     load = models.ForeignKey(
         Load, on_delete=models.CASCADE, related_name="load_movements")
     from_location = models.CharField(max_length=20)
@@ -641,6 +653,9 @@ class LoadMovement(models.Model):
         Trip, null=True, blank=True, on_delete=models.SET_NULL)
     warehouse = models.ForeignKey(LoadWarehouse, null=True, blank=True,
                                   on_delete=models.SET_NULL, related_name="warehouse_load_movements")
+    
+    status = models.CharField(max_length=40, choices=MOVEMENT_STATUS_CHOICES, blank=True, null=True)
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, null=True, blank=True)
 
     date = models.DateTimeField(auto_now_add=True)
 

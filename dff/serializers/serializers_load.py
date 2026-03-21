@@ -21,6 +21,7 @@ from att.models import Contact, ContractReferenceDate, PaymentTerm, Person, Vehi
 from att.serializers import BodyTypeSerializer, IncotermSerializer, ModeTypeSerializer, StatusTypeSerializer, VehicleSerializer
 from axx.models import Ctr, Exp, Inv, Load, LoadEvent, LoadMovement, Tor, Trip
 from ayy.models import CMR, CMRStockMovement
+from cwh.service import sync_load_movements_for_load
 from dff.serializers.serializers_bce import ImageUploadOutSerializer, ImageUploadUFOnlySerializer
 from dff.serializers.serializers_ctr import CtrSerializer
 from dff.serializers.serializers_entry_detail import EntryBasicReadListSerializer, EntrySerializer
@@ -32,9 +33,8 @@ from dff.serializers.serializers_other import CMRSerializer, CommentSerializer, 
 from dff.serializers.serializers_tor import TorSerializer
 
 
-
-
 User = get_user_model()
+
 
 LOAD_EVENT_FLAG_MAP = {
     "shipper_confirmed": "SHIPPER_CONFIRMED",
@@ -458,6 +458,8 @@ class LoadSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
                     defaults={**cmr_data, "company": instance.company},
                 )
 
+            sync_load_movements_for_load(instance)
+
             if instance.trip_id:
                 sync_trip_stops_for_trip(instance.trip)
 
@@ -496,6 +498,8 @@ class LoadSerializer(UniqueFieldsMixin, WritableNestedModelSerializer):
             #     )
 
             instance.refresh_from_db()
+
+            sync_load_movements_for_load(instance)
 
             new_trip = instance.trip if instance.trip_id else None
             new_trip_id = instance.trip_id
